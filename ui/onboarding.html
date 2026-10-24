@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<!-- Rabik first-run window. Rabik.swift loads this (orbs.js goes in place of the marker), calls ob.set({...}) every second
+<!-- Rabik first-run window. Rabik.swift loads this (ui/logo.png goes in place of the logo marker), calls ob.set({...}) every second
      with which permissions are on, and gets {do:'grant', id} / {do:'done'} back. -->
 <style>
   :root {
@@ -30,10 +30,10 @@
   .page.on .r:nth-child(2) { transition-delay: .07s; } .page.on .r:nth-child(3) { transition-delay: .14s; }
   .page.on .r:nth-child(4) { transition-delay: .21s; } .page.on .r:nth-child(5) { transition-delay: .28s; }
 
-  #orbwrap { position: relative; width: 128px; height: 128px; }
-  #orbwrap::before { content: ""; position: absolute; inset: -60px; border-radius: 50%;
+  #logowrap { position: relative; width: 128px; height: 128px; }
+  #logowrap::before { content: ""; position: absolute; inset: -60px; border-radius: 50%;
     background: radial-gradient(closest-side, var(--glow), transparent); animation: drift 7s ease-in-out infinite; }
-  #orb { position: relative; width: 128px; height: 128px; }
+  #logo { position: relative; width: 128px; height: 128px; }
 
   .keys { display: flex; gap: 8px; justify-content: center; margin-top: 26px; }
   .key { min-width: 40px; height: 40px; padding: 0 12px; box-sizing: border-box; border-radius: 9px; display: grid; place-items: center;
@@ -332,7 +332,7 @@
 <body>
 <button class="btn quiet" id="back" hidden>Back</button>
 <section class="page" id="welcome">
-  <div id="orbwrap" class="r"><canvas id="orb"></canvas></div>
+  <div id="logowrap" class="r"><img id="logo" src="data:image/png;base64,/*LOGO*/" alt=""></div>
   <h1 class="r">Meet Rabik</h1>
   <p class="sub r" id="welcome-talk">Hold the shortcut, say what you need, let go. Your Mac does the rest.</p>
   <div class="keys r" id="welkeys"><div class="key">⌃</div><div class="key">⌥</div><div class="key wide">Space</div></div>
@@ -540,18 +540,17 @@
 
 <div id="dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
 
-<script type="text/plain" id="orbsrc">/*ORBS*/</script>
 <script type="module">
   const $ = id => document.getElementById(id);
   const post = m => window.webkit?.messageHandlers.ob.postMessage(m);
   const pages = ['welcome', 'perms', 'agents', 'try', 'mac', 'learn', 'text', 'dictate', 'point', 'pointer', 'work', 'meeting', 'improve', 'done'];
-  let cur = '', orbWake = null;
+  let cur = '';
   const skip = id => ['devin', 'pi'].includes(provider) && ['agents', 'work'].includes(id);   // their CLIs run no Rabik agents
   const go = id => {
     while (skip(id)) id = pages[pages.indexOf(id) + 1];
     if (recording) post({ do: 'cancelRecord' });
     if (cur) { $(cur).classList.remove('on'); $(cur).classList.add('gone'); const c = cur; setTimeout(() => $(c).classList.remove('gone'), 600); }
-    cur = id; orbWake?.(); orbWake = null; $(id).classList.add('on');
+    cur = id; $(id).classList.add('on');
     for (const page of pages) { $(page).inert = page !== id; $(page).setAttribute('aria-hidden', String(page !== id)); }
     [...$('dots').children].forEach((d, i) => { d.classList.toggle('on', pages[i] === id); d.hidden = skip(pages[i]); });
     $('back').hidden = pages.indexOf(id) < 1;
@@ -927,27 +926,11 @@
   })();
   reduced.addEventListener('change', () => {
     welcomeGeneration++; previewGeneration++;
-    orbWake?.(); orbWake = null;
     keys().forEach(k => k.classList.remove('down'));
     if (reduced.matches) { dcGen++; dcWake?.(); Object.keys(loops).forEach(id => finals[id]()); }
     else setTimeout(press, 1200);
   });
 
   paintPrefs(); go('welcome');
-
-  // The same orb as the overlay, breathing.
-  try {
-    const E = await import(URL.createObjectURL(new Blob([$('orbsrc').textContent], { type: 'text/javascript' })));
-    const cv = $('orb'), ctx = cv.getContext('2d'), S = 64, dpr = 4, preset = E.r('breathing', S);
-    cv.width = cv.height = S * dpr;
-    let t = 0, prev = performance.now();
-    (function frame(now) {
-      const idle = reduced.matches || cur !== 'welcome';   // still under Reduce Motion; the orb only shows on the welcome page
-      if (!idle) t += (now - prev) / 1000 * preset.speed; prev = now;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, S, S);
-      E.p(ctx, E.M[preset.mode](S, t, preset.opts), true, null);
-      if (idle) orbWake = () => requestAnimationFrame(frame); else requestAnimationFrame(frame);
-    })(prev);
-  } catch (e) {}
 </script>
 </body></html>

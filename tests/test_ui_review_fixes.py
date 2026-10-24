@@ -111,20 +111,16 @@ if (sent?.dictationHistory !== true || button.textContent !== 'History') process
         self.assertIn('if (reduced.matches) { finals[id](); await motionChange(); }', self.onboarding)
         self.assertNotIn("const still = matchMedia('(prefers-reduced-motion: reduce)').matches", self.onboarding)
 
-    def test_onboarding_welcome_orb_keeps_animating(self):
-        start = self.onboarding.index("    const cv = $('orb')")
-        loop = self.onboarding[start:self.onboarding.index('})(prev);', start) + len('})(prev);')]
-        node(self, r'''const run = (isReduced, page) => { let frames = 0, timers = 0, painted = 0;
-const canvas2d = { setTransform() {}, clearRect() {} }, $ = () => ({ getContext: () => canvas2d }), E = { r: () => ({ mode: 'm', speed: 1, opts: {} }), M: { m: () => ({}) }, p: () => painted++ };
-globalThis.requestAnimationFrame = () => frames++; globalThis.setTimeout = () => timers++;
-let reduced = { matches: isReduced }, cur = page, orbWake = null;
-''' + loop + r'''
-return {frames, timers, painted, waiting: typeof orbWake === 'function'}; };
-const active = run(false, 'welcome'), still = run(true, 'welcome'), away = run(false, 'text');
-if (active.painted !== 1 || active.frames !== 1 || active.timers || active.waiting) process.exit(1);
-if (still.painted !== 1 || still.frames || still.timers || !still.waiting) process.exit(2);
-if (away.frames || away.timers || !away.waiting) process.exit(3);
-''')
+    def test_onboarding_welcome_shows_the_logo(self):
+        welcome = self.onboarding[self.onboarding.index('<section class="page" id="welcome">'):]
+        welcome = welcome[:welcome.index('</section>')]
+        self.assertIn('<img id="logo" src="data:image/png;base64,/*LOGO*/" alt="">', welcome)
+        self.assertEqual(self.onboarding.count('/*LOGO*/'), 1)   # loadPage fills every marker: one comment mention would inline the image twice
+        load = self.swift[self.swift.index('func loadPage('):self.swift.index('\n}\n', self.swift.index('func loadPage('))]
+        self.assertIn('"/*LOGO*/"', load)
+        self.assertIn('dir + "/ui/logo.png"', load)
+        self.assertIn('ui/*.png', (ROOT / 'build.sh').read_text())
+        self.assertTrue((ROOT / 'ui/logo.png').read_bytes().startswith(b'\x89PNG'))
 
     def test_settings_and_agents_text_colours_are_readable(self):
         light = re.search(r':root \{(.*?)\}', self.settings, re.S).group(1)

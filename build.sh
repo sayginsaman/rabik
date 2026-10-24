@@ -17,7 +17,7 @@ swiftc -O -target "$(uname -m)-apple-macos26.0" Rabik.swift -o "$STAGE/Rabik"
 APP=~/Applications/Rabik.app   # in Applications so System Settings can list it for permissions
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/ui"
 cp rabik.py "$APP/Contents/Resources/"
-cp ui/*.html ui/*.js "$APP/Contents/Resources/ui/"
+cp ui/*.html ui/*.js ui/*.png "$APP/Contents/Resources/ui/"
 cp ui/AppIcon.icns "$APP/Contents/Resources/"
 cat > "$APP/Contents/Info.plist" <<P
 <?xml version="1.0" encoding="UTF-8"?>

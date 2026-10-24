@@ -582,11 +582,12 @@ func callJS(_ web: WKWebView?, _ fn: String, _ args: [Any]) {
     web?.evaluateJavaScript("\(fn)(...\(j))")
 }
 
-// Load ui/<name> with orbs.js inlined at its /*ORBS*/ marker.
+// Load ui/<name> with orbs.js inlined at its /*ORBS*/ marker and ui/logo.png (base64) at its /*LOGO*/ marker.
 func loadPage(_ web: WKWebView, _ name: String) {
-    let html = (try? String(contentsOfFile: dir + "/ui/" + name, encoding: .utf8)) ?? "missing " + name
-    let orbs = (try? String(contentsOfFile: dir + "/ui/orbs.js", encoding: .utf8)) ?? ""
-    web.loadHTMLString(html.replacingOccurrences(of: "/*ORBS*/", with: orbs), baseURL: nil)
+    var html = (try? String(contentsOfFile: dir + "/ui/" + name, encoding: .utf8)) ?? "missing " + name
+    if html.contains("/*ORBS*/") { html = html.replacingOccurrences(of: "/*ORBS*/", with: (try? String(contentsOfFile: dir + "/ui/orbs.js", encoding: .utf8)) ?? "") }
+    if html.contains("/*LOGO*/") { html = html.replacingOccurrences(of: "/*LOGO*/", with: (try? Data(contentsOf: URL(fileURLWithPath: dir + "/ui/logo.png")))?.base64EncodedString() ?? "") }
+    web.loadHTMLString(html, baseURL: nil)
 }
 
 // The screen under the mouse, else the main one.
