@@ -1,19 +1,19 @@
 import os, re, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
-SCRIPT = re.search(r'let r = sh\(#"""\n(.*?)"""#\)', (Path(__file__).parent.parent / 'Atticus.swift').read_text(), re.S).group(1)
+SCRIPT = re.search(r'let r = sh\(#"""\n(.*?)"""#\)', (Path(__file__).parent.parent / 'Rabik.swift').read_text(), re.S).group(1)
 
 
 @unittest.skipUnless(sys.platform == 'darwin', 'the app runs this updater with macOS /bin/zsh')
 class UpdaterTests(unittest.TestCase):
     def test_repeated_checks_do_not_start_overlapping_updates(self):
-        source = (Path(__file__).parent.parent / 'Atticus.swift').read_text()
-        updater = source.split('enum Updater {', 1)[1].split('// Opening Atticus again', 1)[0]
+        source = (Path(__file__).parent.parent / 'Rabik.swift').read_text()
+        updater = source.split('enum Updater {', 1)[1].split('// Opening Rabik again', 1)[0]
         self.assertIn('guard !checking else { done(); return }', updater)
         self.assertLess(updater.index('checking = true'), updater.index('status = "Checking…"'))
         self.assertIn('DispatchQueue.main.async {\n                checking = false', updater)
 
-    # Oct 21: main was 99 commits ahead of origin; HEAD != @{u} read as an update, so Atticus rebuilt and relaunched every ~90 s.
+    # Oct 21: main was 99 commits ahead of origin; HEAD != @{u} read as an update, so Rabik rebuilt and relaunched every ~90 s.
     def test_only_new_upstream_commits_rebuild(self):
         scratch = tempfile.TemporaryDirectory(); self.addCleanup(scratch.cleanup); root = Path(scratch.name)
         git = lambda cwd, *a: subprocess.run(['git', '-C', str(cwd), '-c', 'user.name=t', '-c', 'user.email=t@t', *a], check=True, capture_output=True)

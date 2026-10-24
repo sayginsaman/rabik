@@ -382,7 +382,7 @@ class ShelfPageTests(unittest.TestCase):
         self.assertEqual(out['fresh'], [1, 0])
         actions = [(p.get('action'), p.get('value', p.get('id'))) for p in posts if isinstance(p, dict)]
         self.assertEqual([v for a, v in actions if a == 'stack'][-4:], ['min', 'min', 'min', ''])   # a peek keeps the saved choice; an empty shelf clears it
-        self.assertIn(('view', 'b' * 32), actions); self.assertNotIn(('show', 'b' * 32), actions)   # a finished chip opens in place, then the Agent view; no Atticus box
+        self.assertIn(('view', 'b' * 32), actions); self.assertNotIn(('show', 'b' * 32), actions)   # a finished chip opens in place, then the Agent view; no Rabik box
         self.assertIn(('dismiss', 'b' * 32), actions)
         self.assertIn(('dismiss', 'd' * 32), actions); self.assertIn(('dismiss', 'e' * 32), actions); self.assertNotIn(('dismiss', 'a' * 32), actions)
         self.assertNotIn(('stack', 'open'), actions)

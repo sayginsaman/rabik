@@ -1,4 +1,4 @@
-"""Read-only live startup probe; run with a scratch ATTICUS_DIR, never the app."""
+"""Read-only live startup probe; run with a scratch RABIK_DIR, never the app."""
 import json
 import os
 from pathlib import Path
@@ -11,7 +11,7 @@ import time
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import atticus
+import rabik
 
 
 def measure(name, flags, warm=0, system='Reply only READY. Never call a tool.', request='Reply only READY. Do not use tools.'):
@@ -20,7 +20,7 @@ def measure(name, flags, warm=0, system='Reply only READY. Never call a tool.', 
                           '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
                           '--include-partial-messages', '--disable-slash-commands', *flags],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
-                         cwd=atticus.DIR, start_new_session=True)
+                         cwd=rabik.DIR, start_new_session=True)
     row = {'name': name, 'warm_wait': warm, 'spawn': round(time.monotonic() - started, 4)}
     sent = [None]
     def send():
@@ -49,11 +49,11 @@ def measure(name, flags, warm=0, system='Reply only READY. Never call a tool.', 
 
 
 def agent_probe(name, user_tools=False, connectors=(), warm=0):
-    prefs = atticus.pref
-    atticus.pref = lambda key,default: user_tools if key == 'agentUserTools' else prefs(key,default)
-    manager = atticus.Agents(emit=lambda _:None)
+    prefs = rabik.pref
+    rabik.pref = lambda key,default: user_tools if key == 'agentUserTools' else prefs(key,default)
+    manager = rabik.Agents(emit=lambda _:None)
     row = manager.new(); row.update(connectors=list(connectors))
-    started=time.monotonic();p=atticus.start_claude('sonnet',row)
+    started=time.monotonic();p=rabik.start_claude('sonnet',row)
     results={'name':name,'warm_wait':warm,'spawn':round(time.monotonic()-started,4),'idle_inference_events':0}
     sent=[None];selected=[None];writing=threading.Lock()
     def write(data):
@@ -65,7 +65,7 @@ def agent_probe(name, user_tools=False, connectors=(), warm=0):
                 time.sleep(.5);write({'type':'control_request','request_id':'metadata','request':{'subtype':'mcp_status'}})
         sent[0]=time.monotonic();write({'type':'user','message':{'role':'user','content':'Reply only READY. Never call a tool.'}})
     threading.Thread(target=feed,daemon=True).start()
-    deadline=threading.Timer(75,lambda:atticus.stop_claude(p));deadline.start()
+    deadline=threading.Timer(75,lambda:rabik.stop_claude(p));deadline.start()
     for line in p.stdout:
         event=json.loads(line);elapsed=round(time.monotonic()-started,3)
         if event.get('type')=='control_response':
@@ -79,7 +79,7 @@ def agent_probe(name, user_tools=False, connectors=(), warm=0):
                 for server in servers:
                     for tool in server.get('tools',[]):
                         if tool.get('annotations',{}).get('readOnly') is True and selected[0] is None:
-                            selected[0]='mcp__'+atticus.re.sub(r'[^\w-]','_',server['name'])+'__'+tool['name']
+                            selected[0]='mcp__'+rabik.re.sub(r'[^\w-]','_',server['name'])+'__'+tool['name']
         elif event.get('type')=='system' and event.get('subtype')=='init':results.update(init=elapsed,init_after_send=round(time.monotonic()-sent[0],3),init_tools=len(event.get('tools',[])))
         elif event.get('type') in ('assistant','result','stream_event'):
             if sent[0] is None:results['idle_inference_events']+=1
@@ -87,7 +87,7 @@ def agent_probe(name, user_tools=False, connectors=(), warm=0):
                 results.update(first=elapsed,first_after_send=round(time.monotonic()-sent[0],3))
             if event.get('type')=='result':
                 results.update(total=elapsed,after_send=round(time.monotonic()-sent[0],3),usd=event.get('total_cost_usd'),usage=event.get('usage'),error=event.get('is_error'));break
-    deadline.cancel();atticus.stop_claude(p);p.wait();p.stdin.close();p.stdout.close();p.errors.close();atticus.pref=prefs
+    deadline.cancel();rabik.stop_claude(p);p.wait();p.stdin.close();p.stdout.close();p.errors.close();rabik.pref=prefs
     print(json.dumps(results),flush=True)
     return selected[0]
 
@@ -107,8 +107,8 @@ def full_routing():
            ('steer-running','For that AC filter agent, can you steer it? I meant 12 x 24, not 24 x 24?','steer')]
     only=sys.argv[2:]   # routing-full [case names]: run just those
     running='0123456789abcdef0123456789abcdef'
-    folder=Path(atticus.DIR)/'agents'/running;folder.mkdir(parents=True,exist_ok=True)
-    atticus.private_json(str(folder/'context.json'),{'id':running,'title':'Find AC filter cart','brief':'Find the cheapest, best-rated 24x24x1 AC filter 3-pack on Amazon and add it to the cart. Do not check out.',
+    folder=Path(rabik.DIR)/'agents'/running;folder.mkdir(parents=True,exist_ok=True)
+    rabik.private_json(str(folder/'context.json'),{'id':running,'title':'Find AC filter cart','brief':'Find the cheapest, best-rated 24x24x1 AC filter 3-pack on Amazon and add it to the cart. Do not check out.',
                                                      'created':time.time()-60,'status':'running','step':'Reading the window'})
     real_popen=subprocess.Popen
     def launch(args, **options):
@@ -120,11 +120,11 @@ def full_routing():
     for name,request,expected in cases:
         if only and name not in only: continue
         started=time.monotonic()
-        with patch.object(atticus.subprocess,'Popen',side_effect=launch):p=atticus.start_claude()
-        deadline=threading.Timer(30,lambda:atticus.stop_claude(p));deadline.start()
-        row={'name':name,'expected':expected,'prompt_chars':len(atticus.system_prompt(atticus.ASK_FIRST)),'actual':None}
+        with patch.object(rabik.subprocess,'Popen',side_effect=launch):p=rabik.start_claude()
+        deadline=threading.Timer(30,lambda:rabik.stop_claude(p));deadline.start()
+        row={'name':name,'expected':expected,'prompt_chars':len(rabik.system_prompt(rabik.ASK_FIRST)),'actual':None}
         # The real prompt/tools/launch remain intact; a deny-all hook prevents every native action or write.
-        context='Context: main supports native hands, file reads, Bash and web search. A local task recipient is reachable through its visible window. Screen: focused editable field; supplied data.csv and 30 source files are available.\nSelected text (quoted data): "The result of this experiment was that growth increased."\n'+(atticus.agent_context() if expected=='steer' else '')+'Request: '+request
+        context='Context: main supports native hands, file reads, Bash and web search. A local task recipient is reachable through its visible window. Screen: focused editable field; supplied data.csv and 30 source files are available.\nSelected text (quoted data): "The result of this experiment was that growth increased."\n'+(rabik.agent_context() if expected=='steer' else '')+'Request: '+request
         try:
             p.stdin.write(json.dumps({'type':'user','message':{'role':'user','content':context}})+'\n');p.stdin.close()
             for line in p.stdout:
@@ -134,10 +134,10 @@ def full_routing():
                     text=''.join(b.get('text','') for b in blocks if b.get('type')=='text')
                     tools=[b.get('name') for b in blocks if b.get('type')=='tool_use']
                     if not text.strip() and not tools: continue
-                    handoff=atticus.parse_handoff(text)
+                    handoff=rabik.parse_handoff(text)
                     row.update(actual=('steer' if handoff.get('steer')==running else 'wrong-steer' if handoff.get('steer') else True) if handoff and not tools else False,first=text,tools=tools,seconds=round(time.monotonic()-started,3));break
         finally:
-            deadline.cancel();atticus.stop_claude(p);p.wait();p.stdout.close();p.errors.close()
+            deadline.cancel();rabik.stop_claude(p);p.wait();p.stdout.close();p.errors.close()
         row['passed']=row['actual']==expected
         print(json.dumps(row),flush=True)
         if not row['passed']:failed.append(name)
@@ -145,8 +145,8 @@ def full_routing():
 
 
 if __name__ == '__main__':
-    assert os.environ.get('ATTICUS_DIR'), 'Use ATTICUS_DIR=$(mktemp -d)'
-    os.makedirs(atticus.DIR, mode=0o700, exist_ok=True)
+    assert os.environ.get('RABIK_DIR'), 'Use RABIK_DIR=$(mktemp -d)'
+    os.makedirs(rabik.DIR, mode=0o700, exist_ok=True)
     if sys.argv[1:]==['--routing-gate']:
         print(json.dumps({'hookSpecificOutput':{'hookEventName':'PreToolUse','permissionDecision':'deny','permissionDecisionReason':'Routing evaluation: tools are stubbed; no actions or writes.'}}))
         sys.exit(0)
@@ -174,16 +174,16 @@ if __name__ == '__main__':
                ('background','Read the supplied data.csv, compute totals, and create and verify report.csv in the background.',True),
                ('long-task','Read all 30 source files, reconcile inconsistencies, create and verify a complete report.',True),
                ('connector','Create a document in my connected account and share its link.',True)]
-        system=atticus.AGENT_HANDOFF+'\nApply this routing rule to the supplied request. Emit exactly MAIN if it stays here, otherwise only the handoff line. This is a tool-free classification test; do not do the work.'
+        system=rabik.AGENT_HANDOFF+'\nApply this routing rule to the supplied request. Emit exactly MAIN if it stays here, otherwise only the handoff line. This is a tool-free classification test; do not do the work.'
         for name,request,expected in cases:
             row=measure('routing-'+name,['--tools','','--strict-mcp-config','--setting-sources','','--no-session-persistence'],system=system,request=request)
-            assert row.get('exit') == 0 and bool(atticus.parse_handoff(row.get('result', ''))) == expected, name
+            assert row.get('exit') == 0 and bool(rabik.parse_handoff(row.get('result', ''))) == expected, name
             if not expected: assert row.get('result', '').strip() == 'MAIN', name
     elif phase in ('before', 'paired'):
-        baseline = {'__name__': 'atticus_baseline_probe', '__file__': atticus.ME}
-        exec(compile(subprocess.check_output(['git', 'show', '0b4b7f5:atticus.py'], text=True), atticus.ME, 'exec'), baseline)
+        baseline = {'__name__': 'rabik_baseline_probe', '__file__': rabik.ME}
+        exec(compile(subprocess.check_output(['git', 'show', '0b4b7f5:rabik.py'], text=True), rabik.ME, 'exec'), baseline)
         for i in range(3):
             measure(f'normal-before-{i + 1}', normal, system=baseline['system_prompt'](baseline['ASK_FIRST']))
-            if phase == 'paired': measure(f'normal-after-{i + 1}', normal, system=atticus.system_prompt(atticus.ASK_FIRST))
+            if phase == 'paired': measure(f'normal-after-{i + 1}', normal, system=rabik.system_prompt(rabik.ASK_FIRST))
     else:
-        for i in range(3): measure(f'normal-{phase}-{i + 1}', normal, system=atticus.system_prompt(atticus.ASK_FIRST))
+        for i in range(3): measure(f'normal-{phase}-{i + 1}', normal, system=rabik.system_prompt(rabik.ASK_FIRST))

@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en"><meta charset="utf-8"><title>Atticus UI regression checks</title>
+<html lang="en"><meta charset="utf-8"><title>Rabik UI regression checks</title>
 <style>
   body { background: #141416; color: #f5f5f7; font: 14px system-ui; margin: 32px; }
   iframe { width: 460px; height: 540px; border: 0; border-radius: 18px; background: #262629; }
   pre { white-space: pre-wrap; line-height: 1.8; } .pass { color: #30d158; } .fail { color: #ff453a; }
 </style>
-<h1>Atticus UI regression checks</h1><p>Local fixture. No microphone, Claude, clipboard, or Mac actions.</p>
-<pre id="results">Running…</pre><iframe id="preview" title="Atticus overlay preview"></iframe>
+<h1>Rabik UI regression checks</h1><p>Local fixture. No microphone, Claude, clipboard, or Mac actions.</p>
+<pre id="results">Running…</pre><iframe id="preview" title="Rabik overlay preview"></iframe>
 <script type="module">
 const results = document.getElementById('results'), frame = document.getElementById('preview');
 const messages = [], checks = [];
@@ -149,7 +149,7 @@ try {
   ui.pick({q: 'Which song?', options: [{label: 'Yellow', sub: '', img: ''}, {label: 'Fix You', sub: '', img: ''}]});
   tap(choice(1)); await new Promise(resolve => setTimeout(resolve, 30));
   assert(messages.some(m => m.pick === '1'), 'Without previews one click picks');
-  const long = 'Claude Code — monitoring atticus-agents live round 3 VM fixtures and reporting back to the main worktree';
+  const long = 'Claude Code — monitoring rabik-agents live round 3 VM fixtures and reporting back to the main worktree';
   ui.pick({q: 'Which Orca chat?', options: Array.from({length: 12}, (_, i) => ({label: i + 1 + ' ' + long, sub: '', img: ''}))}); await new Promise(resolve => setTimeout(resolve, 60));
   const grid = d.querySelector('.pk .g'), card = d.querySelector('.pk').getBoundingClientRect(), th = d.getElementById('thread').getBoundingClientRect();
   assert(grid.scrollHeight > grid.clientHeight && card.height <= th.height + 1 && grid.scrollWidth <= grid.clientWidth, 'Many long choices scroll inside the card, which fits the box');

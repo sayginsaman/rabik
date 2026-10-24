@@ -1,7 +1,7 @@
 """The answer box over real backdrops, VM only (opt-in, not discovered: run this module by name).
 
 run.sh <repo> tests.shoot_boxlook  → measured glass colors, then PNGs printed as base64 (the runner copies nothing back).
-The box is the app's own glass (sliced from Atticus.swift) with the real ui.html on top.
+The box is the app's own glass (sliced from Rabik.swift) with the real ui.html on top.
 """
 import base64
 import json
@@ -100,7 +100,7 @@ SCENES = [('sections-dark', 'dark', ask('can you tell me the pythagorean theorem
 
 
 def fixture():
-    source = (ROOT / 'Atticus.swift').read_text()
+    source = (ROOT / 'Rabik.swift').read_text()
     start = source.index('        let bg = NSVisualEffectView(frame: web.frame)')
     glass = source[start:source.index('bg.addSubview(tint)', start)] + 'bg.addSubview(tint)'
     tint = re.search(r'alpha:([\d.]+)\)\.cgColor', glass)[1]

@@ -39,7 +39,7 @@ m.prep();$('context').value='My note';m.material('File facts');$('gather').click
 m.nudge({title:'Pilot review',when:'Starts in 2 min',who:'Dana',context:'Pilot review\nWith: Dana'});
 assert(!$('nudge').hidden&&$('head').hidden&&$('ntitle').textContent==='Pilot review','Calendar nudge shows a small card');
 $('ready').click();await wait(30);assert(!$('prep').hidden&&$('context').value.startsWith('Pilot review')&&messages.some(x=>x.do==='focus'),'Get ready opens prep with the invite');
-m.nudge({title:'Meeting detected',when:'In Zoom · Want Atticus to listen?',who:'',context:'',go:'Start'});assert($('ready').textContent==='Get ready','Detected call offers context setup');
+m.nudge({title:'Meeting detected',when:'In Zoom · Want Rabik to listen?',who:'',context:'',go:'Start'});assert($('ready').textContent==='Get ready','Detected call offers context setup');
 const sent=messages.length;$('ready').click();await wait(30);assert(!$('prep').hidden&&!messages.slice(sent).some(x=>x.do==='start'),'Detected call opens context before listening');
 m.listen();m.saving(true);assert(!$('saving').hidden&&$('saving').textContent==='Saving transcript','Live saving is calmly visible');m.clock(125);assert($('status').textContent==='Getting ready','Startup never claims capture is ready');m.capturing();assert($('status').textContent==='Listening · 02:05','Quiet elapsed listening label');
 assert($('prep').hidden&&!$('askbar').hidden,'Listening reveals transcript and ask bar');

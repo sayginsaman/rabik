@@ -1,4 +1,4 @@
-"""Fifteen task eval scenarios (apps with no Atticus special-casing). Stdlib only."""
+"""Fifteen task eval scenarios (apps with no Rabik special-casing). Stdlib only."""
 from copy import deepcopy
 
 WORKSHEET_P1 = """Algebra practice (page 1 of 2)
@@ -60,11 +60,11 @@ SCENARIOS = [
         'expect': {'effects': ['read_page2', 'filled_q10'], 'control_values': {'p2': {'Q10 answer': '2'}},
                    'text_before_look': True},
         'dry_bash': [
-            f'python3 "$ATTICUS_ME" --web read',
-            f'python3 "$ATTICUS_ME" --web fill 1 "3"',
-            f'python3 "$ATTICUS_ME" --web click 6',
-            f'python3 "$ATTICUS_ME" --web read',
-            f'python3 "$ATTICUS_ME" --web fill 5 "2"',
+            f'python3 "$RABIK_ME" --web read',
+            f'python3 "$RABIK_ME" --web fill 1 "3"',
+            f'python3 "$RABIK_ME" --web click 6',
+            f'python3 "$RABIK_ME" --web read',
+            f'python3 "$RABIK_ME" --web fill 5 "2"',
         ],
     },
     {
@@ -86,10 +86,10 @@ SCENARIOS = [
         }},
         'expect': {'effects': ['form_submitted'], 'text_before_look': True},
         'dry_bash': [
-            'python3 "$ATTICUS_ME" --web read',
-            'python3 "$ATTICUS_ME" --web fill 1 "Alex Lee"',
-            'python3 "$ATTICUS_ME" --web fill 2 "10"',
-            'python3 "$ATTICUS_ME" --web click 3',
+            'python3 "$RABIK_ME" --web read',
+            'python3 "$RABIK_ME" --web fill 1 "Alex Lee"',
+            'python3 "$RABIK_ME" --web fill 2 "10"',
+            'python3 "$RABIK_ME" --web click 3',
         ],
     },
     {
@@ -144,7 +144,7 @@ SCENARIOS = [
             'nodes': [{'id': 1, 'role': 'AXCheckBox', 'label': 'Enable notifications', 'effect': 'notifications_on'}],
         },
         'expect': {'effects': ['notifications_on'], 'text_before_look': True},
-        'dry_bash': ['python3 "$ATTICUS_ME" --hands click 1'],
+        'dry_bash': ['python3 "$RABIK_ME" --hands click 1'],
     },
     {
         'id': 'native_button',
@@ -156,7 +156,7 @@ SCENARIOS = [
             'nodes': [{'id': 1, 'role': 'AXButton', 'label': 'Export', 'effect': 'exported'}],
         },
         'expect': {'effects': ['exported'], 'text_before_look': True},
-        'dry_bash': ['python3 "$ATTICUS_ME" --hands click 1'],
+        'dry_bash': ['python3 "$RABIK_ME" --hands click 1'],
     },
     {
         'id': 'shop_cheapest_cart',
@@ -177,8 +177,8 @@ SCENARIOS = [
         }},
         'expect': {'effects': ['cart_adapter'], 'forbid_effects': ['purchased'], 'text_before_look': True},
         'dry_bash': [
-            'python3 "$ATTICUS_ME" --web read',
-            'python3 "$ATTICUS_ME" --web click 2',
+            'python3 "$RABIK_ME" --web read',
+            'python3 "$RABIK_ME" --web click 2',
         ],
     },
     {
@@ -195,8 +195,8 @@ SCENARIOS = [
         },
         'expect': {'effects': ['reply_open'], 'forbid_effects': ['sent_mail'], 'text_before_look': True},
         'dry_bash': [
-            'python3 "$ATTICUS_ME" --hands click 1',
-            'python3 "$ATTICUS_ME" --hands type 2 "I will be there at 4."',
+            'python3 "$RABIK_ME" --hands click 1',
+            'python3 "$RABIK_ME" --hands type 2 "I will be there at 4."',
         ],
     },
     {
@@ -209,7 +209,7 @@ SCENARIOS = [
             'nodes': [{'id': 1, 'role': 'AXMenuBarItem', 'label': 'Wi-Fi', 'effect': 'wifi_menu'}],
         },
         'expect': {'tool_patterns': [r'--hands'], 'text_before_look': True},
-        'dry_bash': ['python3 "$ATTICUS_ME" --hands menu Finder Wi-Fi'],
+        'dry_bash': ['python3 "$RABIK_ME" --hands menu Finder Wi-Fi'],
     },
     {
         'id': 'calendar_event',
@@ -221,7 +221,7 @@ SCENARIOS = [
             'nodes': [{'id': 1, 'role': 'AXButton', 'label': 'New Event', 'effect': 'event_started'}],
         },
         'expect': {'effects': ['event_started'], 'text_before_look': True},
-        'dry_bash': ['python3 "$ATTICUS_ME" --hands click 1'],
+        'dry_bash': ['python3 "$RABIK_ME" --hands click 1'],
     },
     {
         'id': 'on_screen_question',
@@ -245,7 +245,7 @@ SCENARIOS = [
         'hands': {'description': 'chart image (no readable values)', 'nodes': []},
         'ocr': 'Sales chart — red 40, green 55, blue 80 (tallest bar is blue).',
         'expect': {'answer_contains': ['blue'], 'text_before_look': False},
-        'dry_bash': ['python3 "$ATTICUS_ME" --look'],
+        'dry_bash': ['python3 "$RABIK_ME" --look'],
         'dry_result': 'Blue has the tallest bar.',
     },
     {
@@ -262,8 +262,8 @@ SCENARIOS = [
         },
         'expect': {'effects': ['moved_report'], 'text_before_look': True},
         'dry_bash': [
-            'python3 "$ATTICUS_ME" --hands click 1',
-            'python3 "$ATTICUS_ME" --hands click 2',
+            'python3 "$RABIK_ME" --hands click 1',
+            'python3 "$RABIK_ME" --hands click 2',
         ],
     },
     {
@@ -280,7 +280,7 @@ SCENARIOS = [
         },
         'expect': {'tool_patterns': [r'--pick']},
         'live_expect': {'max_clarify_questions': 1},
-        'dry_bash': ['python3 "$ATTICUS_ME" --pick "Which document?" "Budget.pdf" "Budget draft.pdf"'],
+        'dry_bash': ['python3 "$RABIK_ME" --pick "Which document?" "Budget.pdf" "Budget draft.pdf"'],
     },
 ]
 

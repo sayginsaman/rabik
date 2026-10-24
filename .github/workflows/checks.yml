@@ -10,4 +10,4 @@ jobs:
       - name: Offline brain and UI syntax regressions
         run: python3 -m unittest discover -s tests -v
       - name: Installer syntax
-        run: bash -n build.sh install.sh
+        run: bash -n build.sh

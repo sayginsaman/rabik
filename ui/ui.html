@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<!-- Atticus overlay. Atticus.app loads this, puts orbs.js in place of the marker below, and calls window.ui.* -->
+<!-- Rabik overlay. Rabik.app loads this, puts orbs.js in place of the marker below, and calls window.ui.* -->
 <style>
   :root { color-scheme: dark; --fg2: #c7c7cc; --accent: #006bd6; --ease: cubic-bezier(.2,.8,.2,1); --spring: cubic-bezier(.34,1.56,.64,1); }
   html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-select: none; cursor: default;
@@ -169,7 +169,7 @@
       0 4px 14px rgba(0,0,0,.35); }
   #x.hot svg { transform: rotate(90deg); }
 
-  /* safe mode: Atticus asks before it deletes, sends or buys */
+  /* safe mode: Rabik asks before it deletes, sends or buys */
   .ok { margin-top: 14px; padding: 13px 14px 14px; border-radius: 14px; background: rgba(255,255,255,.07); cursor: pointer;
     box-shadow: inset 0 0 0 .5px rgba(255,255,255,.14); animation: grow .32s var(--spring) both; overflow: hidden; max-height: 320px;
     transition: max-height .34s var(--ease), opacity .25s, margin .34s var(--ease), padding .34s var(--ease), background .2s; }
@@ -247,7 +247,6 @@
   .ok.offer { cursor: default; } .ok.offer:is(:hover,.hot) { background: rgba(255,255,255,.07); }   /* a question, not a command: nothing to unfold */
   .ok.offer p { margin: 4px 0 0; font-size: 12px; line-height: 1.4; color: var(--fg2); }
   .ok.offer .details { display: block; margin: 9px auto 0; height: auto; flex: none; border-radius: 0; background: none; box-shadow: none; }
-  .tip.kofi { cursor: pointer; background: rgba(255,255,255,.07); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.16); } .tip.kofi::before { color: #ff375f; }   /* quiet: no accent, it's an ask not a hint */
   .tip.gone { opacity: 0; transform: translateY(-4px); transition: opacity .4s, transform .4s; }
 
   /* memory receipt: one quiet row under an answer that remembered or forgot something. Click: it opens in place; click an item: Settings → Memory there */
@@ -398,7 +397,7 @@
   <i id="check"></i><div class="dn" id="dn" role="status"></div>
   <div id="pointbar" role="group" aria-label="Point at your screen"><span class="chip"><img alt="What you marked" hidden><i></i><span>Marked</span><button class="rm" title="Remove mark" aria-label="Remove mark"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2L2 8"/></svg></button></span>
     <span class="hint" aria-live="polite"></span><span class="keys"><button class="go gotit">Got it</button></span></div>
-  <div id="comp" inert><input id="ask" placeholder="Ask Atticus…" autocomplete="off" spellcheck="false" aria-label="Ask Atticus">
+  <div id="comp" inert><input id="ask" placeholder="Ask Rabik…" autocomplete="off" spellcheck="false" aria-label="Ask Rabik">
     <div id="models" role="menu" aria-label="Model"></div><button id="model" title="Model" aria-label="Model" hidden></button>
     <button id="point" title="Point at your screen" aria-label="Point at your screen" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M9 8l11 4.5-4.6 1.9L13.5 19z"/><path d="M5.1 11.9A5.5 5.5 0 0 1 12.9 4.1"/></svg></button>
     <button id="mic" title="Talk instead" aria-label="Talk instead"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button></div>
@@ -682,12 +681,12 @@
   const clockBegin = () => {
     if (clockStart !== null || clockHeld !== null || !turn()) return;
     clock = document.createElement('div'); clock.className = 'elapsed';
-    clock.title = 'Time Atticus spent working. Waiting for your pick or approval is not counted.';
+    clock.title = 'Time Rabik spent working. Waiting for your pick or approval is not counted.';
     clock.innerHTML = '<b></b>';
     turn().append(clock); clockStart = performance.now(); clockTick();
   };
 
-  // One line from Atticus beside the agent's own orb (the chip's hue), in place of this turn's answer.
+  // One line from Rabik beside the agent's own orb (the chip's hue), in place of this turn's answer.
   const agentAck=(a,row,text)=>{a.className='a agent-ack';a.replaceChildren();a.dataset.answer=text;
     if(row?.id){const c=document.createElement('canvas'),p=E.r('breathing',32);c.width=c.height=64;c.dataset.agent=row.id;c.style.filter='hue-rotate('+(parseInt(row.id.slice(0,4),16)%90-45)+'deg)';const ctx=c.getContext('2d');ctx.scale(2,2);E.p(ctx,E.M[p.mode](32,0,p.opts),true,null);a.append(c);}
     a.append(el('span','',text));};
@@ -739,13 +738,13 @@
     moveFailed(){status('Could not move');fit();},
     paused(on=true){
       $('thread').querySelector('.paused')?.remove();
-      if(!on){status('Atticus resumed');fit();return}
-      const d=document.createElement('div');d.className='ok offer paused';d.innerHTML='<b>Atticus is paused</b><div><button class="go">Resume</button></div>';d.querySelector('button').onclick=()=>post({resume:true});
+      if(!on){status('Rabik resumed');fit();return}
+      const d=document.createElement('div');d.className='ok offer paused';d.innerHTML='<b>Rabik is paused</b><div><button class="go">Resume</button></div>';d.querySelector('button').onclick=()=>post({resume:true});
       $('thread').append(d);status('Paused');fit();
     },
     workerFailed(){
       working=false;clockStop();settle();status('Couldn’t start');
-      const d=document.createElement('div');d.className='ok offer worker';d.innerHTML='<b>Atticus’s helper couldn’t start</b><p>Retry, or open Setup & Permissions to repair it.</p><div><button>Open Setup</button><button class="go">Retry</button></div>';
+      const d=document.createElement('div');d.className='ok offer worker';d.innerHTML='<b>Rabik’s helper couldn’t start</b><p>Retry, or open Setup & Permissions to repair it.</p><div><button>Open Setup</button><button class="go">Retry</button></div>';
       const [setup,retry]=d.querySelectorAll('button');setup.onclick=()=>post({setup:true});retry.onclick=()=>{retry.disabled=true;status('Starting…',true);post({workerRetry:true})};
       (turn()||$('thread')).append(d);fit();
     },
@@ -763,7 +762,7 @@
     agentCount(value){const count=typeof value==='number'?value:value.count,pill=$('agents-pill'),label=count+' agent'+(count===1?'':'s');pill.hidden=!count;pill.classList.toggle('attention',!!value.attention);
       pill.lastChild.textContent=label;pill.title=value.attention?'An agent needs you':'Open Agents';pill.setAttribute('aria-label',label+(value.attention?', one needs you':' running')+'. Open Agents');fit();},
     agentEscape(){const b=$('thread').querySelector('.agent-card [data-esc]');if(b)b.click();else post({agentGone:true});},   // Esc is a native hotkey: it picks the card's quiet choice
-    selected(t) {   // the text Atticus is working from, so the user knows it saw the right thing
+    selected(t) {   // the text Rabik is working from, so the user knows it saw the right thing
       const d = turn(); if (!d || !t.trim()) return;
       const s = document.createElement('div'); s.className = 'sel'; s.textContent = 'Selected: “' + t.trim().replace(/\s+/g, ' ') + '”';
       d.prepend(s); fit();
@@ -777,7 +776,7 @@
       for (const [label, action] of actions) {
         const b = document.createElement('button'); b.textContent = label;
         if (mode === 'draft' && action === 'copy' && !editable) b.className = 'go';
-        if (action === 'replace') { b.className = mode === 'delete' ? 'go del' : 'go'; b.disabled = !editable; b.title = !editable ? 'This app does not let Atticus edit here. Use Copy.' : mode === 'draft' ? 'Insert at your cursor' : label + ' the selected text'; }
+        if (action === 'replace') { b.className = mode === 'delete' ? 'go del' : 'go'; b.disabled = !editable; b.title = !editable ? 'This app does not let Rabik edit here. Use Copy.' : mode === 'draft' ? 'Insert at your cursor' : label + ' the selected text'; }
         b.onclick = e => { e.stopPropagation(); post(action === 'copy' ? {copy: draft} : {[action]: true}); };
         bar.append(b);
       }
@@ -792,7 +791,7 @@
       bar.querySelector('.go').disabled = true; fit();
     },
     mini(m) { miniUpdate(m); },
-    point(value) {   // {active, marked, picked, thumb}: pointing now, a mark is waiting, it is one of Atticus's marks, a picture of it; false: none
+    point(value) {   // {active, marked, picked, thumb}: pointing now, a mark is waiting, it is one of Rabik's marks, a picture of it; false: none
       const active = !!value?.active, marked = !!value?.marked, button = $('point'), img = bar.querySelector('img'), was = $('status').textContent;
       button.classList.toggle('active', active); button.classList.toggle('marked', marked);
       button.setAttribute('aria-pressed', active);
@@ -928,9 +927,9 @@
         }
       } else if (tag === '✎' && turn()) { try { receipt(JSON.parse(s)); } catch {}
       } else if (tag === 'i' && turn()) {
-        const learned = s.startsWith('Learned: '), kofi = s.startsWith('Support: '), d = document.createElement('div');   // "Learned" when it saved a rule, the Ko-fi line, else "Tip"
-        d.className = 'tip' + (learned ? ' learned' : kofi ? ' kofi' : ''); d.dataset.k = learned ? 'Learned' : kofi ? '♥' : 'Tip'; d.textContent = learned || kofi ? s.slice(9) : s;
-        if (!learned) { const o = document.createElement('button'); o.className = 'off'; o.textContent = kofi ? 'Turn off' : 'Turn off tips'; d.append(o); }
+        const learned = s.startsWith('Learned: '), d = document.createElement('div');   // "Learned" when it saved a rule, else "Tip"
+        d.className = 'tip' + (learned ? ' learned' : ''); d.dataset.k = learned ? 'Learned' : 'Tip'; d.textContent = learned ? s.slice(9) : s;
+        if (!learned) { const o = document.createElement('button'); o.className = 'off'; o.textContent = 'Turn off tips'; d.append(o); }
         turn().append(d);
         setTimeout(() => { d.classList.add('gone'); setTimeout(() => { d.remove(); fit(); }, 400); }, 9000);   // never sticks around
       }
@@ -978,8 +977,7 @@
       if (document.body.classList.contains('dictate')) return;   // the pill has no typing box: only its buttons act
       if (el?.closest('#mode')) return enableSafeMode();
       if ($('comp').classList.contains('pick')) pickRow(false);   // a click anywhere else closes the model row
-      if (el?.closest('.tip .off')) { const k = el.closest('.tip.kofi') ? 'support' : 'tips'; post({ off: k }); el.closest('.tip').remove(); status(k === 'tips' ? 'Tips off · The menu bar turns them back on' : 'Tip reminders off · Settings → About turns them back on'); return fit(); }   // its own "Turn off": no more of that kind
-      if (el?.closest('.tip.kofi')) post({ kofi: true });   // the support line opens Ko-fi, then goes like any tip
+      if (el?.closest('.tip .off')) { post({ off: 'tips' }); el.closest('.tip').remove(); status('Tips off · The menu bar turns them back on'); return fit(); }   // its own "Turn off": no more of that kind
       if (el?.closest('.tip')) { el.closest('.tip').remove(); return fit(); }   // click a tip: it goes
       const on = el?.closest('.a:not(.stopped):not(.cancel)'), q = el?.closest('.q:not(.empty)');
       drop();
@@ -1044,7 +1042,7 @@
     improve() {   // once, after a task that worked: people who updated never saw setup's question
       $('thread').querySelectorAll('.ok.improve').forEach(e => e.remove());
       const d = document.createElement('div'); d.className = 'ok offer improve';
-      d.innerHTML = '<b>Help make Atticus better?</b><p>When a task fails, send what you asked, the steps and why. Anonymous, cleaned first. Change it in Settings.</p><div><button>Not Now</button><button class="go">Help Improve</button></div>';
+      d.innerHTML = '<b>Help make Rabik better?</b><p>When a task fails, send what you asked, the steps and why. Anonymous, cleaned first. Change it in Settings.</p><div><button>Not Now</button><button class="go">Help Improve</button></div>';
       d.querySelectorAll(':scope > div > button').forEach((b, i) => b.onclick = e => {
         e.stopPropagation(); if (d.classList.contains('gone')) return;
         post({ improve: !!i }); status(i ? 'Thank you' : '', true);

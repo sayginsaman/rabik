@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<!-- Atticus first-run window. Atticus.swift loads this (orbs.js goes in place of the marker), calls ob.set({...}) every second
+<!-- Rabik first-run window. Rabik.swift loads this (orbs.js goes in place of the marker), calls ob.set({...}) every second
      with which permissions are on, and gets {do:'grant', id} / {do:'done'} back. -->
 <style>
   :root {
@@ -111,7 +111,7 @@
   #count { margin-top: 14px; font-size: 12px; color: var(--fg3); font-variant-numeric: tabular-nums; transition: color .3s; }
   #count.all { color: var(--green); }
 
-  /* try it: keys light up as the user holds them, then turn green once Atticus hears the hotkey */
+  /* try it: keys light up as the user holds them, then turn green once Rabik hears the hotkey */
   .keys.big { margin-top: 30px; gap: 10px; } .keys.big .key { height: 52px; min-width: 52px; font-size: 19px; border-radius: 11px; }
   .keys.big .key.wide { min-width: 160px; font-size: 15px; }
   .key.lit { transform: translateY(2px); color: #fff; background: linear-gradient(#3d9bff, var(--accent));
@@ -133,17 +133,6 @@
     box-shadow: inset 0 0 0 .5px var(--line), 0 10px 30px rgba(0,0,0,.12); }
   .bar2 { display: flex; gap: 10px; margin-top: 26px; }
   .bar2 .btn { margin-top: 0; }
-  /* the tip page: one warm heart, then Leave a Tip beside Next */
-  #tip-heart { width: 72px; height: 72px; margin-bottom: 20px; border-radius: 22px; display: grid; place-items: center;
-    background: linear-gradient(160deg, #ff7a8a, #ff375f); box-shadow: 0 10px 28px rgba(255,55,95,.32), inset 0 .5px 0 rgba(255,255,255,.35); }
-  #tip-heart svg { width: 36px; height: 36px; fill: #fff; }
-  #tip.on #tip-heart { animation: beat 1.6s .5s var(--ease) 2; }
-  @keyframes beat { 0%, 100% { transform: none; } 15% { transform: scale(1.1); } 30% { transform: none; } 45% { transform: scale(1.06); } }
-  #tip p.sub { max-width: 420px; }
-  #kofi { display: inline-flex; align-items: center; gap: 7px; background: #ff375f; }
-  #kofi svg { width: 15px; height: 15px; fill: #fff; }
-  #tip .done-note { margin-top: 18px; }
-  @media (prefers-reduced-motion: reduce) { #tip.on #tip-heart { animation: none; } }
   .done-note { height: 18px; margin-top: 12px; font-size: 12.5px; color: var(--fg3); }
   #feedback-note .alt { margin: 0; font-size: 12.5px; }
   .done-note a { color: var(--accent); cursor: pointer; } .done-note a:hover { text-decoration: underline; }
@@ -344,14 +333,14 @@
 <button class="btn quiet" id="back" hidden>Back</button>
 <section class="page" id="welcome">
   <div id="orbwrap" class="r"><canvas id="orb"></canvas></div>
-  <h1 class="r">Meet Atticus</h1>
+  <h1 class="r">Meet Rabik</h1>
   <p class="sub r" id="welcome-talk">Hold the shortcut, say what you need, let go. Your Mac does the rest.</p>
   <div class="keys r" id="welkeys"><div class="key">⌃</div><div class="key">⌥</div><div class="key wide">Space</div></div>
   <button class="btn r" data-go="perms">Get Started</button>
 </section>
 
 <section class="page" id="perms">
-  <h2 class="r">Give Atticus a hand</h2>
+  <h2 class="r">Give Rabik a hand</h2>
   <p class="sub r">macOS asks once for each one. You can change them any time in System Settings.</p>
   <div id="list" class="r"></div>
   <div id="count" class="r"></div>
@@ -361,7 +350,7 @@
 <section class="page" id="agents">
   <h2 class="r">Agents keep working while you do</h2>
   <p class="sub r">Hand off a bigger task and keep asking. An agent uses these only when a task needs them.</p>
-  <div class="cap r">Atticus turns these on</div>
+  <div class="cap r">Rabik turns these on</div>
   <div class="list r" id="own"></div>
   <div class="cap r">Only you can allow these. macOS and Claude ask you directly.</div>
   <div class="list r" id="yours"></div>
@@ -394,9 +383,9 @@
 <section class="page" id="learn">
   <div class="kicker r">It learns you</div>
   <h2 class="r">Tell it once. It remembers.</h2>
-  <p class="sub r">Say “remember…” or “from now on…” and Atticus keeps it for every ask after. Tasks that worked get faster next time. Change or delete anything in Settings → Memory.</p>
+  <p class="sub r">Say “remember…” or “from now on…” and Rabik keeps it for every ask after. Tasks that worked get faster next time. Change or delete anything in Settings → Memory.</p>
   <div class="says r"><i>“Remember I use Chrome, not Safari”</i><i>“From now on, open apps on my left screen”</i><i>“Remember my monitor is screen 2”</i><i>“No, that’s wrong”</i></div>
-  <div class="done-note r">Two screens? Say which one: “on my laptop”, “on the big screen”. Atticus remembers the answer.</div>
+  <div class="done-note r">Two screens? Say which one: “on my laptop”, “on the big screen”. Rabik remembers the answer.</div>
   <div class="bar2 r"><button class="btn quiet" data-go="text">Skip</button><button class="btn" data-go="text">Next</button></div>
 </section>
 
@@ -435,7 +424,7 @@
 <section class="page" id="point">
   <div class="kicker r">Draw on screen</div>
   <h2 class="r">It shows you, right on screen</h2>
-  <p class="sub r">Ask how to do something and Atticus marks each spot, one step at a time. Ask it to explain something and draw it, and the drawing builds up like a whiteboard.</p>
+  <p class="sub r">Ask how to do something and Rabik marks each spot, one step at a time. Ask it to explain something and draw it, and the drawing builds up like a whiteboard.</p>
   <div class="stage r" id="ptstage" aria-hidden="true">
     <div id="pt-win"><div class="tb"><i></i><i></i><i></i></div>
       <div class="it"><b style="background:#8e8e93"></b>General</div>
@@ -466,7 +455,7 @@
   role: "admin",
 }</pre><svg id="pa-mark" width="230" height="146"><ellipse pathLength="1" cx="61" cy="60" rx="50" ry="13" transform="rotate(-4 61 60)"/></svg></div>
     <div class="fake gone2" id="pa-box"><div id="pa-row"><span id="pa-hint">Click, circle or scribble on anything, then ask</span><span id="pa-chip" hidden><b></b>Marked<i>×</i></span></div>
-      <div id="pa-ask"><span id="pa-q">Ask Atticus…</span><i id="pa-pt"><svg viewBox="0 0 24 24"><path d="M9 8l11 4.5-4.6 1.9L13.5 19z"/><path d="M5.1 11.9A5.5 5.5 0 0 1 12.9 4.1"/></svg></i><i><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></i></div><div id="pa-a" hidden>Line 2 needs a comma after “Sam”.</div></div>
+      <div id="pa-ask"><span id="pa-q">Ask Rabik…</span><i id="pa-pt"><svg viewBox="0 0 24 24"><path d="M9 8l11 4.5-4.6 1.9L13.5 19z"/><path d="M5.1 11.9A5.5 5.5 0 0 1 12.9 4.1"/></svg></i><i><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></i></div><div id="pa-a" hidden>Line 2 needs a comma after “Sam”.</div></div>
   </div>
   <div class="bar2 r"><button class="btn quiet" data-go="work">Skip</button><button class="btn" data-go="work">Next</button></div>
 </section>
@@ -474,7 +463,7 @@
 <section class="page" id="work">
   <div class="kicker r">Your plan, your pace</div>
   <h2 class="r">Quick asks stay quick</h2>
-  <p class="sub r"><span id="wk-plan">Choose how much of your plan Atticus uses. </span>A long ask moves to a background agent by itself, so you keep working. ⌃⌥↩ moves one sooner.</p>
+  <p class="sub r"><span id="wk-plan">Choose how much of your plan Rabik uses. </span>A long ask moves to a background agent by itself, so you keep working. ⌃⌥↩ moves one sooner.</p>
   <div class="stage r" aria-hidden="true">
     <div class="fake gone2" id="wk-box"><div class="q">“Find standing desks under $600”</div><div id="wk-line">Searching the web…</div></div>
     <div class="fake gone2" id="wk-chip"><small id="wk-state">Agent · working</small><b>Standing desks</b><u></u></div>
@@ -505,11 +494,11 @@
 
 <section class="page" id="improve">
   <div class="kicker r">Optional</div>
-  <h2 class="r">Help make Atticus better</h2>
-  <p class="sub r">When a task fails, Atticus can tell its maker what went wrong, so the next version gets it right. Change it anytime in Settings.</p>
+  <h2 class="r">Help make Rabik better</h2>
+  <p class="sub r">When a task fails, Rabik can tell its maker what went wrong, so the next version gets it right. Change it anytime in Settings.</p>
   <div class="list r">
     <div class="row"><div class="ic" style="background:#0a84ff"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H10l-5 4z"/></svg></div>
-      <div class="txt"><b>Only what failed</b><span>What you asked, the steps Atticus took, and why it didn’t work.</span></div></div>
+      <div class="txt"><b>Only what failed</b><span>What you asked, the steps Rabik took, and why it didn’t work.</span></div></div>
     <div class="row"><div class="ic" style="background:#30d158"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
       <div class="txt"><b>Anonymous</b><span>A random ID. Never your name, your screen, your files or passwords.</span></div></div>
     <div class="row"><div class="ic" style="background:#8e8e93"><svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 9 6 9 6a15 15 0 0 1-2.7 3.2M6.6 7.6A15 15 0 0 0 3 12s4 6 9 6a9 9 0 0 0 3.4-.7"/></svg></div>
@@ -518,27 +507,19 @@
   <div class="bar2 r"><button class="btn quiet" data-improve="false">Not Now</button><button class="btn" data-improve="true">Help Improve</button></div>
 </section>
 
-<section class="page" id="tip">
-  <div id="tip-heart" class="r" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg></div>
-  <h2 class="r">Atticus is free and open source</h2>
-  <p class="sub r">If you ever find yourself enjoying Atticus, a small tip goes a long way. It keeps Atticus free for everyone, and it would really support me.</p>
-  <div class="bar2 r"><button class="btn" id="kofi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>Leave a Tip</button><button class="btn quiet" data-go="done" id="tip-next">Next</button></div>
-  <p class="done-note r">You can always find “Leave a Tip” in the menu bar later.</p>
-</section>
-
 <section class="page" id="done">
   <svg id="done-check" class="r" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11"/><path d="M6.5 11.3l3 3 6-6.3"/></svg>
   <h2 class="r" id="done-title">You’re all set</h2>
   <p class="sub r" id="done-sub">Hold the keys anytime and just ask. Everything else lives in Settings, in the menu bar.</p>
   <div class="tips r"><div><kbd>esc</kbd> stops an answer</div><div>Click an answer to copy</div><div>Click away to close</div><div>Hover the box to type</div></div>
-  <p class="done-note r" id="feedback-note">Atticus is new and growing, and your feedback helps a lot. <button class="alt" id="feedback-link">Report feedback ↗</button></p>
-  <button class="btn r" id="finish">Start Using Atticus</button>
+  <p class="done-note r" id="feedback-note">Rabik is new and growing, and your feedback helps a lot. <button class="alt" id="feedback-link">Report feedback ↗</button></p>
+  <button class="btn r" id="finish">Start Using Rabik</button>
 </section>
 
 <div id="prov" hidden role="dialog" aria-modal="true" aria-labelledby="prov-h">
   <div class="card">
     <h3 id="prov-h">Choose your AI provider</h3>
-    <p>Atticus thinks with one of these. Change it anytime in Settings.</p>
+    <p>Rabik thinks with one of these. Change it anytime in Settings.</p>
     <div role="radiogroup" aria-labelledby="prov-h">
       <button class="opt" role="radio" data-p="claude"><span class="dot"></span><div class="txt"><b>Claude</b><span>Your Claude Pro or Max plan, through Claude Code.</span></div></button>
       <button class="opt" role="radio" data-p="devin"><span class="dot"></span><div class="txt"><b>Devin</b><span>Your Devin plan, through the Devin CLI.</span></div></button>
@@ -557,15 +538,15 @@
   </div>
 </div>
 
-<div id="dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<div id="dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
 
 <script type="text/plain" id="orbsrc">/*ORBS*/</script>
 <script type="module">
   const $ = id => document.getElementById(id);
   const post = m => window.webkit?.messageHandlers.ob.postMessage(m);
-  const pages = ['welcome', 'perms', 'agents', 'try', 'mac', 'learn', 'text', 'dictate', 'point', 'pointer', 'work', 'meeting', 'improve', 'tip', 'done'];
+  const pages = ['welcome', 'perms', 'agents', 'try', 'mac', 'learn', 'text', 'dictate', 'point', 'pointer', 'work', 'meeting', 'improve', 'done'];
   let cur = '', orbWake = null;
-  const skip = id => ['devin', 'pi'].includes(provider) && ['agents', 'work'].includes(id);   // their CLIs run no Atticus agents
+  const skip = id => ['devin', 'pi'].includes(provider) && ['agents', 'work'].includes(id);   // their CLIs run no Rabik agents
   const go = id => {
     while (skip(id)) id = pages[pages.indexOf(id) + 1];
     if (recording) post({ do: 'cancelRecord' });
@@ -578,9 +559,8 @@
   document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
   $('back').onclick = () => { let i = pages.indexOf(cur) - 1; while (skip(pages[i])) i--; go(pages[i]); };
   $('finish').onclick = () => post({ do: 'done' });
-  $('kofi').onclick = () => post({ do: 'kofi' });
   $('feedback-link').onclick = () => post({ do: 'feedback' });   // Settings → Report feedback, over this window
-  document.querySelectorAll('[data-improve]').forEach(b => b.onclick = () => { post({ do: 'set', k: 'improve', v: b.dataset.improve }); go('tip'); });
+  document.querySelectorAll('[data-improve]').forEach(b => b.onclick = () => { post({ do: 'set', k: 'improve', v: b.dataset.improve }); go('done'); });
   document.querySelectorAll('.sw input').forEach(i => i.onchange = () => post({ do: 'set', k: i.dataset.k, v: String(i.checked) }));
   let prefs = {};
   const WHY = { cheapest: 'Haiku for every ask. Fastest, and uses the least of your plan.', balanced: 'Haiku for quick asks. Your work model takes over real work.',
@@ -610,7 +590,7 @@
   document.querySelectorAll('.seg[data-k]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => {
     prefs[g.dataset.k] = b.dataset.v; paintPrefs(); post({ do: 'set', k: g.dataset.k, v: b.dataset.v });
   }));
-  // Dictation's shortcut: Atticus.swift records the next keys (the same recorder as Settings) and answers with ob.rec / ob.taken / ob.recorded.
+  // Dictation's shortcut: Rabik.swift records the next keys (the same recorder as Settings) and answers with ob.rec / ob.taken / ob.recorded.
   let recording = false, dcWarn = 0;
   const dcHint = () => prefs.dictateHotkeyLabel ? 'In any text field, your words land at the cursor.' : 'Click, then press the keys you want.';
   const dcKeys = (label, text) => {
@@ -637,7 +617,7 @@
     ['ax', 'Accessibility', 'Moves windows and clicks buttons for you.', '#0a84ff', '<circle cx="12" cy="4.5" r="1.6"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4.5M12 14.5l-3 6M12 14.5l3 6"/>'],
     ['screen', 'Screen Recording', 'Looks at your screen when you say “this”.', '#bf5af2', '<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/>'],
     ['chrome', 'Chrome Pages', 'Reads and clicks web pages in Chrome, in the background.', '#34c759', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5h8.2M9 13.7L4.9 6.6M15 13.7l-4.1 7.1"/>'],
-    ['auto', 'Automation', 'Pick the apps Atticus can control, all at once.', '#636366', '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'],
+    ['auto', 'Automation', 'Pick the apps Rabik can control, all at once.', '#636366', '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'],
   ];
   const rows = (list, prefix, label = 'Allow') => list.map(([id, name, why, color, svg], i) => `
     <div class="row" id="${prefix}${id}" style="transition-delay:${.25 + i * .06}s">
@@ -709,7 +689,7 @@
     if (last) ob.set(last);
     closeProv();
   };
-  // Agents: what Atticus turns on itself, then what only the user can (macOS privacy switches, a claude.ai sign-in). Status is live; done rows show a check.
+  // Agents: what Rabik turns on itself, then what only the user can (macOS privacy switches, a claude.ai sign-in). Status is live; done rows show a check.
   const glyph = id => P.find(p => p[0] === id);
   const OWN = [['tools', 'Your Claude Code tools', 'MCP servers, skills and plugins you already use.', '#d97757', '<path d="M14.5 5.5l4 4-9 9H5.5v-4z"/><path d="M12.5 7.5l4 4"/>'],
     ['chrome', 'Page reading in Chrome', 'Reads and clicks pages in the background.', ...glyph('chrome').slice(3)]];
@@ -734,7 +714,7 @@
     const core=[['claude','AI provider'],['mic','Microphone'],['speech','Speech Recognition'],['ax','Accessibility']],missing=core.filter(([id])=>!s[id]).map(([,name])=>name),voice=['claude','mic','speech'].every(id=>s[id]);
     $('done-title').textContent=!missing.length?'You’re all set':voice?'Voice is ready':'Setup isn’t finished yet';
     $('done-sub').textContent=!missing.length?(toggleMode?'Press':'Hold')+' the shortcut anytime and just ask. Everything else lives in Settings, in the menu bar.':(voice?'Still needed for full Mac control: ':'Still needed: ')+missing.join(', ')+'. You can allow '+(missing.length===1?'it':'them')+' later in Setup & Permissions.';
-    $('finish').textContent=voice?'Start Using Atticus':'Finish Setup Later';
+    $('finish').textContent=voice?'Start Using Rabik':'Finish Setup Later';
   };
   window.ob = {
     mode(toggle) {
@@ -752,7 +732,7 @@
       const k = cur === 'try' ? [...$('trykeys').children] : [];
       if (!k.length || k[0].classList.contains('yes')) return;
       k.forEach((c, i) => setTimeout(() => { c.classList.remove('lit', 'down'); c.classList.add('yes'); }, i * 70));
-      { $('hint').textContent = 'That’s it. Atticus is on it.'; $('hint').classList.add('yes'); }
+      { $('hint').textContent = 'That’s it. Rabik is on it.'; $('hint').classList.add('yes'); }
       $('try-skip').hidden = true; $('try-next').hidden = false;
     },
     plan(c) {   // the AI client (Claude Code or Devin): installed, signed in, paid plan? The row says which, the button fixes it
@@ -767,7 +747,7 @@
     walk(id) {   // Enable All: the step it is on says what to do there; the button waits until the walk ends
       document.querySelectorAll('#agents .row').forEach(r => {
         const line = r.querySelector('.txt span'), now = r.id === 'a-' + id;
-        if (now && !r.classList.contains('now')) { line.dataset.why = line.textContent; line.textContent = OWN.some(o => 'a-' + o[0] === r.id) ? 'Turning it on…' : 'Turn on Atticus in System Settings.'; }
+        if (now && !r.classList.contains('now')) { line.dataset.why = line.textContent; line.textContent = OWN.some(o => 'a-' + o[0] === r.id) ? 'Turning it on…' : 'Turn on Rabik in System Settings.'; }
         if (!now && line.dataset.why) { line.textContent = line.dataset.why; delete line.dataset.why; }
         r.classList.toggle('now', now);
       });
@@ -801,7 +781,7 @@
     rec(m) { if (recording) /^Add/.test(m) || !m ? dcKeys('', m || 'Type Shortcut') : dcKeys(m); },   // held modifiers, live
     taken(kind, own) {
       clearTimeout(dcWarn); $('dc-hint').className = 'warn';
-      $('dc-hint').textContent = own ? 'That’s already your Atticus shortcut. Kept your old one.' : 'Another app already uses that shortcut. Kept your old one.';
+      $('dc-hint').textContent = own ? 'That’s already your Rabik shortcut. Kept your old one.' : 'Another app already uses that shortcut. Kept your old one.';
       dcWarn = setTimeout(() => { dcWarn = 0; paintPrefs(); }, 4000);
     },
     recorded(label) { recording = false; $('dc-field').classList.remove('rec'); prefs.dictateHotkeyLabel = label; paintPrefs(); },
@@ -916,7 +896,7 @@
     async pointer() {
       const box = $('pa-box'), mark = $('pa-mark'), q = $('pa-q'), pt = $('pa-pt');
       box.classList.add('gone2'); mark.classList.remove('on'); pt.classList.remove('on'); $('pa-hint').hidden = true; $('pa-chip').hidden = true; $('pa-a').hidden = true;
-      q.textContent = 'Ask Atticus…'; q.classList.remove('on');
+      q.textContent = 'Ask Rabik…'; q.classList.remove('on');
       await wait(600); box.classList.remove('gone2'); await wait(900);
       pt.classList.add('press'); await wait(220); pt.classList.remove('press'); pt.classList.add('on'); $('pa-hint').hidden = false; await wait(1100);
       mark.classList.add('on'); await wait(1000);

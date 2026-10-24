@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == 'darwin', 'macOS native meeting bridge')
 class MeetingBridgeTests(unittest.TestCase):
     def test_prep_queue_edits_and_stop_with_fake_workers(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         classes = source[source.index('// Meeting audio'):source.index('// MARK: - Hands')]
         # Keep the actual start guards and state transition; replace hardware work with no-op capture.
         begin = classes.index('        let g = generation', classes.index('    func start(_ context: String)'))
@@ -271,7 +271,7 @@ nsapp.run()
             binary = root / 'bridge'
             compiled = subprocess.run(['swiftc', str(file), '-o', str(binary)], text=True, capture_output=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
-            result = subprocess.run([str(binary), str(root), sys.executable], env={**os.environ, 'ATTICUS_DIR': str(root)}, text=True, capture_output=True, timeout=20)
+            result = subprocess.run([str(binary), str(root), sys.executable], env={**os.environ, 'RABIK_DIR': str(root)}, text=True, capture_output=True, timeout=20)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             timings = [json.loads(line) for line in result.stdout.splitlines() if line.startswith('{') and 'meeting-answer-latency' in line]
             self.assertTrue(timings, result.stdout)

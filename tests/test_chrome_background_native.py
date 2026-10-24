@@ -15,17 +15,17 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-import atticus
+import rabik
 
 CHROME = Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 
 
-@unittest.skipUnless(os.environ.get('ATTICUS_VM') == '1' and sys.platform == 'darwin' and CHROME.exists(),
-                     'Isolated Chrome profile requires ATTICUS_VM=1 and macOS Chrome')
+@unittest.skipUnless(os.environ.get('RABIK_VM') == '1' and sys.platform == 'darwin' and CHROME.exists(),
+                     'Isolated Chrome profile requires RABIK_VM=1 and macOS Chrome')
 class ChromeBackgroundTests(unittest.TestCase):
     def test_native_fullscreen_placement_repeats_without_toggling(self):
-        with tempfile.TemporaryDirectory(prefix='atticus-place-') as tmp:
-            root=Path(tmp); marker='Atticus placement '+root.name
+        with tempfile.TemporaryDirectory(prefix='rabik-place-') as tmp:
+            root=Path(tmp); marker='Rabik placement '+root.name
             page=root/'page.html';page.write_text('<title>'+marker+'</title><p>Scratch placement</p>')
             with (root/'chrome.log').open('w') as log:
                 process=subprocess.Popen([str(CHROME),f'--user-data-dir={root / "profile"}','--no-first-run','--no-default-browser-check','--disable-sync',page.as_uri()],stdout=log,stderr=log,start_new_session=True)
@@ -40,29 +40,29 @@ class ChromeBackgroundTests(unittest.TestCase):
                         if 'not allowed' in probe.stderr or 'not authorized' in probe.stderr: self.skipTest(probe.stderr.strip())
                         time.sleep(.2)
                     else: self.fail('Scratch Chrome window not accessible: '+(probe.stderr if probe else '')+(root/'chrome.log').read_text()[-1000:])
-                    with patch.object(atticus,'preview_app'),patch.object(atticus,'free_focus'):
-                        screen=atticus.screens()[0][0]
-                        reply=atticus.place('Google Chrome','fullscreen',screen,marker)
+                    with patch.object(rabik,'preview_app'),patch.object(rabik,'free_focus'):
+                        screen=rabik.screens()[0][0]
+                        reply=rabik.place('Google Chrome','fullscreen',screen,marker)
                         self.assertNotIn('NOT DONE',reply);self.assertNotIn('could not check',reply)
-                        self.assertEqual(atticus.osa(selector),'true',reply)
+                        self.assertEqual(rabik.osa(selector),'true',reply)
                         # Use the actual screen name so the already-in-place path applies on the VM's virtual display.
-                        again=atticus.place('Google Chrome','fullscreen',screen,marker)
+                        again=rabik.place('Google Chrome','fullscreen',screen,marker)
                         self.assertIn('already full screen',again)
-                        self.assertEqual(atticus.osa(selector),'true',again)
+                        self.assertEqual(rabik.osa(selector),'true',again)
                 finally:
                     os.killpg(process.pid,signal.SIGTERM)
                     try: process.wait(timeout=5)
                     except subprocess.TimeoutExpired: os.killpg(process.pid,signal.SIGKILL);process.wait()
 
     def test_pinned_background_window_javascript_and_ax(self):
-        with tempfile.TemporaryDirectory(prefix='atticus-chrome-') as tmp:
+        with tempfile.TemporaryDirectory(prefix='rabik-chrome-') as tmp:
             root = Path(tmp); profile = root / 'profile'; (profile / 'Default').mkdir(parents=True)
             prefs = {'browser':{'allow_javascript_apple_events':True}}
             (profile / 'Default/Preferences').write_text(json.dumps(prefs)); (profile / 'Local State').write_text(json.dumps(prefs))
-            marker = 'ATTICUS SCRATCH ' + root.name
+            marker = 'RABIK SCRATCH ' + root.name
             page = root / 'page.html'
             page.write_text(f'<title>{marker}</title><button onclick="document.getElementById(\'result\').textContent=\'Clicked in background\'">Change text</button><input aria-label="Name"><p id="result">Untouched</p>')
-            env = {**os.environ,'ATTICUS_DIR':tmp}
+            env = {**os.environ,'RABIK_DIR':tmp}
             log = open(root / 'chrome.log','w')
             process = subprocess.Popen([str(CHROME),f'--user-data-dir={profile}','--no-first-run','--no-default-browser-check','--disable-sync','--disable-background-networking',page.as_uri()],env=env,stdout=log,stderr=log,start_new_session=True)
             foreground = None
@@ -83,12 +83,12 @@ class ChromeBackgroundTests(unittest.TestCase):
                 if not ids: self.skipTest('Scratch Chrome did not expose its uniquely titled fixture')
                 window, tab = map(int,ids.split('\t'))
                 tell = f'tell application "Google Chrome" to execute (first tab of window id {window} whose id is {tab}) javascript '
-                webjs = Path(atticus.WEB_JS).read_text()
+                webjs = Path(rabik.WEB_JS).read_text()
                 read = osa(tell + json.dumps(f'({webjs})("read", "", "")'))
                 self.assertIn(marker,read); self.assertIn('1 button: Change text',read)
                 (root / 'web.json').write_text(json.dumps({'app':'Google Chrome','window':window,'tab':tab}))
                 # Another scratch Chrome window becomes browser window 1; the mapped page must remain the action target.
-                other = root / 'other.html'; other.write_text('<title>ATTICUS scratch cover</title><p>Second fixture window</p>')
+                other = root / 'other.html'; other.write_text('<title>RABIK scratch cover</title><p>Second fixture window</p>')
                 osa(f'tell application "Google Chrome"\nset w to make new window\nset URL of active tab of w to "{other.as_uri()}"\nend tell')
                 time.sleep(.5)
                 self.assertNotEqual(int(osa('tell application "Google Chrome" to get id of window 1')),window)
@@ -98,7 +98,7 @@ class ChromeBackgroundTests(unittest.TestCase):
 let app=NSApplication.shared; app.setActivationPolicy(.regular)
 let previous=NSWorkspace.shared.frontmostApplication
 let w=NSWindow(contentRect:NSRect(x:40,y:40,width:800,height:600),styleMask:[.titled],backing:.buffered,defer:false)
-w.title="Atticus scratch foreground"; w.orderFrontRegardless()
+w.title="Rabik scratch foreground"; w.orderFrontRegardless()
 DispatchQueue.main.asyncAfter(deadline:.now()+0.2) { app.activate(ignoringOtherApps:true); w.makeKeyAndOrderFront(nil) }
 DispatchQueue.main.asyncAfter(deadline:.now()+0.6) { print(ProcessInfo.processInfo.processIdentifier); fflush(stdout) }
 NSWorkspace.shared.notificationCenter.addObserver(forName:NSWorkspace.didActivateApplicationNotification,object:nil,queue:.main) { n in
@@ -108,7 +108,7 @@ signal(SIGTERM) { _ in DispatchQueue.main.async { previous?.activate(); exit(0) 
 ''')
                 cover = root / 'ForegroundFixture.app/Contents/MacOS/cover'; cover.parent.mkdir(parents=True)
                 with open(cover.parent.parent / 'Info.plist','wb') as f:
-                    plistlib.dump({'CFBundleIdentifier':'com.atticus.foreground.fixture','CFBundleExecutable':'cover','CFBundleName':'Foreground Fixture','CFBundlePackageType':'APPL'},f)
+                    plistlib.dump({'CFBundleIdentifier':'com.rabik.foreground.fixture','CFBundleExecutable':'cover','CFBundleName':'Foreground Fixture','CFBundlePackageType':'APPL'},f)
                 subprocess.run(['swiftc',str(source),'-o',str(cover)],env=env,check=True,capture_output=True)
                 foreground = subprocess.Popen([str(cover)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
                 pid = int(foreground.stdout.readline()); time.sleep(.4)
@@ -116,9 +116,9 @@ signal(SIGTERM) { _ in DispatchQueue.main.async { previous?.activate(); exit(0) 
                 self.assertEqual(front(),pid)
                 osa(tell + json.dumps('document.title'))
                 before = front(); self.assertNotEqual(before,process.pid)
-                with patch.object(atticus,'DIR',tmp), patch.dict(os.environ,{'ATTICUS_FRONT':'Google Chrome','ATTICUS_DIR':tmp},clear=False):
-                    self.assertIn('Filled',atticus.web('fill','2','Background name'))
-                    self.assertIn('Clicked 1',atticus.web('click','1'))
+                with patch.object(rabik,'DIR',tmp), patch.dict(os.environ,{'RABIK_FRONT':'Google Chrome','RABIK_DIR':tmp},clear=False):
+                    self.assertIn('Filled',rabik.web('fill','2','Background name'))
+                    self.assertIn('Clicked 1',rabik.web('click','1'))
                 self.assertEqual(front(),before,'JavaScript must leave the current foreground app focused')
                 result = osa(tell + json.dumps('document.getElementById("result").textContent + "/" + document.querySelector("input").value'))
                 self.assertEqual(result,'Clicked in background/Background name')
@@ -160,18 +160,18 @@ end tell'''
                 worker = root / 'fake-app'
                 worker.write_text('#!/bin/sh\nif [ "$1" = "--target-app" ]; then echo "Google Chrome"; fi\n')
                 worker.chmod(0o700)
-                agent_env = {**env, 'ATTICUS_DIR':str(scratch), 'ATTICUS_ASK':str(scratch), 'ATTICUS_AGENT':'fixture', 'ATTICUS_FRONT':'Google Chrome', 'ATTICUS_APP':str(worker)}
+                agent_env = {**env, 'RABIK_DIR':str(scratch), 'RABIK_ASK':str(scratch), 'RABIK_AGENT':'fixture', 'RABIK_FRONT':'Google Chrome', 'RABIK_APP':str(worker)}
                 # URL selects the explicitly named browser; the CLI normally resolves the default handler.
-                code = 'import atticus; print(atticus.web("read", __import__("sys").argv[1], app="Google Chrome"))'
+                code = 'import rabik; print(rabik.web("read", __import__("sys").argv[1], app="Google Chrome"))'
                 readers = [subprocess.Popen([sys.executable, '-c', code, origin+'/page.html?read='+str(i)], env=agent_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for i in range(3)]
                 for reader in readers:
                     output, error = reader.communicate(timeout=30)
                     self.assertEqual(reader.returncode,0,error); self.assertIn(marker,output,output)
-                shown = subprocess.run([sys.executable, '-c', 'import atticus,sys;print(atticus.show(sys.argv[1]))', origin+'/page.html?show'],
+                shown = subprocess.run([sys.executable, '-c', 'import rabik,sys;print(rabik.show(sys.argv[1]))', origin+'/page.html?show'],
                                        env=agent_env, capture_output=True, text=True, timeout=30)
                 self.assertEqual(shown.returncode,0,shown.stderr); self.assertIn(marker,shown.stdout,shown.stdout)
                 (scratch/'window-summary.json').write_text(json.dumps({'app':'Google Chrome','web':True}))
-                window = subprocess.run([sys.executable, '-c', 'import atticus;print(atticus.window_text("Google Chrome"))'],
+                window = subprocess.run([sys.executable, '-c', 'import rabik;print(rabik.window_text("Google Chrome"))'],
                                         env=agent_env, capture_output=True, text=True, timeout=30)
                 self.assertEqual(window.returncode,0,window.stderr); self.assertIn(marker,window.stdout,window.stdout)
                 self.assertEqual(osa('tell application "Google Chrome" to return {id of window 1, id of active tab of window 1, count windows}'), browser_before, 'Background reads selected a tab/window or created a window')
@@ -200,17 +200,17 @@ end tell'''
         # No Apple events: in the guest they wait on an Automation prompt nobody can click. The pages report to a local
         # server, Chrome flags place the window, and the foreground fixture answers which app is front and Chrome's window order.
         root_dir = Path(__file__).resolve().parents[1]
-        with tempfile.TemporaryDirectory(prefix='atticus-canvas-') as tmp:
+        with tempfile.TemporaryDirectory(prefix='rabik-canvas-') as tmp:
             root = Path(tmp); profile = root / 'profile'; profile.mkdir()
             say = 'const say=(p,d)=>fetch(p,{method:"POST",body:JSON.stringify(d),keepalive:true});'
-            (root / 'canvas.html').write_text(f'''<title>ATTICUS CANVAS {root.name}</title><body style="margin:0"><canvas id=c aria-label="Board" role=img width=440 height=300 style="display:block;background:#fff"></canvas>
+            (root / 'canvas.html').write_text(f'''<title>RABIK CANVAS {root.name}</title><body style="margin:0"><canvas id=c aria-label="Board" role=img width=440 height=300 style="display:block;background:#fff"></canvas>
 <img alt="Blank" width=440 height=120 style="display:block" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="><script>{say}const c=document.getElementById('c'),g=c.getContext('2d');
 for(const t of ['pointerdown','mousedown','click'])c.addEventListener(t,e=>{{say('/hit',[e.type,e.offsetX,e.offsetY,e.isTrusted]);if(t=='pointerdown'){{g.fillStyle='#000';g.fillRect(e.offsetX-20,e.offsetY-15,40,30)}}}});
 for(const t of ['pointermove','mousemove','pointerdown','mouseup'])addEventListener(t,e=>say('/ev',[e.type,e.clientX,e.clientY,e.isTrusted,document.hasFocus(),document.visibilityState]),true);
 const info=()=>say('/info',{{w:'canvas',x:screenX,y:screenY,bar:outerHeight-innerHeight,focus:document.hasFocus(),vis:document.visibilityState}});info();setInterval(info,300);
 window.open('/other.html','other','left=10,top=60,width=490,height=460');</script>''')
             # --window-position places every new window, so the popup moves itself beside the canvas window, not over it
-            (root / 'other.html').write_text(f'<title>ATTICUS canvas other</title><p>Other window</p><script>{say}moveTo(10,60);resizeTo(490,460);setInterval(()=>say("/info",{{w:"other",x:screenX}}),300)</script>')
+            (root / 'other.html').write_text(f'<title>RABIK canvas other</title><p>Other window</p><script>{say}moveTo(10,60);resizeTo(490,460);setInterval(()=>say("/info",{{w:"other",x:screenX}}),300)</script>')
             seen, hits, events = {}, [], []
             class Pages(http.server.SimpleHTTPRequestHandler):
                 def log_message(self, *a): pass
@@ -223,23 +223,23 @@ window.open('/other.html','other','left=10,top=60,width=490,height=460');</scrip
             server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Pages, directory=tmp))
             threading.Thread(target=server.serve_forever, daemon=True).start()
             self.addCleanup(server.server_close); self.addCleanup(server.shutdown)
-            binary = root / 'Atticus'
-            compiled = subprocess.run(['swiftc', str(root_dir / 'Atticus.swift'), '-o', str(binary)], capture_output=True, text=True)
+            binary = root / 'Rabik'
+            compiled = subprocess.run(['swiftc', str(root_dir / 'Rabik.swift'), '-o', str(binary)], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
-            env = {**os.environ, 'ATTICUS_DIR':tmp, 'ATTICUS_RESOURCES_DIR':str(root_dir), 'ATTICUS_HANDS_STATE':str(root / 'hands.json')}
-            env.pop('ATTICUS_AX_ONLY', None); env.pop('ATTICUS_HANDS_WINDOW', None)
+            env = {**os.environ, 'RABIK_DIR':tmp, 'RABIK_RESOURCES_DIR':str(root_dir), 'RABIK_HANDS_STATE':str(root / 'hands.json')}
+            env.pop('RABIK_AX_ONLY', None); env.pop('RABIK_HANDS_WINDOW', None)
             def hands(*args):
                 label = subprocess.run([str(binary), '--hands', 'label', *args], env=env, capture_output=True, text=True, timeout=15)
                 self.assertEqual(label.returncode, 0, label.stdout + label.stderr)
-                r = subprocess.run([str(binary), '--hands', *args], input=label.stdout, env={**env, 'ATTICUS_HANDS_RECEIPT':'1'}, capture_output=True, text=True, timeout=15)
+                r = subprocess.run([str(binary), '--hands', *args], input=label.stdout, env={**env, 'RABIK_HANDS_RECEIPT':'1'}, capture_output=True, text=True, timeout=15)
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr); return r.stdout
-            if 'Allow Atticus' in subprocess.run([str(binary), '--hands', 'see', '2147483647'], env=env, capture_output=True, text=True).stdout:
+            if 'Allow Rabik' in subprocess.run([str(binary), '--hands', 'see', '2147483647'], env=env, capture_output=True, text=True).stdout:
                 self.skipTest('Temporary binary lacks Accessibility permission; no permission changes made')
             source = root / 'cover.swift'
             source.write_text('''import Cocoa
 let app=NSApplication.shared; app.setActivationPolicy(.regular)
 let w=NSWindow(contentRect:NSRect(x:20,y:20,width:300,height:100),styleMask:[.titled],backing:.buffered,defer:false)
-w.title="Atticus scratch foreground"; w.orderFrontRegardless()
+w.title="Rabik scratch foreground"; w.orderFrontRegardless()
 DispatchQueue.main.asyncAfter(deadline:.now()+0.2) { app.activate(ignoringOtherApps:true); w.makeKeyAndOrderFront(nil) }
 DispatchQueue.main.asyncAfter(deadline:.now()+0.6) { print(ProcessInfo.processInfo.processIdentifier); fflush(stdout) }
 NSWorkspace.shared.notificationCenter.addObserver(forName:NSWorkspace.didActivateApplicationNotification,object:nil,queue:.main) { n in
@@ -256,7 +256,7 @@ signal(SIGTERM) { _ in exit(0) }; app.run()
 ''')
             cover = root / 'ForegroundFixture.app/Contents/MacOS/cover'; cover.parent.mkdir(parents=True)
             with open(cover.parent.parent / 'Info.plist', 'wb') as f:
-                plistlib.dump({'CFBundleIdentifier':'com.atticus.canvas.foreground', 'CFBundleExecutable':'cover', 'CFBundleName':'Canvas Foreground', 'CFBundlePackageType':'APPL'}, f)
+                plistlib.dump({'CFBundleIdentifier':'com.rabik.canvas.foreground', 'CFBundleExecutable':'cover', 'CFBundleName':'Canvas Foreground', 'CFBundlePackageType':'APPL'}, f)
             subprocess.run(['swiftc', str(source), '-o', str(cover)], env=env, check=True, capture_output=True)
             log = open(root / 'chrome.log', 'w')
             origin = f'http://127.0.0.1:{server.server_port}'
@@ -293,7 +293,7 @@ signal(SIGTERM) { _ in exit(0) }; app.run()
                 spot = lambda x, y: f"{at['x'] + x},{at['y'] + at['bar'] + y}"
                 # As in a main ask with no see: the map is the user's front app; the point is in Chrome's canvas window, not Chrome's focused one.
                 mapped = subprocess.run([str(binary), '--hands', 'see', str(pid)], env=env, capture_output=True, text=True, timeout=15)   # see makes the map: label needs one
-                self.assertIn('Window: Atticus scratch foreground', mapped.stdout, mapped.stdout + mapped.stderr)
+                self.assertIn('Window: Rabik scratch foreground', mapped.stdout, mapped.stdout + mapped.stderr)
                 key = lambda: ask('key', 'KEY')
                 self.assertEqual(key(), 'true true')
                 out = hands('click', spot(120, 90))
@@ -325,10 +325,10 @@ signal(SIGTERM) { _ in exit(0) }; app.run()
 
     def test_point_click_confirms_a_landed_click_in_a_fullscreen_window(self):
         """Saarth's Oct 21 case: a canvas in a cross-origin iframe in a native-full-screen Chrome window, Chrome inactive while an
-        accessory app (as Atticus is) is front. The click lands, and the reply must confirm the change, not say 'Nothing changed'
+        accessory app (as Rabik is) is front. The click lands, and the reply must confirm the change, not say 'Nothing changed'
         (a full-screen window's own capture returns a stale frame; the real screen at the spot shows the change)."""
         root_dir = Path(__file__).resolve().parents[1]
-        with tempfile.TemporaryDirectory(prefix='atticus-fs-') as tmp:
+        with tempfile.TemporaryDirectory(prefix='rabik-fs-') as tmp:
             root = Path(tmp); profile = root / 'profile'; profile.mkdir()
             seen, hits = {}, []
             class Pages(http.server.SimpleHTTPRequestHandler):
@@ -344,28 +344,28 @@ signal(SIGTERM) { _ in exit(0) }; app.run()
             port = server.server_port
             say = 'const say=(p,d)=>fetch(p,{method:"POST",body:JSON.stringify(d),keepalive:true});'
             # localhost vs 127.0.0.1 is a cross-origin iframe: the canvas is in a different-origin document, as Google Minesweeper is.
-            (root / 'top.html').write_text(f'''<title>ATTICUS FS {root.name}</title><body style="margin:0;background:#888"><iframe src="http://localhost:{port}/game.html" width=440 height=420 style="border:0;display:block"></iframe><script>{say}
+            (root / 'top.html').write_text(f'''<title>RABIK FS {root.name}</title><body style="margin:0;background:#888"><iframe src="http://localhost:{port}/game.html" width=440 height=420 style="border:0;display:block"></iframe><script>{say}
 const info=()=>say('/info',{{w:'full',x:screenX,y:screenY,bar:outerHeight-innerHeight,ow:outerWidth,sw:screen.width,focus:document.hasFocus()}});info();setInterval(info,300);</script>''')
             (root / 'game.html').write_text(f'''<body style="margin:0"><canvas id=c width=440 height=300 style="display:block;background:#fff"></canvas><script>{say}const c=document.getElementById('c'),g=c.getContext('2d');
 for(const t of ['pointerdown','mousedown','click'])c.addEventListener(t,e=>{{say('/hit',[e.type,e.offsetX,e.offsetY,e.isTrusted]);if(t=='pointerdown'){{g.fillStyle='#000';g.fillRect(e.offsetX-20,e.offsetY-15,40,30)}}}});</script>''')
-            binary = root / 'Atticus'
-            compiled = subprocess.run(['swiftc', str(root_dir / 'Atticus.swift'), '-o', str(binary)], capture_output=True, text=True)
+            binary = root / 'Rabik'
+            compiled = subprocess.run(['swiftc', str(root_dir / 'Rabik.swift'), '-o', str(binary)], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
-            env = {**os.environ, 'ATTICUS_DIR': tmp, 'ATTICUS_RESOURCES_DIR': str(root_dir), 'ATTICUS_HANDS_STATE': str(root / 'hands.json')}
-            env.pop('ATTICUS_AX_ONLY', None); env.pop('ATTICUS_HANDS_WINDOW', None)
-            if 'Allow Atticus' in subprocess.run([str(binary), '--hands', 'see', '2147483647'], env=env, capture_output=True, text=True).stdout:
+            env = {**os.environ, 'RABIK_DIR': tmp, 'RABIK_RESOURCES_DIR': str(root_dir), 'RABIK_HANDS_STATE': str(root / 'hands.json')}
+            env.pop('RABIK_AX_ONLY', None); env.pop('RABIK_HANDS_WINDOW', None)
+            if 'Allow Rabik' in subprocess.run([str(binary), '--hands', 'see', '2147483647'], env=env, capture_output=True, text=True).stdout:
                 self.skipTest('Temporary binary lacks Accessibility permission; no permission changes made')
             def hands(*args):
                 label = subprocess.run([str(binary), '--hands', 'label', *args], env=env, capture_output=True, text=True, timeout=20)
                 self.assertEqual(label.returncode, 0, label.stdout + label.stderr)
-                r = subprocess.run([str(binary), '--hands', *args], input=label.stdout, env={**env, 'ATTICUS_HANDS_RECEIPT': '1'}, capture_output=True, text=True, timeout=20)
+                r = subprocess.run([str(binary), '--hands', *args], input=label.stdout, env={**env, 'RABIK_HANDS_RECEIPT': '1'}, capture_output=True, text=True, timeout=20)
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr); return r.stdout
-            source = root / 'cover.swift'   # an accessory app, as Atticus is: it floats over Chrome's full-screen Space without switching away from it
+            source = root / 'cover.swift'   # an accessory app, as Rabik is: it floats over Chrome's full-screen Space without switching away from it
             source.write_text('''import Cocoa
 let app=NSApplication.shared; app.setActivationPolicy(.accessory)
 let w=NSWindow(contentRect:NSRect(x:0,y:0,width:300,height:120),styleMask:[.titled],backing:.buffered,defer:false)
 w.collectionBehavior=[.canJoinAllSpaces,.fullScreenAuxiliary]
-w.title="Atticus scratch foreground"; w.setFrameTopLeftPoint(NSPoint(x:700,y:(NSScreen.screens.first?.frame.height ?? 800)-200)); w.orderFrontRegardless()
+w.title="Rabik scratch foreground"; w.setFrameTopLeftPoint(NSPoint(x:700,y:(NSScreen.screens.first?.frame.height ?? 800)-200)); w.orderFrontRegardless()
 DispatchQueue.main.asyncAfter(deadline:.now()+0.2) { app.activate(ignoringOtherApps:true); w.makeKeyAndOrderFront(nil) }
 DispatchQueue.main.asyncAfter(deadline:.now()+0.6) { print(ProcessInfo.processInfo.processIdentifier); fflush(stdout) }
 NSWorkspace.shared.notificationCenter.addObserver(forName:NSWorkspace.didActivateApplicationNotification,object:nil,queue:.main) { n in
@@ -379,7 +379,7 @@ signal(SIGTERM) { _ in exit(0) }; app.run()
 ''')
             cover = root / 'ForegroundFixture.app/Contents/MacOS/cover'; cover.parent.mkdir(parents=True)
             with open(cover.parent.parent / 'Info.plist', 'wb') as f:
-                plistlib.dump({'CFBundleIdentifier': 'com.atticus.fs.foreground', 'CFBundleExecutable': 'cover', 'CFBundleName': 'FS Foreground', 'CFBundlePackageType': 'APPL'}, f)
+                plistlib.dump({'CFBundleIdentifier': 'com.rabik.fs.foreground', 'CFBundleExecutable': 'cover', 'CFBundleName': 'FS Foreground', 'CFBundlePackageType': 'APPL'}, f)
             subprocess.run(['swiftc', str(source), '-o', str(cover)], env=env, check=True, capture_output=True)
             log = open(root / 'chrome.log', 'w')
             origin = f'http://127.0.0.1:{port}'
@@ -409,7 +409,7 @@ signal(SIGTERM) { _ in exit(0) }; app.run()
                 at = seen['full']
                 self.assertGreaterEqual(at['ow'], at['sw'] - 2, 'Chrome is not full screen')
                 mapped = subprocess.run([str(binary), '--hands', 'see', str(pid)], env=env, capture_output=True, text=True, timeout=15)
-                self.assertIn('Window: Atticus scratch foreground', mapped.stdout, mapped.stdout + mapped.stderr)
+                self.assertIn('Window: Rabik scratch foreground', mapped.stdout, mapped.stdout + mapped.stderr)
                 before = len(hits)
                 out = hands('click', f"{at['x'] + 120},{at['y'] + at['bar'] + 90}")
                 deadline = time.time() + 3

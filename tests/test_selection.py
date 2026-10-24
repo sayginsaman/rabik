@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == 'darwin', 'macOS Swift regression')
 class SelectionTests(unittest.TestCase):
     def test_paste_rechecks_target_cancellation_and_clipboard_ownership(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         apply = source[source.index('    func apply(_ draft:'):source.index('    func replace(_ draft:')]
         borrow = source[source.index('func borrowPasteboard'):source.index('struct TextSelection {')]
         swift = '''import Foundation
@@ -129,7 +129,7 @@ answered = false; h.apply("private", preserveFocus: true, valid: { NSWorkspace.s
 precondition(!ok && events == eventCount && activations == activationCount && NSWorkspace.shared.frontmostApplication === other, "focus-preserving insert raised the old app or typed there")
 reset(); clipboardBusy = true; ok = false; let busyEvents = events
 h.apply("draft", valid: { true }) { ok = $0 }; pump(0.3)
-precondition(!ok && events == busyEvents && pb.pasteboardItems?.first?.data(forType: .rich) != nil, "pasted while another Atticus process held the clipboard")
+precondition(!ok && events == busyEvents && pb.pasteboardItems?.first?.data(forType: .rich) != nil, "pasted while another Rabik process held the clipboard")
 clipboardBusy = false; pump(2, until: { ok }); precondition(ok && leases == unlocks, "paste did not resume after the clipboard freed, or kept the lock")
 reset(); NSApp.keyWindow = 1; ok = false; let hidKeyed = hidEvents, pidKeyed = events
 answered = false; h.apply("draft", valid: { true }) { ok = $0; answered = true }; pump(2, until: { answered }); NSApp.keyWindow = nil
@@ -147,7 +147,7 @@ print("paste safety ok")
         self.assertIn('paste safety ok', run_swift(self, swift))
 
     def test_typing_capture_accepts_empty_fields_but_never_secure_fields(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         capture = source[source.index('    static func capture('):source.index('    static func selectedRange(')]
         pastable = source[source.index('    var pastable: Bool'):source.index('    func apply(')]
         typing_guard = next(line for line in source.splitlines() if 'guard let selected = TextSelection.capture(enabled: true' in line)
@@ -206,7 +206,7 @@ precondition(rich?.text == "old" && rich?.element == 2 && rich?.focus == 1 && ri
 useParent = false; selectedText = "old"
 precondition(TextSelection.capture(enabled: false, allowEmpty: true) == nil)
 NSWorkspace.shared.frontmostApplication = .current
-precondition(TextSelection.capture(enabled: true, allowEmpty: true) == nil, "Atticus captured its own field")
+precondition(TextSelection.capture(enabled: true, allowEmpty: true) == nil, "Rabik captured its own field")
 NSWorkspace.shared.frontmostApplication = NSRunningApplication()
 subrole = "secure"; precondition(TextSelection.capture(enabled: true, allowEmpty: true) == nil, "password field captured")
 subrole = "field"; selectedText = String(repeating: "x", count: 6001)
@@ -225,7 +225,7 @@ print("typing capture ok")
         self.assertIn('typing capture ok', run_swift(self, swift))
 
     def test_capture_is_async_and_cancelled_or_stale_results_are_ignored(self):
-        source = (ROOT / 'Atticus.swift').read_text().split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
+        source = (ROOT / 'Rabik.swift').read_text().split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
         capture = source[source.index('    func captureSelection()'):source.index('    func captureDictationSelection(')]
         finish = source[source.index('    func finish()'):source.index('        aheadItem?.cancel()', source.index('    func finish()'))] + '        finished += 1\n    }\n'
         swift = '''import Foundation

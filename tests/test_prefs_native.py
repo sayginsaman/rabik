@@ -1,4 +1,4 @@
-"""Native settings and usage regressions in a scratch ATTICUS_DIR."""
+"""Native settings and usage regressions in a scratch RABIK_DIR."""
 import os
 from pathlib import Path
 import subprocess
@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == "darwin", "macOS Swift regression")
 class PrefsNativeTests(unittest.TestCase):
     def test_all_windows_follow_sharing_preference(self):
-        source = (ROOT / "Atticus.swift").read_text()
+        source = (ROOT / "Rabik.swift").read_text()
         self.assertEqual(source.count(".sharingType ="), 1)
         prefs = source[source.index("enum Prefs"):source.index("func profileName(")]
         live = next(line for line in source.splitlines() if 'if k == "hideWhenSharing"' in line)
@@ -39,16 +39,16 @@ for enabled in [false, true, false] {
             compiled = subprocess.run(["swiftc", str(path), "-o", str(binary)], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             result = subprocess.run([str(binary)], capture_output=True, text=True,
-                                    env={**os.environ, "ATTICUS_DIR": root})
+                                    env={**os.environ, "RABIK_DIR": root})
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_old_long_asks_choices_are_not_read(self):
-        source = (ROOT / "Atticus.swift").read_text()
+        source = (ROOT / "Rabik.swift").read_text()
         self.assertNotIn('"longAsks"', source)
         self.assertNotIn('agentsAuto', source)
 
     def test_retired_settings_keep_saved_values_without_rewriting_disk(self):
-        source = (ROOT / "Atticus.swift").read_text()
+        source = (ROOT / "Rabik.swift").read_text()
         prefs = source[source.index("enum Prefs"):source.index("func applySharing(")]
         swift = """import Foundation
 let controlKey = 1, optionKey = 2
@@ -70,16 +70,16 @@ if CommandLine.arguments.contains("--saved") {
             saved = '{"workIn":"front","askMe":false,"tips":false,"aheadDelay":1.2,"speak":true,"routing":"capable","quietAudio":true,"selection":false,"learn":false,"dictateLearn":false}'
             settings = Path(root) / "settings.json"
             settings.write_text(saved)
-            result = subprocess.run([str(binary), "--saved"], capture_output=True, text=True, env={**os.environ, "ATTICUS_DIR": root})
+            result = subprocess.run([str(binary), "--saved"], capture_output=True, text=True, env={**os.environ, "RABIK_DIR": root})
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(settings.read_text(), saved)
             fresh = Path(root) / "fresh"
-            result = subprocess.run([str(binary)], capture_output=True, text=True, env={**os.environ, "ATTICUS_DIR": str(fresh)})
+            result = subprocess.run([str(binary)], capture_output=True, text=True, env={**os.environ, "RABIK_DIR": str(fresh)})
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertFalse((fresh / "settings.json").exists())
 
     def test_dictation_shortcut_defaults_to_fn_but_keeps_any_choice(self):
-        source = (ROOT / "Atticus.swift").read_text()
+        source = (ROOT / "Rabik.swift").read_text()
         prefs = source[source.index("enum Prefs"):source.index("func applySharing(")]
         swift = """import Foundation
 let controlKey = 1, optionKey = 2
@@ -100,15 +100,15 @@ print(Prefs.str("dictateHotkeyLabel") + "|" + String(Int(Prefs.num("dictateHotke
             for i, (before, want) in enumerate(cases):
                 case = Path(root) / str(i); case.mkdir()
                 if before: (case / "settings.json").write_text(before)
-                result = subprocess.run([str(binary)], capture_output=True, text=True, env={**os.environ, "ATTICUS_DIR": str(case)})
+                result = subprocess.run([str(binary)], capture_output=True, text=True, env={**os.environ, "RABIK_DIR": str(case)})
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(result.stdout.strip(), want, before)
 
     def test_settings_are_private_and_usage_counts_final_rows(self):
-        source = (ROOT / "Atticus.swift").read_text()
+        source = (ROOT / "Rabik.swift").read_text()
         prefs = source[source.index("enum Prefs"):source.index("func audioProp")]
         today = source[source.index("    func today()"):source.index("    @objc func toggleMeeting")]
-        today = today.replace('NSString(string: "~/.config/atticus/log.jsonl").expandingTildeInPath',
+        today = today.replace('NSString(string: "~/.config/rabik/log.jsonl").expandingTildeInPath',
                               '(Prefs.path as NSString).deletingLastPathComponent + "/log.jsonl"')
         swift = """import Cocoa
 let controlKey = 1, optionKey = 2
@@ -138,11 +138,11 @@ precondition(usage == "Today: $0.03 · asks $0.01 · agents $0.02", "usage did n
             compiled = subprocess.run(["swiftc", str(path), "-o", str(binary)], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             result = subprocess.run([str(binary)], capture_output=True, text=True,
-                                    env={**os.environ, "ATTICUS_DIR": root})
+                                    env={**os.environ, "RABIK_DIR": root})
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_unwritable_settings_keep_the_old_value(self):
-        source = (ROOT / "Atticus.swift").read_text()
+        source = (ROOT / "Rabik.swift").read_text()
         prefs = source[source.index("enum Prefs"):source.index("func audioProp")]
         swift = """import Cocoa
 let controlKey = 1, optionKey = 2
@@ -152,11 +152,11 @@ precondition(!Prefs.bool("speak"), "the unsaved value stayed in memory")
 """
         with tempfile.TemporaryDirectory() as root:
             path, binary, blocked = Path(root) / "check.swift", Path(root) / "check", Path(root) / "not-a-folder"
-            path.write_text(swift); blocked.write_text("")   # ATTICUS_DIR is a file, so settings.json can't be written
+            path.write_text(swift); blocked.write_text("")   # RABIK_DIR is a file, so settings.json can't be written
             compiled = subprocess.run(["swiftc", str(path), "-o", str(binary)], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             result = subprocess.run([str(binary)], capture_output=True, text=True,
-                                    env={**os.environ, "ATTICUS_DIR": str(blocked)})
+                                    env={**os.environ, "RABIK_DIR": str(blocked)})
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 

@@ -1,4 +1,4 @@
-Atticus.app/
+Rabik.app/
 __pycache__/
 .DS_Store
 
@@ -29,7 +29,7 @@ CLAUDE.local.md
 .claude/
 .cursor/
 index.html
-docs/atticus-film.mp4
+docs/rabik-film.mp4
 docs/film-poster.png
 
 # Nix build result symlinks

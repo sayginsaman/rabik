@@ -23,19 +23,19 @@ import ScreenCaptureKit
 enum Prefs { static func str(_ key: String) -> String { "back" } }
 __NATIVE__
 let app = NSApplication.shared; app.setActivationPolicy(.accessory)
-let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleDisplaySleepDisabled], reason: "Atticus isolated window fixtures")
+let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleDisplaySleepDisabled], reason: "Rabik isolated window fixtures")
 let mode = CommandLine.arguments[1]
 if mode == "cover" || mode == "activation" { app.setActivationPolicy(.regular) }
 if mode == "cover" {
     let cover=NSWindow(contentRect:NSRect(x:100,y:100,width:300,height:200),styleMask:[.titled],backing:.buffered,defer:false)
-    cover.title="Atticus activation cover";cover.makeKeyAndOrderFront(nil)
+    cover.title="Rabik activation cover";cover.makeKeyAndOrderFront(nil)
     MiniScreen.activate(ProcessInfo.processInfo.processIdentifier)
     print("READY");fflush(stdout);app.run()
 }
 if mode == "activation" {
     let target=NSWindow(contentRect:NSRect(x:40,y:40,width:600,height:375),styleMask:[.titled],backing:.buffered,defer:false)
     let other=NSWindow(contentRect:NSRect(x:70,y:70,width:400,height:300),styleMask:[.titled],backing:.buffered,defer:false)
-    target.title="Atticus exact activation target";other.title="Atticus other activation window"
+    target.title="Rabik exact activation target";other.title="Rabik other activation window"
     target.orderFrontRegardless();other.orderFrontRegardless()
     let mini=MiniScreen(),pid=ProcessInfo.processInfo.processIdentifier
     let f=target.frame,height=NSScreen.screens.first!.frame.height
@@ -148,9 +148,9 @@ class MiniScreenNativeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory(); cls.addClassCleanup(cls.temp.cleanup)
-        cls.root = Path(cls.temp.name); cls.binary = cls.root / 'Atticus'
-        cls.env = {**os.environ, 'ATTICUS_DIR':str(cls.root), 'ATTICUS_RESOURCES_DIR':str(ROOT)}
-        swift = (ROOT / 'Atticus.swift').read_text()
+        cls.root = Path(cls.temp.name); cls.binary = cls.root / 'Rabik'
+        cls.env = {**os.environ, 'RABIK_DIR':str(cls.root), 'RABIK_RESOURCES_DIR':str(ROOT)}
+        swift = (ROOT / 'Rabik.swift').read_text()
         ax = swift[swift.index('func axAttribute('):swift.index('struct TextSelection')]
         mini = swift[swift.index('final class PassView:'):swift.index('final class App:')]
         source = cls.root / 'main.swift'; source.write_text(HARNESS.replace('__NATIVE__',ax + mini))
@@ -185,7 +185,7 @@ class MiniScreenNativeTests(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stdout + result.stderr)
         print(result.stdout.strip(),flush=True)
 
-    @unittest.skipUnless(os.environ.get('ATTICUS_MINISCREEN_CPU') == '1', 'Opt-in 20 s CPU benchmark per mode')
+    @unittest.skipUnless(os.environ.get('RABIK_MINISCREEN_CPU') == '1', 'Opt-in 20 s CPU benchmark per mode')
     def test_cpu_cost(self):
         averages = {}
         for mode in ('baseline', 'cpu'):
@@ -218,7 +218,7 @@ class MiniScreenNativeTests(unittest.TestCase):
         finally: server.shutdown(); server.server_close(); thread.join()
 
     def test_target_selection_and_minimized_fallback_with_fake_ax(self):
-        swift = (ROOT / 'Atticus.swift').read_text()
+        swift = (ROOT / 'Rabik.swift').read_text()
         mini = swift[swift.index('final class PassView:'):swift.index('final class App:')]
         stub = r'''
 import Cocoa
@@ -246,7 +246,7 @@ final class PanelStub { var isVisible=false }
 final class DrawingStub { var active=false,hasInput=false,clears=0;func clear() {clears += 1;active=false;hasInput=false};func stopVoice() {} }
 final class Starter {
  let drawing=DrawingStub();var drawingReply=false
- let mini=MiniScreen(),engine=EngineStub(),panel=PanelStub();var busy=false,fresh=false,retryOffer=false,askFile="",agentCard="",replyAgent="",focusFile=NSTemporaryDirectory()+"atticus-focus-fixture"
+ let mini=MiniScreen(),engine=EngineStub(),panel=PanelStub();var busy=false,fresh=false,retryOffer=false,askFile="",agentCard="",replyAgent="",focusFile=NSTemporaryDirectory()+"rabik-focus-fixture"
  func shush() {}
  func hush(keepReply:Bool) {if !keepReply {drawingReply=false}}
  func dismiss() {}

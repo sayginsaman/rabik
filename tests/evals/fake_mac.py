@@ -13,7 +13,7 @@ from pathlib import Path
 _LOCK = threading.Lock()
 
 def _load():
-    path = os.environ.get('ATTICUS_EVAL_STATE', '')
+    path = os.environ.get('RABIK_EVAL_STATE', '')
     if not path or not os.path.isfile(path):
         return {'pages': {}, 'hands': {}, 'log': [], 'effects': []}
     with _LOCK:
@@ -22,7 +22,7 @@ def _load():
 
 
 def _save(state):
-    path = os.environ.get('ATTICUS_EVAL_STATE', '')
+    path = os.environ.get('RABIK_EVAL_STATE', '')
     if not path:
         return
     with _LOCK:
@@ -36,7 +36,7 @@ def _log(kind, detail):
     row = {'t': time.time(), 'kind': kind, 'detail': detail}
     state.setdefault('log', []).append(row)
     _save(state)
-    path = os.environ.get('ATTICUS_EVAL_LOG', '')
+    path = os.environ.get('RABIK_EVAL_LOG', '')
     if path:
         with open(path, 'a') as f:
             f.write(json.dumps(row) + '\n')
@@ -166,7 +166,7 @@ def _hands_act(args, state):
     nodes = {n['id']: n for n in hands.get('nodes', [])}
     verb, target = args[0], args[1] if len(args) > 1 else ''
     if verb == 'see':
-        path = os.environ.get('ATTICUS_HANDS_STATE', '')
+        path = os.environ.get('RABIK_HANDS_STATE', '')
         if path:
             os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
             with open(path, 'w') as f:
@@ -278,10 +278,10 @@ def run(args, **kwargs):
         return subprocess.CompletedProcess(cmd, 0, '', '')
     if cmd[0] == 'curl' and 'wttr.in' in ' '.join(cmd):
         return subprocess.CompletedProcess(cmd, 0, 'Fixture: Sunny +20°C', '')
-    me = os.environ.get('ATTICUS_EVAL_ME', '')
+    me = os.environ.get('RABIK_EVAL_ME', '')
     if me and me in cmd[0]:
         return None
-    app = os.environ.get('ATTICUS_APP', '')
+    app = os.environ.get('RABIK_APP', '')
     if app and cmd[0] == app and len(cmd) > 2 and cmd[1] == '--window-target':
         target = {'pid': state.get('pid', 4242), 'windowID': '99', 'windowFrame': [0, 0, 900, 700],
                   'app': cmd[2], 'window': state.get('front_window', 'Fixture')}
@@ -306,7 +306,7 @@ def run(args, **kwargs):
 
 
 def popen(args, **kwargs):
-    app = os.environ.get('ATTICUS_APP', '')
+    app = os.environ.get('RABIK_APP', '')
     if not app or not args or args[0] != app or len(args) < 2 or args[1] != '--hands':
         return None
     state = _load()
@@ -330,7 +330,7 @@ def popen(args, **kwargs):
     if hand_args[:1] == ['label'] or hand_args[:1] == ['see']:
         out, code = finish()
         return _FakeProc(args, out, returncode=code, stdin_pipe=stdin_pipe)
-    if (kwargs.get('env') or os.environ).get('ATTICUS_HANDS_SESSION') == '1':
+    if (kwargs.get('env') or os.environ).get('RABIK_HANDS_SESSION') == '1':
         return _SessionProc(args, _hands_label(hand_args, state), finish)
 
     proc = _FakeProc(args, '', returncode=0, stdin_pipe=stdin_pipe)

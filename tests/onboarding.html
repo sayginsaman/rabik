@@ -21,7 +21,7 @@ async function go(id){d.querySelector(`.page.on [data-go="${id}"]`).click();awai
  for(const e of $(''+id).children){const r=e.getBoundingClientRect();if(!e.hidden)assert(r.left>=0&&r.right<=640&&r.top>=0&&r.bottom<=612,'Fits window '+id+' / '+(e.id||e.tagName))}
 }
 page('welcome');await go('perms');
-w.ob.plan({ok:false,need:'upgrade',client:'claude',text:'Atticus needs a paid Claude plan (Pro or Max).'});w.ob.server({apiBase:'',apiModel:''});assert($('client-alt').textContent==='Change provider','Plan row offers Change provider');
+w.ob.plan({ok:false,need:'upgrade',client:'claude',text:'Rabik needs a paid Claude plan (Pro or Max).'});w.ob.server({apiBase:'',apiModel:''});assert($('client-alt').textContent==='Change provider','Plan row offers Change provider');
 $('client-alt').click();await until(()=>!$('prov').hidden,'provider sheet');assert(d.querySelector('.opt[data-p="claude"]').getAttribute('aria-checked')==='true'&&$('srv').hidden,'Sheet opens on the current provider');
 for(const e of [d.querySelector('#prov .card')]){const r=e.getBoundingClientRect();assert(r.top>=0&&r.bottom<=612&&r.left>=0&&r.right<=640,'Provider sheet fits window')}
 w.ob.local([{name:'Ollama',base:'http://localhost:11434',models:['qwen3']}]);assert(!$('local-offer').hidden&&$('local-use').textContent==='Use Ollama','Running local server is offered');
@@ -43,12 +43,12 @@ w.ob.set({mic:true,speech:true,ax:true,screen:false,auto:true,chrome:false,calen
 assert($('a-ax').classList.contains('ok')&&!$('a-screen').classList.contains('ok')&&$('a-connectors').classList.contains('ok')&&$('a-connectors').textContent.includes('1 need sign-in'),'Agents rows show live status, nothing asked twice');
 assert(!$('enable').hidden&&$('agents-next').textContent==='Skip for Now','Enable All shows while something is missing');
 $('enable').click();await until(()=>messages.some(m=>m.do==='enableAll'&&m.connected==='true'),'Enable All request');assert(true,'Enable All starts the walk');
-w.ob.walk('screen');assert($('a-screen').classList.contains('now')&&!$('a-ax').classList.contains('now')&&$('a-screen').textContent.includes('Turn on Atticus in System Settings')&&$('enable').disabled,'Enable All marks the step it is on and says what to do');
+w.ob.walk('screen');assert($('a-screen').classList.contains('now')&&!$('a-ax').classList.contains('now')&&$('a-screen').textContent.includes('Turn on Rabik in System Settings')&&$('enable').disabled,'Enable All marks the step it is on and says what to do');
 w.ob.set({mic:true,speech:true,ax:true,screen:true,auto:true,chrome:true,calendar:true,tools:true});w.ob.walk('');
 assert($('enable').hidden&&$('agents-next').textContent==='Continue','All on: Continue is the main action');
 await go('try');assert($('try-next').hidden,'Try Next waits for shortcut');
 w.ob.tried();await until(()=>!$('try-next').hidden&&$('try-skip').hidden,'Try Next button');assert(true,'Shortcut enables Next');
-await go('mac');assert(!!$('mac-mini')&&$('mac').textContent.includes('background'),'Mac preview explains background work and live mini screen');await go('learn');assert($('learn').textContent.includes('remember'),'Setup teaches that Atticus remembers');await go('text');await go('dictate');
+await go('mac');assert(!!$('mac-mini')&&$('mac').textContent.includes('background'),'Mac preview explains background work and live mini screen');await go('learn');assert($('learn').textContent.includes('remember'),'Setup teaches that Rabik remembers');await go('text');await go('dictate');
 const P0={draw:true,meeting:false,routing:'balanced',dictateMode:'verbatim',dictateHotkeyLabel:''},keysIn=()=>[...$('dc-field').querySelectorAll('i')].map(i=>i.textContent).join('');
 w.ob.prefs(P0);assert($('dc-field').textContent==='Record Shortcut'&&$('dc-clear').hidden&&$('dc-mode').classList.contains('dim'),'Dictation starts with no shortcut and its mode greyed');
 $('dc-field').click();await until(()=>messages.some(m=>m.do==='recordDictate')&&$('dc-field').classList.contains('rec'),'dictation recorder');assert($('dc-field').textContent==='Type Shortcut','Clicking the field records the next keys');
@@ -76,11 +76,9 @@ for(const e of $('work').querySelectorAll('.row')){const r=e.getBoundingClientRe
 await go('meeting');assert($('meeting').textContent.includes('Settings → Meetings')&&!!$('mt-archive'),'Meeting preview includes the local archive');await go('improve');
 for(const e of $('improve').children){const r=e.getBoundingClientRect();assert(r.left>=0&&r.right<=640&&r.top>=0&&r.bottom<=612,'Fits window improve / '+e.className)}
 assert($('improve').textContent.includes('Anonymous')&&d.querySelector('#improve .bar2 .btn:not(.quiet)').textContent==='Help Improve','Improve page says what is sent; Help Improve is the main action');
-d.querySelector('#improve [data-improve="true"]').click();await until(()=>d.querySelector('.page.on')?.id==='tip','tip page');page('tip');
-for(const e of $('tip').children){const r=e.getBoundingClientRect();assert(r.left>=0&&r.right<=640&&r.top>=0&&r.bottom<=612,'Fits window tip / '+(e.id||e.className))}
-assert($('tip').textContent.includes('really support me')&&$('kofi').textContent.includes('Leave a Tip'),'Tip page asks for a tip on its own screen');
-$('kofi').click();await until(()=>messages.some(m=>m.do==='kofi'),'tip request');assert(true,'Leave a Tip opens the tip page');assert(d.querySelector('.page.on').id==='tip','Tipping stays on the tip page');
-await go('done');
+d.querySelector('#improve [data-improve="true"]').click();await until(()=>d.querySelector('.page.on')?.id==='done','done page');page('done');
+for(const e of $('done').children){const r=e.getBoundingClientRect();if(!e.hidden)assert(r.left>=0&&r.right<=640&&r.top>=0&&r.bottom<=612,'Fits window done / '+(e.id||e.tagName))}
+assert(!$('tip')&&!$('kofi'),'No tip page or tip button');
 await until(()=>messages.some(m=>m.do==='set'&&m.k==='improve'&&m.v==='true'),'improve preference');assert(true,'Help Improve turns the setting on');assert($('feedback-note').textContent.includes('Report feedback'),'Last page asks for feedback');$('feedback-link').click();await until(()=>messages.some(m=>m.do==='feedback'),'feedback link message');assert(true,'Its link opens Report feedback');await until(()=>w.getComputedStyle($('done-check').querySelector('circle')).opacity==='1','done check (it only reaches its last frame by animating)');assert(true,'Done check finishes');
 const reduced=await load('reduced',true);
 await until(()=>reduced.document.getElementById('macstage').classList.contains('snapped')&&reduced.document.getElementById('mt-ans').classList.contains('on')&&reduced.document.getElementById('dc-words').textContent==='I was thinking we could leave.','reduced-motion final previews');

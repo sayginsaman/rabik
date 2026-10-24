@@ -1,4 +1,4 @@
-<!doctype html><meta charset="utf-8"><title>Atticus agents fixture</title>
+<!doctype html><meta charset="utf-8"><title>Rabik agents fixture</title>
 <style>body{background:#151518;color:#f5f5f7;font:13px -apple-system;margin:24px}iframe{border:0;border-radius:13px}#shelf{width:260px;height:650px}#view{width:760px;height:580px}#result{white-space:pre-wrap}</style>
 <h1>Agents</h1><p>Mock bridge only. Hover a chip; select an agent; try approvals, follow-ups and Reduce Motion.</p>
 <iframe id="shelf" title="Agent shelf"></iframe><iframe id="view" title="Agent view"></iframe><pre id="result"></pre><pre id="results"></pre>
@@ -89,7 +89,7 @@ try{
  shelfApi.state({...setupRow,question:{...setupRow.question,waiting:true}});await sleep(60);card=shelf.querySelector('[data-id="'+setupRow.id+'"] .pk.setup');
  check(!card.querySelector('button.go')&&card.querySelector('.note.waiting'),'While it waits for the switch, only Not now remains');
  shelfApi.state({...setupRow,question:{need:'page-js',app:'Google Chrome',q:'I can turn on page reading in Google Chrome for you',_a:'answers/p'}});await sleep(60);card=shelf.querySelector('[data-id="'+setupRow.id+'"] .pk.setup');
- check(card.querySelector('button.go').textContent==='Do it↩'&&card.querySelector('[data-esc]').textContent==='Noesc','What Atticus can change itself asks Do it / No');
+ check(card.querySelector('button.go').textContent==='Do it↩'&&card.querySelector('[data-esc]').textContent==='Noesc','What Rabik can change itself asks Do it / No');
  const steered={...setupRow,status:'running',question:null,step:'Reading',steer:{ack:'Got it: 12×24, not 24×24',at:Date.now()/1000},timeline:[{user:'I meant 12 x 24'}]};shelfApi.state(steered);await sleep(60);
  const glow=shelf.querySelector('[data-id="'+steered.id+'"]');check(glow.classList.contains('steered')&&glow.querySelector('.step').textContent==='Got it: 12×24, not 24×24','A steered chip glows and says what it heard');
  api.state(steered);api.select(steered.id);await sleep(60);check(view.querySelector('.entry.user')?.textContent.includes('I meant 12 x 24'),'The user’s words show in the timeline');

@@ -43,7 +43,7 @@ class FixtureTests(unittest.TestCase):
 import WebKit
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
-let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleDisplaySleepDisabled], reason: "Atticus isolated WebKit fixtures")
+let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleDisplaySleepDisabled], reason: "Rabik isolated WebKit fixtures")
 let config = WKWebViewConfiguration(); config.websiteDataStore = .nonPersistent()   // a disk cache keyed by the reused port served the last run's ui/*.js
 let web = WKWebView(frame: NSRect(x: 0, y: 0, width: 1000, height: 900), configuration: config)
 let panel = NSPanel(contentRect: web.frame, styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)

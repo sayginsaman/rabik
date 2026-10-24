@@ -11,7 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform=='darwin','macOS native replay')
 class ReplayNativeTests(unittest.TestCase):
     def test_menu_success_has_no_post_press_accessibility_queries(self):
-        source=(ROOT/'Atticus.swift').read_text()
+        source=(ROOT/'Rabik.swift').read_text()
         start=source.index('            if input[0] == "menu" {')
         branch=source[start:source.index('\n            }\n',start)+15]
         swift='''import Foundation
@@ -37,11 +37,11 @@ enum Hands {
  return 1
  }
 }
-precondition(try! Hands.call(["menu","com.atticus.fixture","Fixture > Start meeting"])==0)
+precondition(try! Hands.call(["menu","com.rabik.fixture","Fixture > Start meeting"])==0)
 precondition(presses==1)
 print("Accepted menu press completes once without post-action AX calls")
 '''
-        with tempfile.TemporaryDirectory(prefix='atticus-replay-native-') as tmp:
+        with tempfile.TemporaryDirectory(prefix='rabik-replay-native-') as tmp:
             root=Path(tmp);file=root/'replay.swift';file.write_text(swift);binary=root/'replay'
             result=subprocess.run(['swiftc',str(file),'-o',str(binary)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)

@@ -11,8 +11,8 @@ from tests.evals.harness import run_all, run_scenario  # noqa: E402
 from tests.evals.scenarios import SCENARIOS  # noqa: E402
 
 
-@unittest.skipUnless(os.environ.get('ATTICUS_RUN_DRY_EVALS') == '1',
-                     '15-scenario dry eval is opt-in (ATTICUS_RUN_DRY_EVALS=1)')
+@unittest.skipUnless(os.environ.get('RABIK_RUN_DRY_EVALS') == '1',
+                     '15-scenario dry eval is opt-in (RABIK_RUN_DRY_EVALS=1)')
 class DryEvalTests(unittest.TestCase):
     def test_all_dry_scenarios_pass(self):
         rows = run_all(ROOT, live=False)
@@ -30,7 +30,7 @@ class EvalHookTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             state = Path(root) / 'state.json'
             state.write_text('{"browser": "Fixture Browser", "front_app": "Fixture Browser", "pages": {}, "log": [], "effects": []}')
-            env = {**os.environ, 'ATTICUS_EVAL_STATE': str(state),
+            env = {**os.environ, 'RABIK_EVAL_STATE': str(state),
                    'PYTHONPATH': str(Path(__file__).resolve().parent) + os.pathsep + os.environ.get('PYTHONPATH', '')}
             r = subprocess.run([sys.executable, '-c', 'import subprocess,sys;sys.exit(subprocess.run(["pgrep","-xq","Fixture Browser"]).returncode)'], env=env)
         self.assertEqual(r.returncode, 0)

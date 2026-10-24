@@ -13,13 +13,13 @@ def swift_check(test, code):
         source = Path(folder) / 'check.swift'
         source.write_text('import Foundation\n' + code)
         result = subprocess.run(['swift', str(source)], capture_output=True, text=True,
-                                env={**os.environ, 'ATTICUS_DIR': folder}, timeout=60)
+                                env={**os.environ, 'RABIK_DIR': folder}, timeout=60)
         test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 class CrossReviewTests(unittest.TestCase):
     def test_pause_blocks_shared_agent_start_before_any_side_effect(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         start = source[source.index('    func accept(_ id:String'):source.index('        row["status"]', source.index('    func accept(_ id:String'))]
         swift_check(self, 'enum Prefs { static func bool(_ key:String)->Bool { true } }\n'
                     + 'final class Fixture { var rows:[String:[String:Any]] = ["late":["status":"offered"]]; var started=false\n'
@@ -27,14 +27,14 @@ class CrossReviewTests(unittest.TestCase):
                     + 'let f=Fixture(); f.accept("late"); precondition(!f.started)\n')
 
     def test_start_guess_counts_agents_waiting_on_the_user_like_the_supervisor(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         start = source.index('        let full = rows.values')
         guess = source[start:source.index('rows[id] = row', start) + len('rows[id] = row')]
         swift_check(self, 'var rows:[String:[String:Any]] = ["a":["status":"running"],"b":["status":"running"],"c":["status":"needs-you"],"new":["status":"offered"]]\n'
                     + 'let id="new"; var row=rows[id]!\n' + guess + '\nprecondition(rows["new"]?["status"] as? String == "queued")\n')
 
     def test_an_agent_question_sounds_once_per_new_question(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         start = source.index('            let question = { (r:[String:Any]?)')
         check = source[start:source.index('\n', source.index('let asks =', start))]
         swift_check(self, 'func asks(_ kind:String, _ old:[String:Any]?, _ row:[String:Any]) -> Bool { let id="a"; let rows:[String:[String:Any]] = old.map { ["a":$0] } ?? [:]\n'
@@ -46,7 +46,7 @@ class CrossReviewTests(unittest.TestCase):
                     + 'precondition(!asks("state", ["status":"running"], ["status":"needs-you"]))\n')
 
     def test_speculative_launch_failure_keeps_listening_until_confirmed(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         failure = source[source.index('        guard let w = warm ?? spawn()'):source.index('        warm = nil; proc = w.p')]
         swift_check(self, 'final class Fixture { var warm:Int?, busy=true, pinned=false, ahead="draft", calls=0\n'
                     + 'func spawn()->Int? { nil }; func js(_ s:String) { calls+=1 }; func show() {}; func telemetry(_ a:[String]) {}\n'
@@ -55,18 +55,18 @@ class CrossReviewTests(unittest.TestCase):
                     + 'f.run(false); precondition(f.pinned && f.calls==1)\n')
 
     def test_failed_resume_and_saving_changes_do_not_apply_success_effects(self):
-        source = (ROOT / 'Atticus.swift').read_text()
-        resume = source[source.index('            if b["resume"] != nil'):source.index('            if b["kofi"]')]
+        source = (ROOT / 'Rabik.swift').read_text()
+        resume = source[source.index('            if b["resume"] != nil'):source.index('            if b["replace"] != nil, !busy')]
         saving = source[source.index('        if k == "meetingSave", v as? Bool == false'):source.index('            let alert = NSAlert(); alert.messageText = "Keep your saved meetings?"')]
         swift_check(self, 'enum Prefs { static func bool(_ k:String)->Bool { true }; static func set(_ k:String,_ v:Bool)->Bool { false } }\n'
                     + 'struct Meeting { func savingChanged(_ on:Bool) { fatalError("archive changed") } }; let meeting=Meeting()\n'
                     + 'final class Settings { var notices=0; func apply(_ k:String,_ v:Bool) {}; func push() {}; func send(_ c:String,_ v:[String:String]) { notices+=1 }\n'
                     + 'func saving() { let k="meetingSave", v:Any=false\n' + saving
                     + ' fatalError("saving side effect ran")\n}\n}\n}\n'
-                    + 'enum Atticus { static let settings=Settings() }\n'
+                    + 'enum Rabik { static let settings=Settings() }\n'
                     + 'func js(_ c:String,_ v:Bool) { fatalError("resume success shown") }; func hide(after:Double) { fatalError() }\n'
                     + 'let b:[String:Bool]=["resume":true]\n' + resume
-                    + 'Atticus.settings.saving(); precondition(Atticus.settings.notices==1)\n')
+                    + 'Rabik.settings.saving(); precondition(Rabik.settings.notices==1)\n')
 
     def test_out_of_order_model_responses_are_ignored(self):
         source = (ROOT / 'ui/settings.html').read_text()
@@ -87,7 +87,7 @@ assert.equal(P.apiModel,'b-model'); assert.equal(JSON.stringify(nodes),before);
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_broken_pipe_preserves_supervisor_identity_for_restart(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         methods = source[source.index('    func send(_ data:[String:Any])'):source.index('    func prepare(_ brief:')]
         swift_check(self, """import Darwin
 func py(_ args:[String])->Process { let p=Process(); p.executableURL=URL(fileURLWithPath:"/bin/cat"); return p }

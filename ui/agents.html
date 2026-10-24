@@ -186,10 +186,10 @@ function madeCards(r){const list=things(r);if(!list.length)return null;const box
  list.forEach((m,i)=>{const b=el('button','thing'+(i?'':' main')),tile=el('i','tile'),txt=el('span','t'),open=el('span','open','Open');tile.append(icon(m.kind));txt.append(el('b','',m.title),el('small','',m.sub));open.append(icon('out'));
   b.append(tile,txt,open);b.title=m.url;b.onclick=e=>{e.stopPropagation();command('open',r.id,{target:m.url});};box.append(b);});return box;}
 const keyButton=(text,key,fn,cls='')=>{const b=button(text,fn,cls),cap=el('kbd','',key);cap.setAttribute('aria-hidden','true');b.append(cap);b.setAttribute('aria-keyshortcuts',key==='↩'?'Enter':'Escape');if(key==='esc')b.dataset.esc='';return b;};
-// Setup an agent asked for: what and why in one line. Atticus's own settings say "Do it"; macOS switches only the user can flip, so Allow shows where.
+// Setup an agent asked for: what and why in one line. Rabik's own settings say "Do it"; macOS switches only the user can flip, so Allow shows where.
 function setup(r,q,card,actions){const answer=a=>command('answer',r.id,{answer:a,question:q._a}),mine=q.need==='page-js',connector=q.need==='connector';
  card.classList.add('setup');if(q.cmd)card.append(el('div','why',q.cmd));
- card.append(el('div','note'+(q.waiting?' waiting':''),q.waiting?(connector?'Waiting for you to connect it…':'Waiting for you to turn it on…'):mine?'Atticus can change this setting itself.':connector?'Connect it on claude.ai. The agent carries on by itself.':'macOS only lets you flip this one. Atticus shows you the switch.'));
+ card.append(el('div','note'+(q.waiting?' waiting':''),q.waiting?(connector?'Waiting for you to connect it…':'Waiting for you to turn it on…'):mine?'Rabik can change this setting itself.':connector?'Connect it on claude.ai. The agent carries on by itself.':'macOS only lets you flip this one. Rabik shows you the switch.'));
  actions.append(keyButton(mine?'No':'Not now','esc',()=>answer('n')));if(!q.waiting)actions.append(keyButton(mine?'Do it':connector?'Connect':'Allow','↩',()=>answer('y'),'go'));}
 function approval(r){const q=r.question,card=el('div','pk'),head=el('b');head.append(icon(q.need?'shield':'alert'),el('span','',q.pick||q.q||'Waiting for you'));card.append(head);const actions=el('div','actions');
  if(q.need)setup(r,q,card,actions);
@@ -330,7 +330,7 @@ function renderList(){const ordered=[...rows].sort((a,b)=>b.created-a.created),n
  sync($('list'),[...(namedRows.length?[head('g-saved','Saved'),...namedRows.map(saved)]:[]),...(now.length?[head('g-now','In progress'),...now.map(item)]:[]),...(past.length?[head('g-past',now.length?'Earlier':'Recent'),...past.map(item)]:[])]);}
 function renderView(){if(!rows.some(r=>r.id===selected))selected=([...rows].sort((a,b)=>(ACTIVE.includes(b.status)-ACTIVE.includes(a.status))||b.created-a.created)[0]?.id)||'';renderList();
  const r=rows.find(r=>r.id===selected),scroll=$('scroll'),nearBottom=scroll.scrollHeight-scroll.scrollTop-scroll.clientHeight<90;$('followup').disabled=!r;$('send').disabled=!r;document.querySelector('header canvas').hidden=!r;
- if(!r){setText($('title'),'Agents');setText($('brief'),'Your tasks, while you do something else.');$('status').replaceChildren();$('tools').replaceChildren();sync($('body'),[['empty','',()=>{const n=el('div','empty');n.append(el('b','','No agents yet'),el('span','','Ask Atticus for something that takes a while.'));return n;}]]);return;}
+ if(!r){setText($('title'),'Agents');setText($('brief'),'Your tasks, while you do something else.');$('status').replaceChildren();$('tools').replaceChildren();sync($('body'),[['empty','',()=>{const n=el('div','empty');n.append(el('b','','No agents yet'),el('span','','Ask Rabik for something that takes a while.'));return n;}]]);return;}
  $('page').className='s-'+r.status;setText($('title'),r.title);setText($('brief'),r.brief||'');document.querySelector('header canvas').style.filter=hue(r);
  const status=$('status');if(status.dataset.sig!==r.status+r.id){status.dataset.sig=r.status+r.id;status.className='status s-'+r.status;status.replaceChildren(el('i','dot'),el('span','',word(r)),el('span','time-label','· '+time(r)),el('span','time-label started','· Started '+begun(r)));}
  const live=ACTIVE.includes(r.status),files=things(r).some(m=>m.url.startsWith('/'));

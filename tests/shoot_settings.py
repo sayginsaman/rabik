@@ -1,6 +1,6 @@
 """Design screenshots of Settings, setup's provider sheet and the box's question cards, VM only (opt-in, not discovered: run this module by name).
 
-run.sh ~/Projects/atticus tests.shoot_settings  → PNGs printed as base64 lines ("PNG <name> <data>"); the runner copies nothing back.
+run.sh ~/Projects/rabik tests.shoot_settings  → PNGs printed as base64 lines ("PNG <name> <data>"); the runner copies nothing back.
 """
 import base64
 import json
@@ -19,7 +19,7 @@ STATE = {'today': {'asks': 3, 'usd': .004, 'secs': 3}, 'week': {'asks': 21, 'usd
          'me': {'facts': [{'id': 'f1', 'category': 'basics', 'kind': 'name', 'value': 'Sam', 'source': 'you', 'date': 'Oct 19'}]}, 'plan': {'ok': True, 'text': 'Signed in. Claude Max.'},
          'asks': [{'at': '2026-10-19 09:30:00', 'task': 'weather tomorrow', 'reply': 'Sunny, 68°F.'}, {'at': '2026-10-19 08:10:00', 'task': 'open my notes', 'reply': 'Opened Notes.'}]}
 ROUTINES = [{'id': 'r1', 'kind': 'time', 'at': '08:00', 'days': 'weekdays', 'ask': 'Summarize my calendar', 'mode': 'cheapest'}]
-DICTATION = {'words': ['Atticus', 'PostHog'], 'stats': {'today': 412, 'words': 18250, 'minutes': 96, 'sessions': 320},
+DICTATION = {'words': ['Rabik', 'PostHog'], 'stats': {'today': 412, 'words': 18250, 'minutes': 96, 'sessions': 320},
              'history': [{'id': 'd1', 'timestamp': 1792425600, 'app': 'Notes', 'text': 'Pick up the desk lamp after school.'},
                          {'id': 'd2', 'timestamp': 1792422000, 'app': 'Messages', 'text': 'On my way, see you in ten.'}]}
 MEETINGS = {'meetings': [{'id': 'm1', 'title': 'Design review', 'started': 1792425600, 'duration': 1860, 'app': 'Zoom', 'summary': 'Settings get their colors back.', 'status': 'Saved'}]}
@@ -89,7 +89,7 @@ after(1.0){ready(0)}
 nsapp.run()'''
 
 # The box's question cards side by side: a command approval, the calendar change, Long asks, and a plain offer.
-EVENT = 'Dentist → Mon Oct 19, 4:00 PM – 5:00 PM · from Mon Oct 19, 3:00 PM – 4:00 PM · Home · this occurrence only'   # as atticus.calendar_tool words it
+EVENT = 'Dentist → Mon Oct 19, 4:00 PM – 5:00 PM · from Mon Oct 19, 3:00 PM – 4:00 PM · Home · this occurrence only'   # as rabik.calendar_tool words it
 ASK = "ui.reset();ui.listen(true);ui.words(WORDS);ui.think();"
 BOX = CARDS[:CARDS.index('let row=#"ROW"#')] + SNAP + r'''func fitted(_ name:String,_ done:@escaping()->Void){web.evaluateJavaScript("document.getElementById('card').getBoundingClientRect().height"){value,_ in
  let h=CGFloat((value as? Double) ?? 300);var f=box.frame;f.origin.y=f.maxY-h;f.size.height=h;box.setFrame(f,display:true);after(0.5){snap(name,box);done()}}}

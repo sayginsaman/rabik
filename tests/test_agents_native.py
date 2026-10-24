@@ -13,7 +13,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def native_fixture(body, real_mini=False):
     """The real agent panels with stubbed app, prefs and worker, then a fixture `body`."""
-    source=(ROOT/'Atticus.swift').read_text()
+    source=(ROOT/'Rabik.swift').read_text()
     panels=source[source.index('// MARK: - Agent panels'):source.index('// First-run window')].replace('NSWorkspace.shared.accessibilityDisplayShouldReduceMotion','fixtureReduced')
     show=source[source.index('    func show()',source.index('final class App')):source.index('    func hide(after',source.index('final class App'))]
     lease=source[source.index('    static func screenLease()'):source.index('    static func fingerprint',source.index('    static func screenLease()'))]
@@ -29,7 +29,7 @@ import EventKit
 let dir=CommandLine.arguments[1]
 var fixtureReduced=false
 enum Prefs {
- static let path=ProcessInfo.processInfo.environment["ATTICUS_DIR"]!+"/settings.json"
+ static let path=ProcessInfo.processInfo.environment["RABIK_DIR"]!+"/settings.json"
  static var d:[String:Any]=[:]
  static func set(_ k:String,_ v:Any){d[k]=v}
  static func bool(_ k:String)->Bool{d[k] as? Bool ?? false}
@@ -92,7 +92,7 @@ def run_fixture(test,body,marker,real_mini=False):
         # No real Claude, connector, audio, or app actions; all native UI stays in the VM.
         resources=root/'resources';resources.mkdir();(resources/'ui').symlink_to(ROOT/'ui')
         (resources/'tests').mkdir();(resources/'tests'/'native_agent_worker.py').write_text('import sys\nfor line in sys.stdin: pass\n')
-        binary=root/'agents';env={**os.environ,'ATTICUS_DIR':str(root),'ATTICUS_ASK':str(root)}
+        binary=root/'agents';env={**os.environ,'RABIK_DIR':str(root),'RABIK_ASK':str(root)}
         build=subprocess.run(['swiftc','-O',str(fixture),'-o',str(binary)],env=env,capture_output=True,text=True)
         test.assertEqual(build.returncode,0,build.stderr)
         result=subprocess.run([str(binary),str(resources)],env=env,capture_output=True,text=True,timeout=120)
@@ -211,7 +211,7 @@ Timer.scheduledTimer(withTimeInterval:0.15,repeats:true){_ in
  }else if stage>=2{
   stage+=1
   if stage==5{require(app.calls.filter{$0=="agentDefaultAction"}.count==1,"No-card Return triggered an agent action");app.defaultKey(true);other=KeyPanel(contentRect:NSRect(x:300,y:300,width:180,height:100),styleMask:[.nonactivatingPanel,.titled],backing:.buffered,defer:false);other?.makeKeyAndOrderFront(nil)}
-  if stage==7{require(app.defaultKeys.isEmpty,"Main card captured Return from another Atticus window");other?.orderOut(nil)}
+  if stage==7{require(app.defaultKeys.isEmpty,"Main card captured Return from another Rabik window");other?.orderOut(nil)}
   if stage==9{require(app.defaultKeys.count==2,"Main card default did not recover after closing another window");app.defaultKey(false);agentsUI.process?.terminate();print("native Return checks ok");exit(0)}
  }
 }
@@ -221,10 +221,10 @@ nsapp.run()''','native Return checks ok')
         run_fixture(self,'''let nsapp=NSApplication.shared;nsapp.setActivationPolicy(.accessory)
 let agentsUI=AgentPanels()
 func require(_ value:Bool,_ message:String){if !value{print(message);fflush(stdout);agentsUI.process?.terminate();exit(1)}}
-let file=ProcessInfo.processInfo.environment["ATTICUS_DIR"]!+"/move-fixture"
+let file=ProcessInfo.processInfo.environment["RABIK_DIR"]!+"/move-fixture"
 require(app.moveRef==nil,"Move shortcut held with nothing to move")
 NSWorkspace.shared.runningApplications.first{$0.bundleIdentifier=="com.apple.finder"}?.activate(options:[])
-app.busy=true;app.agentMoveFile=file;app.askFile="/tmp/atticus-fixture-pending"
+app.busy=true;app.agentMoveFile=file;app.askFile="/tmp/rabik-fixture-pending"
 require(app.moveRef != nil,"Move shortcut did not register while the ask can move")
 func press(){DispatchQueue.global().async{   // real modifier downs and ups: flags on a lone Return leave Control held for later tests
  let source=CGEventSource(stateID:.privateState),held:CGEventFlags=[.maskControl,.maskAlternate]
@@ -248,21 +248,21 @@ nsapp.run()''','move shortcut checks ok')
 
     def test_complete_app_compiles_and_native_selftest(self):
         with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);binary=root/'Atticus'
-            env={**os.environ,'ATTICUS_DIR':str(root),'ATTICUS_RESOURCES_DIR':str(ROOT)}
-            build=subprocess.run(['swiftc','-O',str(ROOT/'Atticus.swift'),'-o',str(binary)],env=env,capture_output=True,text=True)
+            root=Path(folder);binary=root/'Rabik'
+            env={**os.environ,'RABIK_DIR':str(root),'RABIK_RESOURCES_DIR':str(ROOT)}
+            build=subprocess.run(['swiftc','-O',str(ROOT/'Rabik.swift'),'-o',str(binary)],env=env,capture_output=True,text=True)
             self.assertEqual(build.returncode,0,build.stderr)
             result=subprocess.run([str(binary),'--selftest'],env=env,capture_output=True,text=True,timeout=20)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             # Export a VM-built, scratch-state preview; never install or launch it on the host.
-            preview=ROOT/'test-artifacts'/'Atticus Agents Preview.app';contents=preview/'Contents'
+            preview=ROOT/'test-artifacts'/'Rabik Agents Preview.app';contents=preview/'Contents'
             (contents/'MacOS').mkdir(parents=True,exist_ok=True);(contents/'Resources').mkdir(exist_ok=True)
-            shutil.copy2(binary,contents/'MacOS'/'Atticus');shutil.copy2(ROOT/'atticus.py',contents/'Resources'/'atticus.py')
+            shutil.copy2(binary,contents/'MacOS'/'Rabik');shutil.copy2(ROOT/'rabik.py',contents/'Resources'/'rabik.py')
             shutil.copytree(ROOT/'ui',contents/'Resources'/'ui',dirs_exist_ok=True)
             launcher=contents/'MacOS'/'launch'
-            launcher.write_text('#!/bin/zsh\nexport ATTICUS_DIR=$(mktemp -d)\nexport ATTICUS_RESOURCES_DIR="$(cd "$(dirname "$0")/../../../.." && pwd)"\nprintf \'%s\\n\' \'{"input":"type","safe":true}\' > "$ATTICUS_DIR/settings.json"\nexec "$(dirname "$0")/Atticus" -onboarded YES\n');launcher.chmod(0o755)
+            launcher.write_text('#!/bin/zsh\nexport RABIK_DIR=$(mktemp -d)\nexport RABIK_RESOURCES_DIR="$(cd "$(dirname "$0")/../../../.." && pwd)"\nprintf \'%s\\n\' \'{"input":"type","safe":true}\' > "$RABIK_DIR/settings.json"\nexec "$(dirname "$0")/Rabik" -onboarded YES\n');launcher.chmod(0o755)
             with (contents/'Info.plist').open('wb') as f:
-                plistlib.dump({'CFBundleIdentifier':'com.atticus.agents-preview','CFBundleName':'Atticus Agents Preview',
+                plistlib.dump({'CFBundleIdentifier':'com.rabik.agents-preview','CFBundleName':'Rabik Agents Preview',
                               'CFBundleExecutable':'launch','CFBundlePackageType':'APPL','CFBundleVersion':'1','LSUIElement':True,
                               'NSMicrophoneUsageDescription':'Listen when you use the microphone.',
                               'NSAppleEventsUsageDescription':'Perform the actions you request.',

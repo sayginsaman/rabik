@@ -100,7 +100,7 @@ class OnboardingPageTests(unittest.TestCase):
             with self.subTest(size=(width, height)):
                 result = subprocess.run(
                     [str(self.binary), str(self.page), str(width), str(height)],
-                    capture_output=True, text=True, timeout=30, env={**os.environ, 'ATTICUS_DIR': self.tmp.name})
+                    capture_output=True, text=True, timeout=30, env={**os.environ, 'RABIK_DIR': self.tmp.name})
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 measured = json.loads(result.stdout.strip().splitlines()[-1])
                 self.assertTrue(measured['sheet']['horizontal'])

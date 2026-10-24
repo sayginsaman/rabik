@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @unittest.skipUnless(sys.platform == "darwin" and
-                     (os.environ.get("ATTICUS_SYSTEM_UI_TEST") == "1" or any("test_platform_preferences_native" in arg for arg in sys.argv)),
+                     (os.environ.get("RABIK_SYSTEM_UI_TEST") == "1" or any("test_platform_preferences_native" in arg for arg in sys.argv)),
                      "explicit VM integration")
 class PlatformPreferencesTests(unittest.TestCase):
     def test_rows_and_switches_resolve_by_accessible_label(self):
@@ -23,14 +23,14 @@ class PlatformPreferencesTests(unittest.TestCase):
             binary.parent.mkdir(parents=True)
             (app / "Contents/Info.plist").write_text(
                 '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>'
-                '<key>CFBundleIdentifier</key><string>com.atticus.app</string>'
+                '<key>CFBundleIdentifier</key><string>com.rabik.app</string>'
                 '<key>CFBundleExecutable</key><string>Fixture</string>'
                 '<key>CFBundlePackageType</key><string>APPL</string></dict></plist>'
             )
-            compiled = subprocess.run(["swiftc", "-O", "-module-name", "Atticus", str(ROOT / "Atticus.swift"), "-o", str(binary)], capture_output=True, text=True)
+            compiled = subprocess.run(["swiftc", "-O", "-module-name", "Rabik", str(ROOT / "Rabik.swift"), "-o", str(binary)], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             state = root / "hands.json"
-            env = {**os.environ, "ATTICUS_DIR": str(root), "ATTICUS_HANDS_STATE": str(state), "ATTICUS_HANDS_TIMING": "1"}
+            env = {**os.environ, "RABIK_DIR": str(root), "RABIK_HANDS_STATE": str(state), "RABIK_HANDS_TIMING": "1"}
             (root / "settings.json").write_text('{"safe":false}')
             subprocess.run(["open", "x-apple.systempreferences:"], check=True)
 
@@ -38,7 +38,7 @@ class PlatformPreferencesTests(unittest.TestCase):
                 return subprocess.run(
                     [str(binary), "--hands", *args],
                     input=json.dumps(receipt) if receipt else None,
-                    env={**env, "ATTICUS_HANDS_RECEIPT": "1" if receipt else "0"},
+                    env={**env, "RABIK_HANDS_RECEIPT": "1" if receipt else "0"},
                     capture_output=True, text=True, timeout=5,
                 )
 
@@ -49,7 +49,7 @@ class PlatformPreferencesTests(unittest.TestCase):
                 if seen.returncode == 0:
                     break
                 time.sleep(.1)
-            if not seen or "Allow Atticus" in seen.stdout:
+            if not seen or "Allow Rabik" in seen.stdout:
                 self.skipTest("temporary bundle lacks VM accessibility permission")
             self.assertEqual(seen.returncode, 0, seen.stdout + seen.stderr)
             mapped = json.loads(state.read_text())

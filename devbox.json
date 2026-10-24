@@ -6,7 +6,7 @@
   ],
   "shell": {
     "init_hook": [
-      "echo 'Atticus development environment. Building the app requires Apple command line tools.'"
+      "echo 'Rabik development environment. Building the app requires Apple command line tools.'"
     ],
     "scripts": {
       "build": "./build.sh",

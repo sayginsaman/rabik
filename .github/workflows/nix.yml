@@ -54,6 +54,6 @@ jobs:
         if: github.event_name != 'pull_request'
         run: nix run .#default -- --version
 
-      - name: nix run .#atticus-mac -- --help
+      - name: nix run .#rabik-mac -- --help
         if: github.event_name != 'pull_request'
-        run: nix run .#atticus-mac -- --help
+        run: nix run .#rabik-mac -- --help

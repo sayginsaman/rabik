@@ -1,6 +1,6 @@
 """Design screenshots of the real agent shelf and Agent view, VM only (opt-in, not discovered: run this module by name).
 
-run.sh ~/Projects/atticus tests.shoot_agents_design  → PNGs in the VM's ~/atticus/test-artifacts/design.
+run.sh ~/Projects/rabik tests.shoot_agents_design  → PNGs in the VM's ~/rabik/test-artifacts/design.
 """
 import json
 import time
@@ -316,16 +316,16 @@ steps.append((1.2,{shoot("12-setup-try",ow);ow.orderOut(nil)
 after(0.1){run(0)}
 nsapp.run()'''
 
-# Show, don't tell: open a real privacy pane in the VM and point at Atticus's switch with the app's own code.
+# Show, don't tell: open a real privacy pane in the VM and point at Rabik's switch with the app's own code.
 def point_fixture():
-    source = (ROOT / 'Atticus.swift').read_text()
+    source = (ROOT / 'Rabik.swift').read_text()
     cut = lambda start, end: source[source.index(start):source.index(end, source.index(start))]
     return ('import Cocoa\n' + cut('func axAttribute(', '// AX has no public') + 'enum Hands {\n' + cut('    static func attribute(_ e: AXUIElement', '    static func array(') + '}\n'
-            + cut('var ring: NSPanel?', 'func jsonString') + 'enum Onboarding {\n static let name = "Atticus"\n' + cut('    static func pointSwitch(', '    static func bundle(') + '}\n'
+            + cut('var ring: NSPanel?', 'func jsonString') + 'enum Onboarding {\n static let name = "Rabik"\n' + cut('    static func pointSwitch(', '    static func bundle(') + '}\n'
             + r'''setvbuf(stdout,nil,_IONBF,0)
 let nsapp=NSApplication.shared;nsapp.setActivationPolicy(.accessory)
 NSWorkspace.shared.open(URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-Onboarding.pointSwitch("Atticus")
+Onboarding.pointSwitch("Rabik")
 var tries=0
 Timer.scheduledTimer(withTimeInterval:0.25,repeats:true){t in tries+=1
  if let r=ring{t.invalidate();print("ring at \(r.frame)");r.sharingType = .readOnly

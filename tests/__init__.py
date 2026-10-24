@@ -1,21 +1,21 @@
-"""Isolate config before importing any Atticus test module."""
+"""Isolate config before importing any Rabik test module."""
 import atexit
 import os
 import tempfile
 
-config = tempfile.TemporaryDirectory(prefix='atticus-test-config-')
-os.environ['ATTICUS_DIR'] = config.name
-os.environ['ATTICUS_POSTHOG_KEY'] = ''   # tests that clear os.environ also drop ATTICUS_DIR; with no key nothing reaches PostHog
+config = tempfile.TemporaryDirectory(prefix='rabik-test-config-')
+os.environ['RABIK_DIR'] = config.name
+os.environ['RABIK_POSTHOG_KEY'] = ''   # tests that clear os.environ also drop RABIK_DIR; with no key nothing reaches PostHog
 atexit.register(config.cleanup)
 
 
 def scratch_dir(test):
-    """A temp atticus.DIR with default prefs for one test, undone at cleanup; returns the folder."""
+    """A temp rabik.DIR with default prefs for one test, undone at cleanup; returns the folder."""
     from pathlib import Path
     from unittest.mock import patch
-    import atticus
+    import rabik
     root = tempfile.TemporaryDirectory(); test.addCleanup(root.cleanup)
-    for p in (patch.object(atticus, 'DIR', root.name), patch.object(atticus, 'pref', side_effect=lambda k, d: d)):
+    for p in (patch.object(rabik, 'DIR', root.name), patch.object(rabik, 'pref', side_effect=lambda k, d: d)):
         p.start(); test.addCleanup(p.stop)
     return Path(root.name)
 
@@ -35,9 +35,9 @@ def run_swift(test, source, timeout=10):
         return result.stdout
 
 
-# Host guard: window/app-driving tests run only in the VM (run.sh sets ATTICUS_VM=1). On Saarth's Mac, launching a
-# compiled fixture/harness, osascript, `open` or the Atticus binary skips the test instead of taking over his screen.
-if not os.environ.get('ATTICUS_VM') and not os.environ.get('ATTICUS_ALLOW_HOST_UI'):
+# Host guard: window/app-driving tests run only in the VM (run.sh sets RABIK_VM=1). On Saarth's Mac, launching a
+# compiled fixture/harness, osascript, `open` or the Rabik binary skips the test instead of taking over his screen.
+if not os.environ.get('RABIK_VM') and not os.environ.get('RABIK_ALLOW_HOST_UI'):
     import subprocess, unittest
     _popen_init = subprocess.Popen.__init__
     _tmp = os.path.realpath(tempfile.gettempdir())
@@ -46,17 +46,17 @@ if not os.environ.get('ATTICUS_VM') and not os.environ.get('ATTICUS_ALLOW_HOST_U
         first = args if isinstance(args, (str, bytes, os.PathLike)) else (args[0] if args else '')
         exe = os.path.realpath(str(first).split()[0]) if first else ''
         name = os.path.basename(exe)
-        if exe.startswith(_tmp) or name in ('osascript', 'open', 'Atticus', 'swift') or '/Atticus.app/' in exe:
+        if exe.startswith(_tmp) or name in ('osascript', 'open', 'Rabik', 'swift') or '/Rabik.app/' in exe:
             raise unittest.SkipTest(f'host guard: {name} runs only in the VM (run.sh)')
         _popen_init(self, args, *a, **k)
     subprocess.Popen.__init__ = _guarded
 
 
-# The app runs one ask per process. A test's in-process atticus.main() left its ask folder, env and relay thread behind;
+# The app runs one ask per process. A test's in-process rabik.main() left its ask folder, env and relay thread behind;
 # the relay polls time.sleep until the folder goes, so a later test's fake clock or sleep mock counted its naps.
 import shutil
-import atticus
-_main = atticus.main
+import rabik
+_main = rabik.main
 
 
 def _one_ask(*a, **k):
@@ -64,8 +64,8 @@ def _one_ask(*a, **k):
     try:
         return _main(*a, **k)
     finally:
-        state = os.path.dirname(os.environ.get('ATTICUS_HANDS_STATE', ''))
-        if os.environ.get('ATTICUS_HANDS_STATE') != env.get('ATTICUS_HANDS_STATE') and os.path.basename(state).startswith('atticus-hands-'):
+        state = os.path.dirname(os.environ.get('RABIK_HANDS_STATE', ''))
+        if os.environ.get('RABIK_HANDS_STATE') != env.get('RABIK_HANDS_STATE') and os.path.basename(state).startswith('rabik-hands-'):
             shutil.rmtree(state, True)
         os.environ.clear(); os.environ.update(env)
-atticus.main = _one_ask
+rabik.main = _one_ask

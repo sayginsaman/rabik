@@ -41,7 +41,7 @@ try {
   assert(f('type-after','Describe the pattern shown:','Answer two.').startsWith('Typed after'),'An empty table answer cell is found from its label');
   assert(w.document.getElementById('table-answer').innerText==='Answer two.'&&w.document.body.innerText.includes('Another prompt remains unchanged.'),'Table insertion preserves prompts');
   f('read');
-  const updated=w.__atticusRead.text;
+  const updated=w.__rabikRead.text;
   assert(updated.includes('Complete final answer')&&updated.includes('Changed frame answer'),'Fresh reads confirm filled values');
   Object.values(profile).forEach(value=>assert(updated.includes(value),`Fresh read verifies ${value}`));
   assert(/radio: Yes.*checked=true/.test(updated),'Fresh reads confirm selected answers');

@@ -1,8 +1,8 @@
-// Runs inside the user's browser tab (atticus.py --web, through AppleScript): read the page, click or fill by number.
+// Runs inside the user's browser tab (rabik.py --web, through AppleScript): read the page, click or fill by number.
 // One expression, called as (src)(cmd, n, text). Numbers refer to the controls saved by the last read.
 (function (cmd, n, text) {
   const clean = s => (s || '').trim().replace(/\s+/g, ' ');
-  const secrets = window.__atticusSecrets ||= new WeakSet();
+  const secrets = window.__rabikSecrets ||= new WeakSet();
   const secret = e => {
     const token = clean(e.autocomplete).toLowerCase().split(' ');
     if (e.type === 'password' || token.includes('current-password') || token.includes('one-time-code')) secrets.add(e);
@@ -46,16 +46,16 @@
       scan(document);
       const ordered = [...seen.filter(c => c.kind !== 'link'), ...seen.filter(c => c.kind === 'link')];
       const controls = ordered.slice(0, 150), omitted = ordered.length - controls.length;
-      window.__atticusControls = controls.map(({e}) => ({e, identity:identity(e)}));
+      window.__rabikControls = controls.map(({e}) => ({e, identity:identity(e)}));
       const out = controls.map(({ e, kind, label, box }, i) => {
         const group = clean(e.closest('fieldset')?.querySelector('legend')?.innerText);
         const current = secret(e) ? '' : box || e.tagName === 'SELECT' ? ` = ${JSON.stringify(value(e).slice(0, 60))}` : /^(checkbox|radio)$/.test(e.type) ? ` checked=${e.checked}` : '';
         return `${i + 1} ${kind}: ${label}${group ? ` (question: ${group})` : ''}${current}${e.disabled ? ' disabled=true' : ''}${e.readOnly ? ' readonly=true' : ''}`;
       });
       if (omitted) out.push(`${omitted} more controls omitted`);
-      window.__atticusRead = { url: location.href, text: 'Controls:\n' + [...frames, ...out].join('\n') + '\n\nPage text:\n' + bodies.join('\n\n') };
+      window.__rabikRead = { url: location.href, text: 'Controls:\n' + [...frames, ...out].join('\n') + '\n\nPage text:\n' + bodies.join('\n\n') };
     }
-    const snapshot = window.__atticusRead;
+    const snapshot = window.__rabikRead;
     if (!snapshot || snapshot.url !== location.href) return 'The page changed. Read again at offset 0.';
     const end = Math.min(offset + 8000, snapshot.text.length);
     return snapshot.text.slice(offset, end) + `\n[Read ${offset}-${end} of ${snapshot.text.length} chars${end < snapshot.text.length ? `; ${snapshot.text.length-end} more chars; --window --offset ${end}` : '; end'}]`;
@@ -130,7 +130,7 @@
     inserted.remove();
     return current(target) === before ? 'The edit did not verify and was undone.' : 'The edit did not verify. Stop and read the document before continuing.';
   }
-  const control = /^\d+$/.test(n) && window.__atticusControls?.[Number(n) - 1], e = control?.e;
+  const control = /^\d+$/.test(n) && window.__rabikControls?.[Number(n) - 1], e = control?.e;
   if (!e || !e.isConnected || e.ownerDocument.defaultView?.document !== e.ownerDocument) return `No control ${n}. Read the page again.`;
   if (identity(e) !== control.identity) return 'The control changed since the read. Read the page again.';
   if (cmd === 'state') return JSON.stringify({label:name(e),value:secret(e) ? '[SECRET]' : e.value ?? e.innerText,checked:e.checked,disabled:e.disabled,readonly:e.readOnly,page:pageState()});

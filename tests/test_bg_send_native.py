@@ -13,7 +13,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-import atticus
+import rabik
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,8 +26,8 @@ class BackgroundSendNativeTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls.temp.cleanup)
         cls.root = Path(cls.temp.name)
-        cls.binary = cls.root / "Atticus"
-        build = subprocess.run(["swiftc", "-O", str(ROOT / "Atticus.swift"), "-o", str(cls.binary)], capture_output=True, text=True)
+        cls.binary = cls.root / "Rabik"
+        build = subprocess.run(["swiftc", "-O", str(ROOT / "Rabik.swift"), "-o", str(cls.binary)], capture_output=True, text=True)
         if build.returncode:
             raise AssertionError(build.stderr)
         fixture_binary = cls.root / "background-send-fixture"
@@ -62,7 +62,7 @@ for _ in 0..<count {
             shutil.copy2(fixture_binary, mac / "fixture")
             with (app / "Contents/Info.plist").open("wb") as handle:
                 plistlib.dump({
-                    "CFBundleIdentifier": f"com.atticus.bg-send.{role}",
+                    "CFBundleIdentifier": f"com.rabik.bg-send.{role}",
                     "CFBundleName": role,
                     "CFBundleExecutable": "fixture",
                     "CFBundlePackageType": "APPL",
@@ -95,8 +95,8 @@ for _ in 0..<count {
         if reset.exists() or cls.status("user").get("longestFocusLoss") != 0:
             raise AssertionError("User fixture focus measurement did not reset")
         (cls.root / "settings.json").write_text('{"safe":false}')
-        cls.env = {**os.environ, "ATTICUS_DIR": str(cls.root), "ATTICUS_RESOURCES_DIR": str(ROOT),
-                   "ATTICUS_AX_ONLY": "1", "ATTICUS_HANDS_STATE": str(cls.root / "hands.json")}
+        cls.env = {**os.environ, "RABIK_DIR": str(cls.root), "RABIK_RESOURCES_DIR": str(ROOT),
+                   "RABIK_AX_ONLY": "1", "RABIK_HANDS_STATE": str(cls.root / "hands.json")}
         probe = subprocess.run([str(cls.binary), "--hands", "see", str(cls.pids["agent"])],
                                env=cls.env, capture_output=True, text=True)
         if probe.returncode:
@@ -162,7 +162,7 @@ for _ in 0..<count {
 
     def hands_action(self, receipt, *args):
         return subprocess.run([str(self.binary), "--hands", *args], input=receipt,
-                              env={**self.env, "ATTICUS_HANDS_RECEIPT": "1"},
+                              env={**self.env, "RABIK_HANDS_RECEIPT": "1"},
                               capture_output=True, text=True, timeout=5)
 
     def test_native_chat_send_keeps_user_focus_routes_keys_and_verifies_return(self):
@@ -183,7 +183,7 @@ for _ in 0..<count {
         self.assertEqual(self.status("agent-ignore")["value"], prompt)
         self.assertFalse((self.root / "agent-ignore-submitted").exists())
 
-    def test_atticus_agent_steer_uses_stdin_without_touching_the_user_app(self):
+    def test_rabik_agent_steer_uses_stdin_without_touching_the_user_app(self):
         worker = self.root / "steer-worker.py"
         received = self.root / "steer-received.jsonl"
         worker.write_text("""import json,sys,time
@@ -193,9 +193,9 @@ for line in sys.stdin:
  time.sleep(.1)
 """)
         events = []
-        with patch.object(atticus, "DIR", str(self.root / "agents-state")), \
-             patch.object(atticus, "pref", side_effect=lambda key, default: default):
-            manager = atticus.Agents(emit=lambda event: events.append(event))
+        with patch.object(rabik, "DIR", str(self.root / "agents-state")), \
+             patch.object(rabik, "pref", side_effect=lambda key, default: default):
+            manager = rabik.Agents(emit=lambda event: events.append(event))
             self.addCleanup(manager.close)
             row = manager.new()
             row.update(status="running", title="Fixture agent", brief="Original task")
@@ -216,7 +216,7 @@ for line in sys.stdin:
             ack = next(event["agent"]["steer"]["ack"] for event in reversed(events) if event["event"] == "steered")
             self.assertEqual(ack, "Sent: also run the tests")
             self.assertNotIn("\n", ack)
-            print(f"BACKGROUND SEND Atticus steer: {elapsed:.1f} ms, focus loss {self.status('user')['longestFocusLoss'] * 1000:.1f} ms", flush=True)
+            print(f"BACKGROUND SEND Rabik steer: {elapsed:.1f} ms, focus loss {self.status('user')['longestFocusLoss'] * 1000:.1f} ms", flush=True)
 
     def test_orca_cli_receipt_needs_no_window_and_does_not_touch_user_input(self):
         fake = self.root / "orca"
@@ -236,7 +236,7 @@ print(json.dumps({'ok':True,'inputAccepted':True,'enterSent':True,'submission':'
         receipt = json.loads(result.stdout)
         self.assertTrue(receipt["inputAccepted"] and receipt["enterSent"])
         self.assertEqual(json.loads(record.read_text())[5], prompt)
-        self.assertTrue(any(rule.startswith("orca terminal send ") for rule in atticus.SAFE_OUT))
+        self.assertTrue(any(rule.startswith("orca terminal send ") for rule in rabik.SAFE_OUT))
         print(f"BACKGROUND SEND Orca CLI: {elapsed:.1f} ms, focus loss {self.status('user')['longestFocusLoss'] * 1000:.1f} ms", flush=True)
 
 

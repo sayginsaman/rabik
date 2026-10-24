@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class DictationDataTests(unittest.TestCase):
     def test_private_bounded_history_stats_and_dictionary(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         store = source[source.index('enum DictationData {'):source.index('enum Prefs {')]
         swift = r'''import AppKit
 struct Prefs {
@@ -25,7 +25,7 @@ struct Prefs {
 defer { try? FileManager.default.removeItem(atPath: (Prefs.path as NSString).deletingLastPathComponent) }
 precondition(DictationData.word("Saarth"))
 precondition(DictationData.word("Saarth") && DictationData.words == ["Saarth"])
-precondition(DictationData.word("Atticus", replacing: "Saarth") && DictationData.words == ["Atticus"])
+precondition(DictationData.word("Rabik", replacing: "Saarth") && DictationData.words == ["Rabik"])
 precondition(!DictationData.word("\n") && !DictationData.word("bad\nword") && !DictationData.word(String(repeating:"a", count:81)))
 precondition(DictationData.record("Three final words", raw: "um Three final words", app: "Example", seconds: 1))
 let row = DictationData.archive.history[0]
@@ -62,11 +62,11 @@ print("private dictation data ok")
         self.assertIn('private dictation data ok', run_swift(self, swift))
 
     def test_corrections_are_single_words_and_reject_rewrites(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         store = source[source.index('enum DictationData {'):source.index('enum Prefs {')]
         swift = r'''import AppKit
 struct Prefs {
-    static var path = "/tmp/unused-atticus-dictation-test/settings.json"
+    static var path = "/tmp/unused-rabik-dictation-test/settings.json"
     static var d: [String: Any] = [:]
     static func bool(_ k: String) -> Bool { false }
     static func set(_ k: String, _ v: Any) -> Bool { true }
@@ -74,7 +74,7 @@ struct Prefs {
 ''' + store + r'''
 let saarth = DictationData.correction("Hello Sarth.", "Hello Saarth.")
 precondition(saarth?.heard == "Sarth" && saarth?.word == "Saarth")
-precondition(DictationData.correction("open atticus", "open Atticus")?.word == "Atticus")
+precondition(DictationData.correction("open rabik", "open Rabik")?.word == "Rabik")
 precondition(DictationData.correction("Hi Andree", "Hi André")?.word == "André")
 precondition(DictationData.correction("I went their", "I went there") == nil)   // an everyday word is no name to learn
 let sarda = DictationData.correction("Can you make sure Sarda does that?", "Can you make sure Saarth does that?")
@@ -107,11 +107,11 @@ print("correction bounds ok")
         self.assertIn('correction bounds ok', run_swift(self, swift))
 
     def test_learned_fix_swaps_the_heard_word_until_forgotten(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         store = source[source.index('enum DictationData {'):source.index('enum Prefs {')]
         swift = r'''import AppKit
 struct Prefs {
-    static var path = "/tmp/unused-atticus-dictation-test/settings.json"
+    static var path = "/tmp/unused-rabik-dictation-test/settings.json"
     static var d: [String: Any] = [:]
     static func bool(_ k: String) -> Bool { false }
     static func set(_ k: String, _ v: Any) -> Bool { d[k] = v; return true }
@@ -135,39 +135,39 @@ print("learned fixes ok")
         self.assertEqual(source.count('DictationData.forget('), 2)   # Undo and Settings remove both drop the fix
 
     def test_dictionary_reaches_cleanup_and_keeps_saved_rules(self):
-        import atticus
-        with patch.object(atticus, 'pref', return_value=['Saarth', 'Atticus', None, 'bad\nword']), \
-             patch.object(atticus, 'relevant_rules', return_value='Spell my name Saarth.'):
-            request = atticus.dictate_request('say Sarth')
-            self.assertIn('["Saarth", "Atticus"]', request)
+        import rabik
+        with patch.object(rabik, 'pref', return_value=['Saarth', 'Rabik', None, 'bad\nword']), \
+             patch.object(rabik, 'relevant_rules', return_value='Spell my name Saarth.'):
+            request = rabik.dictate_request('say Sarth')
+            self.assertIn('["Saarth", "Rabik"]', request)
             self.assertIn('Spell my name Saarth.', request)
             self.assertNotIn('bad', request)
-            self.assertEqual(atticus.dictate_result('say Sarth', '<cleaned>Say Saarth.</cleaned>', {'Sarth': 'Saarth'}), 'Say Saarth.')
+            self.assertEqual(rabik.dictate_result('say Sarth', '<cleaned>Say Saarth.</cleaned>', {'Sarth': 'Saarth'}), 'Say Saarth.')
 
     def test_cleanup_gets_sound_alike_hints_and_may_write_the_name(self):
-        import atticus
+        import rabik
         prefs = {'dictateWords': ['Saarth'], 'dictateFixes': {'some veto': 'Saarth', 'old': 'Gone'}}
-        with patch.object(atticus, 'pref', side_effect=lambda k, d=None: prefs.get(k, d)), \
-             patch.object(atticus, 'relevant_rules', return_value=''):
-            self.assertEqual(atticus.dictate_hints('Can you make sure Sarda does that?', ['Saarth']), {'Sarda': 'Saarth'})
-            self.assertEqual(atticus.dictate_hints('You make sure some veto that.', ['Saarth']), {'some veto': 'Saarth'})   # a learned heard form
-            self.assertEqual(atticus.dictate_hints('Saarth sorted it', ['Saarth']), {})   # already said right
-            self.assertEqual(atticus.dictate_hints('Hi there', ['Saarth']), {})
-            self.assertEqual(atticus.dictate_hints('Can you ask some of you to do that?', ['Semva']).get('some of you'), 'Semva')
+        with patch.object(rabik, 'pref', side_effect=lambda k, d=None: prefs.get(k, d)), \
+             patch.object(rabik, 'relevant_rules', return_value=''):
+            self.assertEqual(rabik.dictate_hints('Can you make sure Sarda does that?', ['Saarth']), {'Sarda': 'Saarth'})
+            self.assertEqual(rabik.dictate_hints('You make sure some veto that.', ['Saarth']), {'some veto': 'Saarth'})   # a learned heard form
+            self.assertEqual(rabik.dictate_hints('Saarth sorted it', ['Saarth']), {})   # already said right
+            self.assertEqual(rabik.dictate_hints('Hi there', ['Saarth']), {})
+            self.assertEqual(rabik.dictate_hints('Can you ask some of you to do that?', ['Semva']).get('some of you'), 'Semva')
             text = 'You make sure start to does that.'
-            request = atticus.dictate_spellings(text)
+            request = rabik.dictate_spellings(text)
             self.assertIn('"start": "Saarth"', request)
-            hints = atticus.dictate_hints(text, ['Saarth'])
-            self.assertEqual(atticus.dictate_result(text, '<cleaned>You make sure Saarth does that.</cleaned>', hints), 'You make sure Saarth does that.')
+            hints = rabik.dictate_hints(text, ['Saarth'])
+            self.assertEqual(rabik.dictate_result(text, '<cleaned>You make sure Saarth does that.</cleaned>', hints), 'You make sure Saarth does that.')
             ordinary = 'Send the update to him this afternoon please.'
             changed = '<cleaned>Send the update to Saarth this afternoon please.</cleaned>'
-            self.assertEqual(atticus.dictate_result(ordinary, changed, {}), ordinary)
-            self.assertEqual(atticus.dictate_result(ordinary, changed, {'him': 'Saarth'}),
+            self.assertEqual(rabik.dictate_result(ordinary, changed, {}), ordinary)
+            self.assertEqual(rabik.dictate_result(ordinary, changed, {'him': 'Saarth'}),
                              'Send the update to Saarth this afternoon please.')
-        self.assertEqual((atticus.dictate_sound('Saarth'), atticus.dictate_sound('start to'), atticus.dictate_sound('André')), ('srt', 'strt', 'amtr'))   # same as DictationData.sound
+        self.assertEqual((rabik.dictate_sound('Saarth'), rabik.dictate_sound('start to'), rabik.dictate_sound('André')), ('srt', 'strt', 'amtr'))   # same as DictationData.sound
 
     def test_correction_window_is_scoped_and_secure_before_read(self):
-        source = (ROOT / 'Atticus.swift').read_text()
+        source = (ROOT / 'Rabik.swift').read_text()
         monitor = source[source.index('    func prepareDictation('):source.index('    func stopDictationCleanup(')]
         for guard in ['addingTimeInterval(20)', 'dictateID == id', '!engine.isRunning', '!busy',
                       'frontmostApplication == target.app', 'CFEqual(focused, target.focus)',

@@ -835,7 +835,7 @@ function resolvePreset(state, size) {
 }
 export { MODE_FRAMES as M, paintFrame as p, resolvePreset as r };
 
-// ── Atticus, not part of the thinking-orbs engine: Markdown and TeX math for every answer (the box, its agent card, the Agent view and shelf) ──
+// ── Rabik, not part of the thinking-orbs engine: Markdown and TeX math for every answer (the box, its agent card, the Agent view and shelf) ──
 // TeX → MathML, drawn by WebKit's own math layout: the subset short answers use. Anything else throws and shows the source.
 const MML = 'http://www.w3.org/1998/Math/MathML';
 const MI = {alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ϵ',varepsilon:'ε',zeta:'ζ',eta:'η',theta:'θ',vartheta:'ϑ',iota:'ι',kappa:'κ',lambda:'λ',mu:'μ',nu:'ν',xi:'ξ',pi:'π',rho:'ρ',sigma:'σ',tau:'τ',upsilon:'υ',phi:'ϕ',varphi:'φ',chi:'χ',psi:'ψ',omega:'ω',

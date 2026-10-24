@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Meeting Copilot</title>
-<!-- Meeting Copilot panel. Atticus.swift calls window.meeting.* and gets {do: …} messages back. States: nudge · prep · live · ended. -->
+<!-- Meeting Copilot panel. Rabik.swift calls window.meeting.* and gets {do: …} messages back. States: nudge · prep · live · ended. -->
 <style>
 :root{color-scheme:dark;--fg:#f5f5f7;--fg2:#a1a1a6;--fg3:#8e8e93;--card:rgba(255,255,255,.06);--card2:rgba(255,255,255,.1);--line:rgba(255,255,255,.12);--accent:#0a84ff;--ease:cubic-bezier(.2,.8,.2,1);--spring:cubic-bezier(.34,1.56,.64,1)}
 *{box-sizing:border-box}
@@ -123,7 +123,7 @@ h1{font-size:17px;font-weight:600;letter-spacing:-.3px;margin:0}
 #older .expanded .collapsed{display:none}
 .collapsed{display:none}
 
-/* transcript: every line can be answered, for questions Atticus didn't catch */
+/* transcript: every line can be answered, for questions Rabik didn't catch */
 #lines{-webkit-user-select:text;user-select:text;cursor:text;padding-top:8px}
 .line{display:flex;gap:10px;font-size:12.5px;line-height:1.45;color:var(--fg);padding:5px 8px;margin:0 -8px;border-radius:8px;position:relative;transition:background .18s var(--ease)}
 .line.hover{background:var(--card)}
@@ -146,7 +146,7 @@ footer{flex:none;padding-top:10px;border-top:.5px solid var(--line);margin:0 -16
 form{position:relative}
 #ask{padding-right:40px;border-radius:12px;height:38px}
 #send{position:absolute;right:5px;top:5px;width:28px;height:28px;padding:0;font-size:14px;line-height:28px}
-/* empty box: the button is the mic (talk to Atticus, e.g. while muted in the call); typed text makes it Send */
+/* empty box: the button is the mic (talk to Rabik, e.g. while muted in the call); typed text makes it Send */
 #send svg{display:block;width:14px;height:14px;margin:auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
 #send.blue svg,#send:not(.blue) b{display:none}
 #send b{font-weight:500}
@@ -210,14 +210,14 @@ body.reduce *{animation:none!important;transition:none!important}
     <button id="latest" hidden>Latest ↓</button>
   </div>
   <section id="transcript" class="pane" role="tabpanel" hidden><div id="nolines">Words show up here as people talk.</div><div id="lines"></div><div id="partial" class="line live" hidden></div><div id="micpartial" class="line live mine" hidden></div><button id="selected" hidden>Ask about selected text</button></section>
-  <section id="ctx" class="pane" role="tabpanel" hidden><p id="ctxhelp">Facts Atticus should use. Edit them any time.</p><textarea id="brief" maxlength="6000" aria-label="Meeting notes" placeholder="Who’s on the call, what it’s about, what you want."></textarea><button id="livechoose" class="quiet">＋ Add files</button><div id="livefiles" class="attachments"></div><button id="retry" class="blue" hidden>Answer with these notes</button></section>
+  <section id="ctx" class="pane" role="tabpanel" hidden><p id="ctxhelp">Facts Rabik should use. Edit them any time.</p><textarea id="brief" maxlength="6000" aria-label="Meeting notes" placeholder="Who’s on the call, what it’s about, what you want."></textarea><button id="livechoose" class="quiet">＋ Add files</button><div id="livefiles" class="attachments"></div><button id="retry" class="blue" hidden>Answer with these notes</button></section>
 </section>
 
 <footer id="askbar" hidden><div class="chips"><button data-ask="What did I miss?">Catch me up</button><button id="screen">Explain the screen</button></div><form id="askform"><input id="ask" placeholder="Ask about the call…" aria-label="Ask about the call" maxlength="1500" autocomplete="off"><button id="send" type="button" aria-label="Ask by voice" title="Ask by voice"><b>↑</b><svg class="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button></form><div id="voicebar" hidden><p id="heard" class="waiting">Listening…</p><button id="voicein" aria-label="Type instead" title="Click to type instead"><span id="askwave" aria-hidden="true"></span></button><button id="voicesend" class="blue" aria-label="Send">↑</button></div></footer>
 
 <section id="ended" hidden><h1 id="endtitle">Your meeting</h1><p class="note" id="endnote">Saved on this Mac.</p><div id="recap" hidden></div><button id="endcopy" class="quiet big">Copy transcript</button><button id="allmeetings" class="quiet big">See all meetings →</button><button id="resume" class="blue big">Resume listening</button><div class="bar" style="margin-top:8px"><button id="save">Done</button><button id="delete">Delete meeting</button></div></section>
 
-<p id="notice" hidden>Atticus hears this call and your microphone. Transcripts stay on this Mac.</p>
+<p id="notice" hidden>Rabik hears this call and your microphone. Transcripts stay on this Mac.</p>
 <div id="toast" role="status" hidden></div>
 <script type="text/plain" id="orbsrc">/*ORBS*/</script>
 <script type="module">
@@ -333,7 +333,7 @@ function card(row){
 document.addEventListener('click',e=>{if(!e.target.closest('.attachment'))document.querySelectorAll('.attachment.expanded').forEach(b=>b.classList.remove('expanded'))});
 window.meeting={
   privacy(on){saving=on;this.mode()},
-  mode(m){if(m)for(const b of $('mode').children)b.setAttribute('aria-pressed',String(b.dataset.mode===m));document.querySelector('#prep h1').textContent=room()?'Get ready for your meeting':'Get ready for your call';$('notice').textContent=(room()?'Atticus hears the room through your microphone.':'Atticus hears this call and your microphone.')+' Transcripts stay on this Mac.'},
+  mode(m){if(m)for(const b of $('mode').children)b.setAttribute('aria-pressed',String(b.dataset.mode===m));document.querySelector('#prep h1').textContent=room()?'Get ready for your meeting':'Get ready for your call';$('notice').textContent=(room()?'Rabik hears the room through your microphone.':'Rabik hears this call and your microphone.')+' Transcripts stay on this Mac.'},
   saving(on){saving=on;document.body.classList.toggle('saved',on);show('saving',running&&!minimized&&on);$('endnote').textContent=on?'Saved on this Mac.':'This transcript isn’t saved. Copy it before closing. Enable saving in Settings for future meetings.';$('delete').disabled=!on;$('restore').title=on?'Restore · Saving transcript':'Restore'},
   recap(m){$('recap').textContent=m.summary+(m.action_items?.length?'\n\nAction items\n'+m.action_items.map(s=>'• '+s).join('\n'):'');show('recap',!!m.summary);if(!running)fit()},
   settled(id){if(id!==viewTransition)return;document.body.classList.remove('transitioning');document.body.classList.add('revealing')},
@@ -402,7 +402,7 @@ window.meeting={
   error(text){toast(text);$('save').disabled=false;$('resume').disabled=false}
 };
 post({do:'ready'});
-// Reuse Atticus's orb; it breathes while listening and holds still otherwise (and under Reduce Motion).
+// Reuse Rabik's orb; it breathes while listening and holds still otherwise (and under Reduce Motion).
 const E=await import(URL.createObjectURL(new Blob([$('orbsrc').textContent],{type:'text/javascript'}))),S=64,dpr=2,reduced=matchMedia('(prefers-reduced-motion: reduce)'),preset=E.r('breathing',S);
 const orbs=[$('orb'),$('orb2'),$('orb3')].map(cv=>{cv.width=cv.height=S*dpr;return cv.getContext('2d')});let t=0,prev=performance.now();
 (function frame(now){const moving=(running||!$('nudge').hidden)&&!reduced.matches&&!document.body.classList.contains('reduce');t+=Math.min(.05,(now-prev)/1000)*preset.speed*(moving?1:0);prev=now;

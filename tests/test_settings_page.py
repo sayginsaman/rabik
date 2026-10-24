@@ -63,7 +63,7 @@ class SettingsPageTests(unittest.TestCase):
 
     def page(self, script):
         p = subprocess.run([str(self.binary), str(ROOT / 'ui/settings.html'), SETUP + script], capture_output=True, text=True,
-                           timeout=30, env={**os.environ, 'ATTICUS_DIR': self.tmp.name})
+                           timeout=30, env={**os.environ, 'RABIK_DIR': self.tmp.name})
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         return json.loads(p.stdout.strip().splitlines()[-1])
 
@@ -123,7 +123,7 @@ class SettingsPageTests(unittest.TestCase):
         taken, own = out['result']
         self.assertEqual(taken[1:], ['taken', True])
         self.assertIn('Another app uses this shortcut', taken[0])
-        self.assertEqual(own, ['That’s already your Atticus shortcut. Kept your old one.', 'warn', ''])
+        self.assertEqual(own, ['That’s already your Rabik shortcut. Kept your old one.', 'warn', ''])
 
     def test_sections_open_at_top_and_apps_opens_under_account(self):
         out = self.page("""const main=document.querySelector('main');st.tab('brain');main.scrollTop=300;const scrolled=main.scrollTop>0;
@@ -138,8 +138,8 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual(out['result'], [True, True, 'Updates are managed by Nix', 'Run nix profile upgrade or nix run again.', 'Version 1.3.3 · Nix'])
 
     def test_retired_settings_are_hidden_and_keep_saved_values(self):
-        sys.path.insert(0, str(ROOT)); import atticus
-        source, page = (ROOT / 'Atticus.swift').read_text(), (ROOT / 'ui/settings.html').read_text()
+        sys.path.insert(0, str(ROOT)); import rabik
+        source, page = (ROOT / 'Rabik.swift').read_text(), (ROOT / 'ui/settings.html').read_text()
         retired = re.findall(r'"(\w+)"', source[source.index('static let retiredKeys'):source.index(']', source.index('static let retiredKeys'))])
         self.assertIn('workIn', retired)
         defaults = source[source.index('static let defaults'):source.index('static let retiredKeys')]
@@ -149,8 +149,8 @@ class SettingsPageTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertIn(f'"{key}":', defaults)   # new users still receive a value
                 self.assertNotIn(f'data-k="{key}"', page)
-                self.assertNotIn(key, atticus.switches())
-                self.assertNotIn(key, atticus.picks())
+                self.assertNotIn(key, rabik.switches())
+                self.assertNotIn(key, rabik.picks())
         self.assertEqual(len(page.split('<nav>')[1].split('</nav>')[0].split('data-s=')) - 1, 9)   # 8 pages and Report feedback
 
     def test_pages_wear_their_sidebar_color_and_row_actions_show_on_focus(self):
@@ -167,12 +167,12 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual((quit_general, quit_account), (True, False))
 
     def test_long_asks_always_move_so_there_is_no_choice(self):
-        sys.path.insert(0, str(ROOT)); import atticus
+        sys.path.insert(0, str(ROOT)); import rabik
         for gone in ('agentsAuto', 'longAsks'):
             self.assertNotIn(gone, (ROOT / 'ui/settings.html').read_text())
-            self.assertNotIn(gone, atticus.switches())
-            self.assertNotIn(gone, atticus.picks())
-        self.assertEqual(atticus.picks()['dictateMode'][1], {'Verbatim': 'verbatim', 'Clean up': 'cleanup'})
+            self.assertNotIn(gone, rabik.switches())
+            self.assertNotIn(gone, rabik.picks())
+        self.assertEqual(rabik.picks()['dictateMode'][1], {'Verbatim': 'verbatim', 'Clean up': 'cleanup'})
 
     def test_scheduled_routines_list_and_remove(self):
         out = self.page("""st.load({prefs:{hotkeyLabel:'⌃⌥Space'},routines:[
@@ -266,17 +266,17 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual(out['result'][2], 0)
 
     def test_state_lists_recent_answers_newest_first(self):
-        sys.path.insert(0, str(ROOT)); import atticus
+        sys.path.insert(0, str(ROOT)); import rabik
         rows = [{'at': '2026-10-14 08:00:00', 'task': 'open notes', 'reply': 'Opened Notes', 'usd': 0, 'secs': 1},
                 {'id': '1-1', 'at': '2026-10-15 09:00:00', 'task': 'weather', 'status': 'running', 'pid': os.getpid()},   # a checkpoint with no answer yet
                 {'at': '2026-10-15 09:30:00', 'task': 'weather', 'reply': 'Sunny', 'usd': 0, 'secs': 1}]
         with tempfile.TemporaryDirectory() as root:
             Path(root, 'log.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
-            with patch.object(atticus, 'DIR', root), patch.object(atticus, 'MEMORY', str(Path(root) / 'memory.md')), \
-                 patch.object(atticus, 'SKILLS', str(Path(root) / 'skills.json')), patch.object(atticus, 'plan', return_value={}), \
-                 patch.object(atticus, 'me', return_value={}), patch('sys.argv', ['atticus.py', '--state']), \
+            with patch.object(rabik, 'DIR', root), patch.object(rabik, 'MEMORY', str(Path(root) / 'memory.md')), \
+                 patch.object(rabik, 'SKILLS', str(Path(root) / 'skills.json')), patch.object(rabik, 'plan', return_value={}), \
+                 patch.object(rabik, 'me', return_value={}), patch('sys.argv', ['rabik.py', '--state']), \
                  contextlib.redirect_stdout(io.StringIO()) as out:
-                atticus.main()
+                rabik.main()
         self.assertEqual([(a['task'], a['reply']) for a in json.loads(out.getvalue())['asks']], [('weather', 'Sunny'), ('open notes', 'Opened Notes')])
 
 
