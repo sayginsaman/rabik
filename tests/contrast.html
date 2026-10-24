@@ -1,0 +1,61 @@
+<!doctype html><meta charset="utf-8"><title>Box contrast</title>
+<pre id="results">Running…</pre><iframe id="preview" style="width:460px;height:700px"></iframe>
+<script type="module">
+const results=document.getElementById('results'), frame=document.getElementById('preview');
+try {
+ const native=await (await fetch('../Atticus.swift')).text();
+ const tint=+native.match(/blue:20\/255,alpha:([\d.]+)\)\.cgColor/)[1];
+ // The box's glass with its tint, measured in the VM over white, mid grey and black (tests.shoot_boxlook test_measure_glass)
+ const glass={0.9:{255:[49,49,53],128:[40,40,44],0:[30,30,34]},0.88:{255:[53,53,56],128:[41,42,46],0:[30,30,34]},0.85:{255:[57,59,61],128:[43,45,49],0:[30,31,34]},0.8:{255:[66,67,71],128:[49,50,53],0:[30,31,34]}}[tint];
+ if(!glass)throw Error('The box tint changed: measure it with tests.shoot_boxlook and add it here');
+ const html=await (await fetch('../ui/ui.html')).text(), orbs=await (await fetch('../ui/orbs.js')).text();
+ const ready=new Promise(resolve=>window.addEventListener('message',e=>{if(e.source===frame.contentWindow&&e.data.ready)resolve()}));
+ const bridge='<script>window.webkit={messageHandlers:{c:{postMessage:m=>parent.postMessage(m,"*")},h:{postMessage:()=>{}}}};<\/script>';
+ frame.srcdoc=html.replace('<head>','<head>'+bridge).replace('/*ORBS*/',()=>orbs);
+ await ready;
+ const w=frame.contentWindow,d=w.document;
+ const style=d.createElement('style');style.textContent=[...d.styleSheets[0].cssRules].map(r=>r.cssText.replaceAll(':hover','.fixture-hover').replaceAll(':focus-visible','.fixture-focus').replaceAll(':focus','.fixture-focus')).join('\n')+'*,*::before,*::after{animation:none!important;transition:none!important}';d.head.append(style);
+ d.getElementById('thread').innerHTML=`<div class="turn old"><div class="q">Earlier ask</div><div class="a">Earlier answer</div></div><div class="turn">
+ <div class="q">Ask bubble</div><div class="q empty hear"></div><div class="steps" data-more="3"><div class="step"><span>Completed step</span></div><div class="step live"><span>Live step</span></div><div class="step cut">Cancelled step</div></div>
+ <div class="mini-fallback" style="position:relative"><span class="mini-title">Preview title</span></div><span class="mini-tag" style="position:relative">Preview app</span><span class="mini-hint" style="position:relative;opacity:1;transform:none">Open preview</span><div class="a">Answer</div><div class="a"><div class="h">Heading</div><p>Answer <strong>bold</strong> <em>italic</em> <code>code</code> <a href="#">link</a> <span class="tex">\\weird</span></p><ol><li>Item</li></ol></div><div class="a cancel">Cancelled answer</div><div class="a stopped">Stopped answer</div>
+ <div class="elapsed">Response time <b>1.24 s</b><button class="redo">Try again</button></div>
+ <div class="ok"><b>Approval</b><code>Command preview</code><div><button class="go">Continue</button><button>Cancel</button></div></div>
+ <div class="ok offer"><p>Offer explanation</p><button class="details">Copy Details</button></div>
+ <div class="pk open"><b>Choose</b><div class="g"><button class="c on"><span class="n">Name</span><span class="s">Subtitle</span><span class="p">Folder</span></button></div><input class="other" placeholder="Something else"><div class="bar"><button class="go">Choose</button></div></div>
+ <div class="rewrite"><button class="go">Replace</button><button class="del">Delete</button></div><div class="rewrite-note">Selection changed</div><div class="sel">Selected text</div>
+ <div class="tip" data-k="Tip">Tip text<button class="off">Turn off tips</button></div><div class="tip learned" data-k="Learned">Learned text</div>
+ <div class="mem open"><button class="mem-h"><b>Memory</b><span class="cat">Category</span></button><div class="mem-card"><div class="mem-c">Category</div><button class="mem-i">Memory text<em>Forget</em></button></div></div>
+ <div class="ok agent-card"><div class="eyebrow">Agent</div><div class="usage">Usage</div><div class="made"><button><span><b>File</b><small>Details</small></span></button></div><div class="keys"><button class="go">Open<kbd>Return</kbd></button><button>Cancel<kbd>Esc</kbd></button></div></div></div>`;
+ d.getElementById('status').innerHTML='<span>Thinking…</span>';
+ w.ui.mode(false);w.ui.agentCount(2);
+ w.ui.hover(true);w.ui.models({list:['haiku','sonnet'],pick:'haiku'});
+ const rgba=s=>s.match(/[\d.]+/g).map(Number), over=(fg,bg)=>fg.slice(0,3).map((v,i)=>v*(fg[3]??1)+bg[i]*(1-(fg[3]??1)));
+ const lum=c=>c.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);
+ const rows=[],fails=[];
+ for(const state of ['rest','hover','focus']) {
+  d.querySelectorAll('#card *').forEach(el=>{el.classList.toggle('fixture-hover',state==='hover');el.classList.toggle('fixture-focus',state==='focus')});
+ for(const backdrop of [255,128,0]) {
+  const base=glass[backdrop];
+  const check=(el,pseudo)=>{
+   const css=w.getComputedStyle(el,pseudo);if(css.display==='none'||css.visibility==='hidden'||+css.opacity===0||el.disabled)return;
+   const chain=[];for(let e=el;e;e=e.parentElement)chain.unshift(e);
+   if(chain.some(e=>w.getComputedStyle(e).display==='none'))return;
+   let bg=base;for(const e of chain)bg=over(rgba(w.getComputedStyle(e).backgroundColor),bg);
+   if(pseudo)bg=over(rgba(css.backgroundColor),bg);
+   let fg=over(rgba(css.color),bg);
+   // Settled ancestor opacity is part of readability too; disabled controls are exempt from AA.
+   for(const e of chain){const a=+w.getComputedStyle(e).opacity;fg=over([...fg,a],bg)}
+   const a=lum(fg),b=lum(bg),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+   const name=(el.id?'#'+el.id:el.tagName.toLowerCase()+'.'+el.className)+(pseudo||'');
+   rows.push(`${state} ${backdrop} ${name}: ${ratio.toFixed(2)}:1`);if(ratio<4.5)fails.push(rows.at(-1));
+  };
+  for(const el of d.querySelectorAll('#card *')) {
+   if([...el.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))check(el);
+   for(const pseudo of ['::before','::after'])if(!['none','normal','""'].includes(w.getComputedStyle(el,pseudo).content))check(el,pseudo);
+   if(el.placeholder)check(el,'::placeholder');
+  }
+ }
+ }
+ results.textContent='MEASURED: '+rows.join('\n')+'\n'+(fails.length?'FAIL\n'+fails.join('\n'):'All settled text styles meet AA');results.className=fails.length?'fail':'pass';
+}catch(e){results.textContent=e.stack;results.className='fail'}
+</script>

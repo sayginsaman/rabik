@@ -1,0 +1,973 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Atticus first-run window. Atticus.swift loads this (orbs.js goes in place of the marker), calls ob.set({...}) every second
+     with which permissions are on, and gets {do:'grant', id} / {do:'done'} back. -->
+<style>
+  :root {
+    --fg: #1d1d1f; --fg2: #6e6e73; --fg3: #6e6e73; --card: rgba(255,255,255,.62); --line: rgba(0,0,0,.08);
+    --key-top: #fdfdfd; --key-bot: #e8e8ed; --key-edge: rgba(0,0,0,.16); --accent: #0a84ff; --green: #28c840;
+    --glow: rgba(120,140,255,.28); --sheet: #fbfbfd; --field: #fff; --track: rgba(120,120,128,.18); --on: #fff; --ease: cubic-bezier(.4,0,.2,1); --out: cubic-bezier(.16,1,.3,1); --spring: cubic-bezier(.34,1.56,.64,1);
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --fg: #f5f5f7; --fg2: #a1a1a6; --fg3: #98989d; --card: rgba(255,255,255,.06); --line: rgba(255,255,255,.08);
+    --key-top: #3a3a3c; --key-bot: #2c2c2e; --key-edge: rgba(0,0,0,.55); --glow: rgba(110,130,255,.22); --sheet: #2a2a2c; --field: rgba(255,255,255,.07); --track: rgba(120,120,128,.32); --on: #636366;
+  } }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; -webkit-user-select: none; cursor: default;
+    font: 13px -apple-system, system-ui, sans-serif; color: var(--fg); -webkit-font-smoothing: antialiased; }
+
+  .page { position: absolute; inset: 0 0 56px; display: flex; flex-direction: column; align-items: center; justify-content: safe center;
+    box-sizing: border-box; overflow-x: hidden; overflow-y: auto; padding: 40px 56px; text-align: center; opacity: 0; pointer-events: none; transform: translateX(40px); filter: blur(6px);
+    transition: opacity .5s var(--ease), transform .6s var(--out), filter .5s var(--ease); }
+  .page.on { opacity: 1; pointer-events: auto; transform: none; filter: none; }
+  .page.gone { transform: translateX(-40px); transition-duration: .35s; }
+
+  h1 { font: 600 34px/1.1 system-ui; letter-spacing: -.025em; margin: 18px 0 10px; }
+  h2 { font: 600 24px/1.15 system-ui; letter-spacing: -.02em; margin: 0 0 8px; }
+  p.sub { font-size: 14px; line-height: 1.5; color: var(--fg2); margin: 0; max-width: 400px; text-wrap: balance; }
+  /* children rise in one after another when their page comes on */
+  .page .r { opacity: 0; transform: translateY(12px); transition: opacity .5s var(--ease), transform .6s var(--out); }
+  .page.on .r { opacity: 1; transform: none; }
+  .page.on .r:nth-child(2) { transition-delay: .07s; } .page.on .r:nth-child(3) { transition-delay: .14s; }
+  .page.on .r:nth-child(4) { transition-delay: .21s; } .page.on .r:nth-child(5) { transition-delay: .28s; }
+
+  #orbwrap { position: relative; width: 128px; height: 128px; }
+  #orbwrap::before { content: ""; position: absolute; inset: -60px; border-radius: 50%;
+    background: radial-gradient(closest-side, var(--glow), transparent); animation: drift 7s ease-in-out infinite; }
+  #orb { position: relative; width: 128px; height: 128px; }
+
+  .keys { display: flex; gap: 8px; justify-content: center; margin-top: 26px; }
+  .key { min-width: 40px; height: 40px; padding: 0 12px; box-sizing: border-box; border-radius: 9px; display: grid; place-items: center;
+    font: 500 15px system-ui; color: var(--fg2); background: linear-gradient(var(--key-top), var(--key-bot));
+    box-shadow: 0 0 0 .5px var(--key-edge), 0 2px 0 var(--key-edge), 0 4px 10px rgba(0,0,0,.08);
+    transition: transform .14s var(--ease), box-shadow .14s var(--ease), color .2s; }
+  .key.wide { min-width: 120px; font-size: 13px; }
+  .key.down { transform: translateY(2px); color: var(--fg); box-shadow: 0 0 0 .5px var(--key-edge), 0 0 0 var(--key-edge), 0 1px 3px rgba(0,0,0,.1); }
+
+  .btn { margin-top: 30px; height: 36px; padding: 0 22px; border: 0; border-radius: 18px; font: 500 14px system-ui; cursor: pointer;
+    color: #fff; background: var(--accent); box-shadow: 0 1px 2px rgba(0,0,0,.15), inset 0 .5px 0 rgba(255,255,255,.25);
+    transition: transform .12s var(--ease), filter .2s, background .3s, color .3s; }
+  .btn:hover { filter: brightness(1.08); } .btn:active { transform: scale(.97); }
+  .btn:focus-visible, .allow:focus-visible { outline: 3px solid rgba(10,132,255,.45); outline-offset: 2px; }
+  .btn.quiet { background: var(--card); color: var(--fg); box-shadow: inset 0 0 0 .5px var(--line); }
+  #back { position: absolute; z-index: 10; top: 18px; left: 22px; margin: 0; padding: 0 10px; height: 30px; color: var(--fg2); background: transparent; box-shadow: none; }
+
+  /* permissions list, grouped like System Settings */
+  #list, .list { width: 100%; max-width: 480px; margin-top: 22px; border-radius: 12px; background: var(--card); text-align: left;
+    box-shadow: inset 0 0 0 .5px var(--line), 0 1px 3px rgba(0,0,0,.04); overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; opacity: 0; transform: translateY(8px);
+    transition: opacity .45s var(--ease), transform .55s var(--out), background .4s; }
+  .row + .row { box-shadow: inset 0 .5px 0 var(--line); }
+  #perms.on .row, #improve.on .row, #agents.on .row, #work.on .row { opacity: 1; transform: none; }
+  .cap { width: 100%; max-width: 480px; margin: 18px 0 -14px; text-align: left; font: 600 11px system-ui; color: var(--fg3); }
+  #agents .list + .cap { margin-top: 14px; } #agents .row { padding: 8px 14px; } #agents .list { margin-top: 20px; } #agents h2 + .sub { max-width: 430px; }
+  .row.now { background: rgba(10,132,255,.08); } .row.now .allow { color: var(--fg3); background: transparent; pointer-events: none; }
+  .row.now .allow::after { content: ""; display: inline-block; width: 10px; height: 10px; margin-left: 6px; vertical-align: -1px; border-radius: 50%;
+    border: 1.5px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  .ic { flex: none; width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center;
+    box-shadow: inset 0 .5px 0 rgba(255,255,255,.3), 0 .5px 1px rgba(0,0,0,.2); }
+  .ic svg { width: 17px; height: 17px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .txt { flex: 1; min-width: 0; }
+  .txt b { display: block; font: 500 13px system-ui; }
+  .txt span { display: block; font-size: 12px; color: var(--fg3); margin-top: 1px; }
+  .allow { flex: none; height: 26px; min-width: 64px; padding: 0 12px; border: 0; border-radius: 13px; cursor: pointer;
+    font: 500 12px system-ui; color: var(--accent); background: rgba(10,132,255,.12); transition: transform .12s var(--ease), background .2s, opacity .3s; }
+  .allow:hover { background: rgba(10,132,255,.2); } .allow:active { transform: scale(.95); }
+  .allow.wait { color: var(--fg3); background: transparent; pointer-events: none; }
+  .allow.wait::after { content: ""; display: inline-block; width: 10px; height: 10px; margin-left: 6px; vertical-align: -1px; border-radius: 50%;
+    border: 1.5px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  .check { flex: none; width: 22px; height: 22px; display: none; }
+  .check circle { fill: var(--green); transform-origin: center; animation: pop .45s var(--spring) both; }
+  .check path { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 14; stroke-dashoffset: 14; animation: draw .35s .15s var(--ease) forwards; }
+  .alt { display: inline-block; margin: 3px 0 0; padding: 0; border: 0; background: none; cursor: pointer; font: 500 11.5px system-ui; color: var(--accent); }
+  .alt:hover { text-decoration: underline; } .alt:focus-visible { outline: 2px solid rgba(10,132,255,.45); outline-offset: 2px; border-radius: 3px; }
+  [hidden] { display: none !important; }
+  /* Change provider: a sheet over the setup page */
+  #prov { position: fixed; inset: 0; z-index: 20; display: flex; align-items: safe center; justify-content: center; box-sizing: border-box; overflow: auto; padding: 16px; background: rgba(0,0,0,.18);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); opacity: 0; transition: opacity .25s var(--ease); }
+  #prov.on { opacity: 1; }
+  #prov .card { width: min(420px, 100%); flex: none; box-sizing: border-box; padding: 20px; border-radius: 16px; text-align: left; background: var(--sheet);
+    box-shadow: 0 0 0 .5px var(--line), 0 18px 50px rgba(0,0,0,.22); transform: translateY(10px) scale(.98); transition: transform .35s var(--out); }
+  #prov.on .card { transform: none; }
+  #prov h3 { margin: 0; font: 600 16px system-ui; } #prov .card > p { margin: 4px 0 14px; font-size: 12px; color: var(--fg2); }
+  .opt { width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border: 0; border-radius: 10px; cursor: pointer; text-align: left;
+    color: var(--fg); background: transparent; box-shadow: inset 0 0 0 .5px var(--line); font: inherit; transition: background .2s, box-shadow .2s; }
+  .opt + .opt { margin-top: 6px; } .opt:hover { background: rgba(127,127,127,.08); }
+  .opt[aria-checked="true"] { background: rgba(10,132,255,.1); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .opt .txt span { margin-top: 2px; }
+  .opt .dot { flex: none; width: 16px; height: 16px; border-radius: 50%; box-sizing: border-box; box-shadow: inset 0 0 0 1.5px var(--fg3); }
+  .opt[aria-checked="true"] .dot { box-shadow: inset 0 0 0 5px var(--accent); }
+  .opt:focus-visible, .chip:focus-visible, .fld:focus-visible { outline: 3px solid rgba(10,132,255,.45); outline-offset: 1px; }
+  #srv { margin-top: 12px; display: grid; gap: 8px; }
+  .chips { display: flex; gap: 6px; } .chips span { align-self: center; font-size: 11.5px; color: var(--fg3); margin-right: 2px; }
+  .chip { height: 24px; padding: 0 10px; border: 0; border-radius: 12px; cursor: pointer; font: 500 11.5px system-ui; color: var(--fg); background: rgba(127,127,127,.14); }
+  .chip:hover { background: rgba(127,127,127,.22); } .chip.on { color: #fff; background: var(--accent); }
+  .fld { width: 100%; box-sizing: border-box; height: 30px; padding: 0 10px; border: 0; border-radius: 8px; font: 13px system-ui; color: var(--fg);
+    background: var(--field); box-shadow: inset 0 0 0 .5px var(--line); -webkit-user-select: text; outline: none; }
+  #srv-note { min-height: 15px; font-size: 11.5px; color: var(--fg3); } #srv-note.bad { color: #ff453a; }
+  #prov .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; } #prov .acts .btn { margin: 0; height: 30px; padding: 0 16px; font-size: 13px; }
+  #prov .acts .btn:disabled { opacity: .45; pointer-events: none; }
+  .row.ok .allow { display: none; } .row.ok .check { display: block; margin: 0 21px; }
+  #count { margin-top: 14px; font-size: 12px; color: var(--fg3); font-variant-numeric: tabular-nums; transition: color .3s; }
+  #count.all { color: var(--green); }
+
+  /* try it: keys light up as the user holds them, then turn green once Atticus hears the hotkey */
+  .keys.big { margin-top: 30px; gap: 10px; } .keys.big .key { height: 52px; min-width: 52px; font-size: 19px; border-radius: 11px; }
+  .keys.big .key.wide { min-width: 160px; font-size: 15px; }
+  .key.lit { transform: translateY(2px); color: #fff; background: linear-gradient(#3d9bff, var(--accent));
+    box-shadow: 0 0 0 .5px rgba(0,0,0,.3), 0 0 0 4px rgba(10,132,255,.18), 0 0 24px rgba(10,132,255,.45); }
+  .key.yes { color: #fff; background: linear-gradient(#4fd86a, var(--green));
+    box-shadow: 0 0 0 .5px rgba(0,0,0,.3), 0 0 0 4px rgba(40,200,64,.16), 0 0 24px rgba(40,200,64,.4); transition-duration: .35s; }
+  #hint { margin-top: 22px; height: 18px; font-size: 13px; color: var(--fg3); transition: color .3s; }
+  #hint.yes { color: var(--green); }
+  /* done: the check pops and draws each time the page comes on */
+  #done-check { width: 64px; height: 64px; margin-bottom: 18px; filter: drop-shadow(0 6px 18px rgba(40,200,64,.35)); }
+  #done-check circle { fill: var(--green); transform-origin: center; transform: scale(.3); opacity: 0; }
+  #done-check path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 14; stroke-dashoffset: 14; }
+  #done.on #done-check circle { animation: pop .55s .1s var(--spring) forwards; }
+  #done.on #done-check path { animation: draw .4s .4s var(--ease) forwards; }
+  /* feature pages: a short looping preview, one thing to try, then Next or Skip */
+  .kicker { font: 600 11px system-ui; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .stage { position: relative; width: min(420px, 100%); flex: none; height: 178px; margin-top: 22px; border-radius: 16px; overflow: hidden; text-align: left;
+    background: linear-gradient(160deg, rgba(120,140,255,.14), rgba(191,90,242,.08) 60%, transparent), var(--card);
+    box-shadow: inset 0 0 0 .5px var(--line), 0 10px 30px rgba(0,0,0,.12); }
+  .bar2 { display: flex; gap: 10px; margin-top: 26px; }
+  .bar2 .btn { margin-top: 0; }
+  /* the tip page: one warm heart, then Leave a Tip beside Next */
+  #tip-heart { width: 72px; height: 72px; margin-bottom: 20px; border-radius: 22px; display: grid; place-items: center;
+    background: linear-gradient(160deg, #ff7a8a, #ff375f); box-shadow: 0 10px 28px rgba(255,55,95,.32), inset 0 .5px 0 rgba(255,255,255,.35); }
+  #tip-heart svg { width: 36px; height: 36px; fill: #fff; }
+  #tip.on #tip-heart { animation: beat 1.6s .5s var(--ease) 2; }
+  @keyframes beat { 0%, 100% { transform: none; } 15% { transform: scale(1.1); } 30% { transform: none; } 45% { transform: scale(1.06); } }
+  #tip p.sub { max-width: 420px; }
+  #kofi { display: inline-flex; align-items: center; gap: 7px; background: #ff375f; }
+  #kofi svg { width: 15px; height: 15px; fill: #fff; }
+  #tip .done-note { margin-top: 18px; }
+  @media (prefers-reduced-motion: reduce) { #tip.on #tip-heart { animation: none; } }
+  .done-note { height: 18px; margin-top: 12px; font-size: 12.5px; color: var(--fg3); }
+  #feedback-note .alt { margin: 0; font-size: 12.5px; }
+  .done-note a { color: var(--accent); cursor: pointer; } .done-note a:hover { text-decoration: underline; }
+  .fake { position: absolute; border-radius: 10px; background: rgba(28,28,30,.92); color: #f5f5f7; box-shadow: 0 8px 24px rgba(0,0,0,.3), inset 0 0 0 .5px rgba(255,255,255,.12);
+    font: 12px/1.4 system-ui; transition: opacity .45s var(--ease), transform .55s var(--out); }
+  .gone2 { opacity: 0 !important; transform: translateY(8px) scale(.97) !important; }
+
+  /* text preview: a line gets selected, the box offers a rewrite, Replace swaps it in */
+  #tx-doc { position: absolute; left: 22px; right: 22px; top: 22px; padding: 12px 14px; border-radius: 10px; background: var(--card);
+    box-shadow: inset 0 0 0 .5px var(--line); font: 13.5px/1.45 system-ui; color: var(--fg); }
+  #tx-line { position: relative; transition: opacity .3s; }
+  #tx-line mark { position: absolute; inset: -1px -2px; background: rgba(10,132,255,.32); border-radius: 3px; transform-origin: left; transform: scaleX(0); transition: transform .9s var(--ease); }
+  #tx-line.sel mark { transform: scaleX(1); }
+  #tx-words { position: relative; }
+  #tx-box { left: 22px; right: 22px; bottom: 16px; padding: 10px 12px; }
+  #tx-box .q { color: #8e8e93; font-size: 11px; margin-bottom: 4px; }
+  #tx-box .acts { display: flex; gap: 6px; margin-top: 8px; }
+  #tx-box .acts i { font: 500 11px system-ui; font-style: normal; padding: 3px 10px; border-radius: 10px; background: rgba(255,255,255,.1); transition: transform .2s, background .2s; }
+  #tx-box .acts i.go { background: #0a84ff; }
+  #tx-box .acts i.press { transform: scale(.92); background: #3d9bff; }
+  #pad { box-sizing: border-box; width: min(420px, 100%); height: 44px; margin-top: 14px; resize: none; padding: 12px 14px; border: 0; border-radius: 10px;
+    font: 13px/1.4 system-ui; color: var(--fg); background: var(--card); box-shadow: inset 0 0 0 .5px var(--line);
+    outline: none; -webkit-user-select: text; cursor: text; caret-color: var(--accent); transition: box-shadow .2s; }
+  #pad::selection { background: rgba(10,132,255,.35); }
+  #pad:focus { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px rgba(10,132,255,.18); }
+
+  /* meeting preview: someone talks, the question is spotted, the answer grows in */
+  #mt-panel { right: 22px; top: 14px; bottom: 14px; width: 214px; padding: 10px 11px; overflow: hidden; }
+  #mt-save { color:#8cbda1;font-size:10px;margin-bottom:8px; }
+  #mt-archive { font-size:12px;line-height:1.5;margin-top:8px; } #mt-archive p { color:#a1a1a6;margin:8px 0; } #mt-archive small { color:#8e8e93; }
+  #mt-panel .hd { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #a1a1a6; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+  #mt-panel .hd i { width: 7px; height: 7px; border-radius: 50%; background: #ff453a; animation: blink 1.6s ease-in-out infinite; }
+  .mt-card { padding: 8px 9px; border-radius: 9px; background: rgba(255,255,255,.07); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.1); transition: opacity .4s var(--ease), transform .5s var(--out); }
+  .mt-card small { display: block; font-size: 10px; color: #8e8e93; }
+  .mt-card p { margin: 2px 0 0; font-size: 11.5px; }
+  .mt-ans { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .5s var(--out), opacity .4s; }
+  .mt-ans.on { max-height: 60px; opacity: 1; }
+  .mt-ans b { display: block; margin-top: 6px; padding-top: 6px; border-top: .5px solid rgba(255,255,255,.12); font-size: 12px; }
+  .mt-think { display: inline-block; margin-top: 6px; font-size: 10.5px; color: #8e8e93; }
+  #mt-call { position: absolute; left: 18px; top: 14px; bottom: 14px; width: 150px; display: grid; grid-template-rows: 1fr 1fr; gap: 8px; }
+  #mt-call div { border-radius: 10px; background: linear-gradient(135deg, rgba(48,176,199,.45), rgba(10,132,255,.3)); position: relative; transition: box-shadow .3s; }
+  #mt-call div + div { background: linear-gradient(135deg, rgba(191,90,242,.4), rgba(255,55,95,.25)); }
+  #mt-call div::after { content: attr(data-n); position: absolute; left: 8px; bottom: 6px; font: 500 10.5px system-ui; color: #fff; }
+  #mt-call div.talk { box-shadow: 0 0 0 2px #30d158; }
+  .mt-row { display: flex; align-items: center; gap: 12px; width: min(420px, 100%); margin-top: 14px; padding: 10px 14px; box-sizing: border-box; border-radius: 12px; text-align: left;
+    background: var(--card); box-shadow: inset 0 0 0 .5px var(--line); }
+  .txt span.beta { display: inline; margin-top: 0; font: 600 9.5px system-ui; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: rgba(10,132,255,.12);
+    padding: 2px 5px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
+  .sw { position: relative; flex: none; width: 38px; height: 22px; }
+  .sw input { appearance: none; margin: 0; width: 100%; height: 100%; border-radius: 11px; background: rgba(127,127,127,.3); cursor: pointer; transition: background .25s var(--ease); }
+  .sw input:checked { background: var(--green); }
+  .sw input:focus-visible { outline: 3px solid rgba(10,132,255,.45); outline-offset: 2px; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; pointer-events: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .3s var(--spring); }
+  .sw:has(input:checked)::after { transform: translateX(16px); }
+  /* choices and a shortcut field, as in Settings */
+  .seg { display: inline-flex; flex: none; padding: 2px; border-radius: 8px; background: var(--track); }
+  .seg button { all: unset; padding: 4px 10px; border-radius: 6px; font-size: 12px; color: var(--fg); cursor: pointer; transition: background .2s, box-shadow .2s; }
+  .seg button.on { background: var(--on); box-shadow: 0 1px 3px rgba(0,0,0,.15), inset 0 0 0 .5px var(--line); }
+  .seg button:not(.on):hover { background: rgba(127,127,127,.12); } .seg button:focus-visible { outline: 2px solid rgba(10,132,255,.5); }
+  .seg button:disabled { opacity: .4; pointer-events: none; }
+  .page.on .r.dim { opacity: .45; }   /* greyed until it applies, as in Settings */
+  .keyfield { position: relative; flex: none; }
+  .kf { all: unset; box-sizing: border-box; min-width: 140px; height: 28px; padding: 0 10px; border-radius: 7px; display: flex; gap: 4px; align-items: center; justify-content: center;
+    font: 500 12.5px system-ui; color: var(--accent); cursor: pointer; background: var(--field); box-shadow: inset 0 0 0 .5px var(--line), 0 1px 1px rgba(0,0,0,.05); transition: box-shadow .2s; }
+  .kf.set { padding-right: 30px; } .kf.rec { color: var(--fg2); box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px rgba(10,132,255,.18); }
+  .kf.rec > span { animation: blink 1.4s ease-in-out infinite; } .kf:focus-visible { outline: 3px solid rgba(10,132,255,.45); outline-offset: 2px; }
+  .kf i { min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 4px; display: grid; place-items: center; font: 500 11px system-ui; font-style: normal; color: var(--fg);
+    background: linear-gradient(var(--key-top), var(--key-bot)); box-shadow: 0 0 0 .5px var(--key-edge), 0 1px 0 var(--key-edge); }
+  .keyfield .x { all: unset; position: absolute; right: 4px; top: 3px; width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; color: var(--fg3); font-size: 15px; cursor: pointer; }
+  .keyfield .x:hover { background: rgba(127,127,127,.14); color: #ff453a; } .keyfield .x:focus-visible { outline: 2px solid rgba(10,132,255,.5); }
+  .txt span.warn { color: #c93400; } @media (prefers-color-scheme: dark) { .txt span.warn { color: #ff9f0a; } }
+  .subrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(420px, 100%); margin-top: 10px; padding: 0 14px; box-sizing: border-box; font-size: 12px; color: var(--fg2); }
+  /* dictate preview: what you say beside the pill (a wave, then the orb, then a check), the slips strike out, the clean text lands at the cursor */
+  #dc-doc { position: absolute; left: 22px; right: 22px; top: 14px; bottom: 52px; padding: 9px 14px; border-radius: 10px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--line);
+    font: 13px/1.45 system-ui; color: var(--fg); }
+  #dc-doc small { display: block; font-size: 11px; color: var(--fg3); margin-bottom: 3px; }
+  #dc-words { white-space: pre-line; }
+  #dc-caret { display: inline-block; width: 1.5px; height: 16px; margin-left: 1px; vertical-align: -3px; background: var(--accent); animation: blink 1s steps(1) infinite; }
+  #dc-key { position: absolute; right: 22px; bottom: 12px; min-width: 32px; height: 32px; padding: 0 9px; border-radius: 8px; font-size: 12px; }
+  #dc-globe button { all: unset; color: var(--accent); cursor: pointer; } #dc-globe button:focus-visible { outline: 2px solid rgba(10,132,255,.5); outline-offset: 2px; }
+  #dc-pill { left: 22px; bottom: 12px; width: 56px; height: 32px; border-radius: 16px; display: grid; place-items: center;
+    transition: opacity .45s var(--ease), transform .55s var(--out), width .22s var(--ease); }
+  #dc-pill.work, #dc-pill.done { width: 32px; }
+  #dc-pill > * { grid-area: 1 / 1; } #dc-pill.work .wv, #dc-pill.done .wv, #dc-pill:not(.work) .orb, #dc-pill:not(.done) svg { display: none; }
+  #dc-pill .wv { display: flex; gap: 2px; align-items: center; height: 12px; } #dc-pill .wv i { width: 3px; border-radius: 2px; background: #0a84ff; animation: eq .9s ease-in-out infinite; }
+  #dc-pill .wv i:nth-child(2n) { animation-delay: .2s; } #dc-pill .wv i:nth-child(3n) { animation-delay: .4s; }
+  #dc-pill .orb { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #64d2ff 35%, #5e5ce6 80%); animation: blink 1s ease-in-out infinite; }
+  #dc-pill svg { width: 20px; height: 20px; } #dc-pill svg circle { fill: #30d158; } #dc-pill svg path { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  #dc-said { position: absolute; left: 88px; right: 66px; bottom: 12px; line-height: 32px; font: italic 12px/32px system-ui; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #dc-said:not(:empty)::before { content: "“"; } #dc-said:not(:empty)::after { content: "”"; }
+  #dc-said .x { text-decoration: line-through transparent; transition: opacity .4s var(--ease), text-decoration-color .4s var(--ease); }
+  #dc-said.done .x { opacity: .4; text-decoration-color: currentColor; }
+  /* work preview: a long ask offers to move, then runs on as an agent chip */
+  #wk-box { left: 22px; top: 16px; width: 208px; box-sizing: border-box; padding: 10px 12px; }
+  #wk-box .q, #wk-chip small { color: #8e8e93; font-size: 11px; }
+  #wk-line { margin-top: 4px; color: #a1a1a6; }
+  #wk-chip { right: 22px; top: 16px; width: 150px; padding: 9px 11px; overflow: hidden; }
+  #wk-chip b { display: block; font-weight: 500; } #wk-chip u { position: absolute; left: 11px; right: 11px; bottom: 0; height: 2px; background: rgba(255,255,255,.1); }
+  #wk-chip.done u { display: none; } #wk-chip.done small { color: #30d158; }
+  #wk-chip u::after { content: ""; position: absolute; inset: 0; width: 40%; background: #0a84ff; animation: crawl 2.4s var(--ease) infinite; }
+  @keyframes crawl { from { width: 8%; } to { width: 85%; } }
+  #work .list { max-width: 420px; margin-top: 14px; } #work .row { padding: 9px 14px; } #work .stage { height: 122px; }
+  /* point preview: a settings window, a question, then a ring lands on the answer */
+  #pt-win { position: absolute; left: 22px; top: 16px; bottom: 16px; width: 230px; border-radius: 10px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--line); overflow: hidden; }
+  #pt-win .tb { height: 22px; display: flex; gap: 5px; align-items: center; padding-left: 9px; border-bottom: .5px solid var(--line); }
+  #pt-win .tb i { width: 7px; height: 7px; border-radius: 50%; background: rgba(127,127,127,.4); }
+  #pt-win .it { display: flex; align-items: center; gap: 8px; margin: 4px 8px; padding: 5px 8px; border-radius: 6px; font: 12px system-ui; color: var(--fg); position: relative; }
+  #pt-win .it b { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+  #pt-spot { position: relative; display: flex; align-items: center; gap: 8px; }
+  /* the leader line: its head runs from the box to the spot, the faint tail follows, then the ring shows */
+  #pt-lead { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #pt-lead line { stroke: url(#pt-ink); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1 2; stroke-dashoffset: 1; }
+  #pt-lead.on line { animation: lead .85s var(--out) forwards; } @keyframes lead { 55% { stroke-dashoffset: 0; } to { stroke-dashoffset: -1; } }
+  #pt-ring { position: absolute; inset: -4px; border-radius: 9px; border: 2px solid #ff375f; box-shadow: 0 0 0 4px rgba(255,55,95,.2), 0 0 18px rgba(255,55,95,.5);
+    opacity: 0; transform: scale(1.4); transition: opacity .35s var(--ease), transform .5s var(--spring); pointer-events: none; }
+  #pt-ring.on { opacity: 1; transform: none; animation: ring 1.2s .5s ease-in-out infinite; }
+  #pt-box { right: 22px; top: 34px; width: 140px; padding: 9px 11px; }
+  #pt-box .q { color: #8e8e93; font-size: 11px; }
+  #pt-ans { margin-top: 5px; transition: opacity .35s; }
+  @keyframes ring { 50% { box-shadow: 0 0 0 7px rgba(255,55,95,.12), 0 0 24px rgba(255,55,95,.6); } }
+  /* then an explanation: the drawing builds like a whiteboard while the caption card keeps every step */
+  #pt-win, #wb { transition: opacity .45s var(--ease); }
+  #ptstage.wb :is(#pt-win, #pt-box), #ptstage:not(.wb) :is(#wb, #wb-card) { opacity: 0; }
+  #wb { position: absolute; left: 22px; top: 16px; fill: none; stroke: #ff375f; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  #wb text { fill: #ff375f; stroke: none; font: 600 13px system-ui; } #wb text.sm { font: 500 11px system-ui; }
+  #wb [data-s] { opacity: 0; transition: opacity .4s var(--ease); } #wb [data-s].on { opacity: 1; }
+  #wb .tr { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .9s var(--ease); } #wb .on .tr { stroke-dashoffset: 0; }
+  #wb-card { right: 22px; top: 16px; width: 150px; padding: 9px 11px; box-sizing: border-box; }
+  #wb-card .hd { display: flex; justify-content: space-between; font-size: 10.5px; color: #8e8e93; }
+  #wb-card p { margin: 0; font-size: 11px; line-height: 1.35; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .5s var(--out), opacity .4s var(--ease), margin .5s var(--out); }
+  #wb-card p.on { max-height: 45px; opacity: 1; margin-top: 5px; }
+  /* pointer preview: the user circles a spot, the box keeps it as a chip, the question goes with it */
+  #pa-win { position: absolute; left: 22px; top: 16px; bottom: 16px; width: 230px; border-radius: 10px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--line); overflow: hidden; }
+  #pa-win .tb { height: 22px; display: flex; gap: 5px; align-items: center; padding-left: 9px; border-bottom: .5px solid var(--line); }
+  #pa-win .tb i { width: 7px; height: 7px; border-radius: 50%; background: rgba(127,127,127,.4); }
+  #pa-win pre { margin: 0; padding: 10px 12px; font: 11px/1.7 ui-monospace, Menlo, monospace; color: var(--fg2); }
+  #pa-mark { position: absolute; left: 0; top: 0; fill: none; stroke: #ff375f; stroke-width: 2.5; stroke-linecap: round; }
+  #pa-mark ellipse { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .8s var(--ease); } #pa-mark.on ellipse { stroke-dashoffset: 0; }
+  #pa-box { right: 22px; top: 22px; width: 150px; padding: 9px 11px; box-sizing: border-box; }
+  #pa-row { display: flex; align-items: center; min-height: 22px; padding-bottom: 7px; margin-bottom: 7px; border-bottom: .5px solid rgba(255,255,255,.12); font-size: 10.5px; color: #a1a1a6; }
+  #pa-chip { display: flex; align-items: center; gap: 6px; color: #f5f5f7; } #pa-chip i { font-style: normal; color: #8e8e93; }
+  #pa-chip b { position: relative; width: 34px; height: 22px; border-radius: 4px; background: rgba(255,255,255,.12); }
+  #pa-chip b::after { content: ""; position: absolute; inset: 6px 4px; border: 1.5px solid #ff375f; border-radius: 50%; }
+  #pa-q { flex: 1; min-width: 0; color: #8e8e93; } #pa-q.on { color: #f5f5f7; } #pa-a { margin-top: 5px; }
+  #pa-ask { display: flex; align-items: center; gap: 4px; }
+  #pa-ask i { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.14); transition: background .3s var(--ease), transform .3s var(--spring); }
+  #pa-ask i.on { background: rgba(10,132,255,.55); } #pa-ask i.press { transform: scale(.88); background: #3d9bff; }
+  #pa-ask svg { width: 10px; height: 10px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  /* mac preview: two windows snap side by side, then music starts */
+  .mw { position: absolute; top: 16px; height: 110px; border-radius: 8px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--line), 0 4px 12px rgba(0,0,0,.12);
+    overflow: hidden; transition: left .6s var(--out), width .6s var(--out), top .6s var(--out), height .6s var(--out); }
+  .mw .tb { height: 16px; display: flex; gap: 4px; align-items: center; padding-left: 7px; font: 500 9.5px system-ui; color: var(--fg3); border-bottom: .5px solid var(--line); }
+  .mw .tb i { width: 6px; height: 6px; border-radius: 50%; background: rgba(127,127,127,.4); }
+  .mw .tb span { margin-left: 6px; }
+  .mw .ln { height: 6px; margin: 8px 9px 0; border-radius: 3px; background: rgba(127,127,127,.18); }
+  #mw-chrome { left: 40px; width: 200px; } #mw-notes { left: 170px; top: 40px; width: 170px; }
+  #macstage.snapped #mw-chrome { left: 14px; top: 14px; width: 193px; height: 150px; }
+  #macstage.snapped #mw-notes { left: 213px; top: 14px; width: 193px; height: 150px; }
+  #mac-mini { display:flex;align-items:center;gap:8px;padding:9px;margin:7px 0;border-radius:8px;background:rgba(255,255,255,.055);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.08);font-size:10px; }
+  #mac-mini span { color:#8e8e93; } #mac-mini b { font-weight:500;flex:1; }
+  #mac-box { left: 50%; bottom: 14px; width: 250px; margin-left: -125px; padding: 8px 11px; z-index: 2; }
+  #mac-box .q { color: #8e8e93; font-size: 11px; }
+  #mac-play { right: 22px; top: 22px; display: flex; align-items: center; gap: 8px; padding: 7px 10px 7px 7px; z-index: 2; }
+  #mac-play b { width: 26px; height: 26px; border-radius: 5px; background: linear-gradient(135deg, #1ed760, #0a84ff); flex: none; }
+  #mac-play small { display: block; font-size: 10px; color: #8e8e93; }
+  .eq { display: flex; gap: 2px; align-items: flex-end; height: 12px; margin-left: 4px; }
+  .eq i { width: 2px; background: #1ed760; border-radius: 1px; animation: eq .9s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: .2s; } .eq i:nth-child(3) { animation-delay: .4s; }
+  @keyframes eq { 0%,100% { height: 3px; } 50% { height: 12px; } }
+  .says { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; width: min(440px, 100%); margin-top: 14px; }
+  .says i, .says button { font: 12px system-ui; font-style: normal; padding: 5px 11px; border: 0; border-radius: 13px; color: var(--fg2); background: var(--card); box-shadow: inset 0 0 0 .5px var(--line); }
+  .says button { cursor: pointer; transition: background .2s, color .2s; } .says button:hover { background: rgba(127,127,127,.12); }
+  .says button[aria-pressed="true"] { color: var(--accent); background: rgba(10,132,255,.12); box-shadow: none; }
+  .says button:focus-visible { outline: 2px solid rgba(10,132,255,.5); outline-offset: 1px; }
+  [hidden] { display: none !important; }
+  @keyframes blink { 50% { opacity: .35; } }
+  .tips { display: flex; gap: 18px; justify-content: center; margin-top: 20px; font-size: 12px; color: var(--fg3); }
+  .tips kbd { font: 500 11px system-ui; padding: 1px 6px; border-radius: 4px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--line); color: var(--fg2); }
+
+  #dots { position: absolute; bottom: 24px; left: 0; right: 0; display: flex; gap: 6px; justify-content: center; }
+  #dots i { width: 6px; height: 6px; border-radius: 3px; background: var(--fg3); opacity: .35; transition: width .45s var(--out), opacity .3s; }
+  #dots i.on { width: 18px; opacity: .8; }
+
+  @keyframes drift { 50% { transform: translate(6px, -4px) scale(1.06); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @media (max-width: 520px) {
+    .page { padding: 36px 24px; }
+    #work .row, .mt-row, .subrow { flex-wrap: wrap; }
+    #work .seg, .subrow .seg { margin-left: auto; }
+    .tips { flex-wrap: wrap; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; animation-iteration-count: 1 !important; } }   /* once: checks still land on their last frame, loops stop */
+</style></head>
+<body>
+<button class="btn quiet" id="back" hidden>Back</button>
+<section class="page" id="welcome">
+  <div id="orbwrap" class="r"><canvas id="orb"></canvas></div>
+  <h1 class="r">Meet Atticus</h1>
+  <p class="sub r" id="welcome-talk">Hold the shortcut, say what you need, let go. Your Mac does the rest.</p>
+  <div class="keys r" id="welkeys"><div class="key">⌃</div><div class="key">⌥</div><div class="key wide">Space</div></div>
+  <button class="btn r" data-go="perms">Get Started</button>
+</section>
+
+<section class="page" id="perms">
+  <h2 class="r">Give Atticus a hand</h2>
+  <p class="sub r">macOS asks once for each one. You can change them any time in System Settings.</p>
+  <div id="list" class="r"></div>
+  <div id="count" class="r"></div>
+  <button class="btn quiet r" id="next" data-go="agents">Skip for Now</button>
+</section>
+
+<section class="page" id="agents">
+  <h2 class="r">Agents keep working while you do</h2>
+  <p class="sub r">Hand off a bigger task and keep asking. An agent uses these only when a task needs them.</p>
+  <div class="cap r">Atticus turns these on</div>
+  <div class="list r" id="own"></div>
+  <div class="cap r">Only you can allow these. macOS and Claude ask you directly.</div>
+  <div class="list r" id="yours"></div>
+  <div class="bar2 r"><button class="btn quiet" data-go="try" id="agents-next">Skip for Now</button><button class="btn" id="enable">Enable All</button></div>
+</section>
+
+<section class="page" id="try">
+  <h2 class="r">Try it now</h2>
+  <p class="sub r" id="try-talk">Hold the keys anywhere, say what you need, then let go. Try one now.</p>
+  <div class="keys big r" id="trykeys"><div class="key">⌃</div><div class="key">⌥</div><div class="key wide">Space</div></div>
+  <div id="hint" class="r">Hold the keys and say “open Calculator”.</div>
+  <div class="bar2 r"><button class="btn quiet" data-go="mac" id="try-skip">Skip</button><button class="btn" data-go="mac" id="try-next" hidden>Next</button></div>
+</section>
+
+<section class="page" id="mac">
+  <div class="kicker r">Your whole Mac, by voice</div>
+  <h2 class="r">Say it. It’s done.</h2>
+  <p class="sub r">Run apps, arrange windows and play music in the background. When the work is out of sight, a live mini screen shows it; click it to open that window.</p>
+  <div class="stage r" id="macstage" aria-hidden="true">
+    <div class="mw" id="mw-chrome"><div class="tb"><i></i><i></i><i></i><span>Chrome</span></div><div class="ln"></div><div class="ln" style="width:60%"></div><div class="ln" style="width:75%"></div></div>
+    <div class="mw" id="mw-notes"><div class="tb"><i></i><i></i><i></i><span>Notes</span></div><div class="ln" style="width:50%"></div><div class="ln"></div></div>
+    <div class="fake gone2" id="mac-play"><b></b><div>Lo-fi beats<small>Spotify</small></div><div class="eq"><i></i><i></i><i></i></div></div>
+    <div class="fake gone2" id="mac-box"><div class="q" id="mac-q">“Chrome left, Notes right”</div><div id="mac-mini"><span>Spotify · Live</span><b>Lo-fi beats</b><div class="eq"><i></i><i></i><i></i></div></div><span id="mac-a">Done.</span></div>
+  </div>
+  <div class="says r"><i>“Open Spotify and play lo-fi”</i><i>“Make Chrome full screen”</i><i>“Volume to 30%”</i><i>“Turn on dark mode”</i></div>
+  <div class="done-note r" id="safe-note">Safe mode is on: deleting, sending or buying asks you first.</div>
+  <div class="bar2 r"><button class="btn quiet" data-go="learn">Skip</button><button class="btn" data-go="learn">Next</button></div>
+</section>
+
+<section class="page" id="learn">
+  <div class="kicker r">It learns you</div>
+  <h2 class="r">Tell it once. It remembers.</h2>
+  <p class="sub r">Say “remember…” or “from now on…” and Atticus keeps it for every ask after. Tasks that worked get faster next time. Change or delete anything in Settings → Memory.</p>
+  <div class="says r"><i>“Remember I use Chrome, not Safari”</i><i>“From now on, open apps on my left screen”</i><i>“Remember my monitor is screen 2”</i><i>“No, that’s wrong”</i></div>
+  <div class="done-note r">Two screens? Say which one: “on my laptop”, “on the big screen”. Atticus remembers the answer.</div>
+  <div class="bar2 r"><button class="btn quiet" data-go="text">Skip</button><button class="btn" data-go="text">Next</button></div>
+</section>
+
+<section class="page" id="text">
+  <div class="kicker r">Any text, any app</div>
+  <h2 class="r">Select it. Say what to do.</h2>
+  <p class="sub r">Rewrite, reply, translate or delete. You see it first, then click Replace.</p>
+  <div class="stage r" aria-hidden="true">
+    <div id="tx-doc"><span id="tx-line"><mark></mark><span id="tx-words">hey can u send me the notes from today, thx</span></span></div>
+    <div class="fake gone2" id="tx-box"><div class="q">“make this polite”</div>Hi! Could you send me today’s notes? Thank you.<div class="acts"><i class="go" id="tx-go">Replace</i><i>Try again</i><i>Copy</i></div></div>
+  </div>
+  <textarea id="pad" class="r" aria-label="Practice text">hey can u send me the notes from today, thx</textarea>
+  <div class="done-note r">Your turn: select this line, hold the keys, say “make this polite”.</div>
+  <div class="bar2 r"><button class="btn quiet" data-go="dictate">Skip</button><button class="btn" data-go="dictate">Next</button></div>
+</section>
+
+<section class="page" id="dictate">
+  <div class="kicker r">Dictate anywhere</div>
+  <h2 class="r">Talk instead of typing</h2>
+  <p class="sub r" id="dc-sub"></p>
+  <div class="stage r" aria-hidden="true">
+    <div id="dc-doc"><small>To: Sam</small><span id="dc-words"></span><i id="dc-caret"></i></div>
+    <span id="dc-said"></span>
+    <div class="fake gone2" id="dc-pill"><span class="wv"><i></i><i></i><i></i><i></i><i></i></span><span class="orb"></span><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="11"/><path d="M6.5 11.3l3 3 6-6.3"/></svg></div>
+    <div class="key" id="dc-key">fn</div>
+  </div>
+  <div class="says r" id="dc-ex" role="group" aria-label="Clean up examples"></div>
+  <div class="mt-row r"><div class="ic" style="background:#ff9f0a"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></div>
+    <div class="txt"><b id="dc-label">Dictation shortcut</b><span id="dc-hint"></span></div>
+    <div class="keyfield"><button class="kf" id="dc-field" aria-labelledby="dc-label" aria-describedby="dc-hint"></button><button class="x" id="dc-clear" aria-label="Clear dictation shortcut" hidden>×</button></div></div>
+  <div class="subrow r" id="dc-globe" hidden><span>Set Press 🌐 key to Do Nothing</span><button id="dc-globe-open">Open Keyboard Settings</button></div>
+  <div class="subrow r" id="dc-mode"><span id="dc-mode-hint">Clean up tidies it as shown. Verbatim types every word.</span><div class="seg" data-k="dictateMode" role="group" aria-label="Dictated text"><button data-v="verbatim">Verbatim</button><button data-v="cleanup">Clean up</button></div></div>
+  <div class="bar2 r"><button class="btn quiet" data-go="point">Skip</button><button class="btn" data-go="point">Next</button></div>
+</section>
+
+<section class="page" id="point">
+  <div class="kicker r">Draw on screen</div>
+  <h2 class="r">It shows you, right on screen</h2>
+  <p class="sub r">Ask how to do something and Atticus marks each spot, one step at a time. Ask it to explain something and draw it, and the drawing builds up like a whiteboard.</p>
+  <div class="stage r" id="ptstage" aria-hidden="true">
+    <div id="pt-win"><div class="tb"><i></i><i></i><i></i></div>
+      <div class="it"><b style="background:#8e8e93"></b>General</div>
+      <div class="it"><span id="pt-spot"><b style="background:#0a84ff"></b>Appearance<span id="pt-ring"></span></span></div>
+      <div class="it"><b style="background:#ff9f0a"></b>Notifications</div>
+      <div class="it"><b style="background:#30d158"></b>Battery</div></div>
+    <div class="fake gone2" id="pt-box"><div class="q">“how do I turn on dark mode?”</div><div id="pt-ans">Step 1 of 2: click Appearance.</div></div>
+    <svg id="pt-lead"><defs><linearGradient id="pt-ink" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0a84ff" stop-opacity=".1"/><stop offset="1" stop-color="#0a84ff"/></linearGradient></defs><line pathLength="1"/></svg>
+    <svg id="wb" width="220" height="146"><g data-s="1"><path class="tr" pathLength="1" d="M30 26V122H150Z"/><path d="M30 110h12v12"/></g>
+      <g data-s="2"><text x="14" y="79">a</text><text x="86" y="140">b</text><text x="98" y="68">c</text></g>
+      <g data-s="3"><text x="116" y="26">a² + b² = c²</text><text class="sm" x="122" y="44">3² + 4² = 5²</text></g></svg>
+    <div class="fake" id="wb-card"><div class="hd"><span>Step <span id="wb-n">1</span> of 3</span><span>✕</span></div>
+      <p data-s="1">A right triangle has one square corner.</p><p data-s="2">Short sides a and b, long side c.</p><p data-s="3">a² + b² = c². With 3 and 4, c is 5.</p></div>
+  </div>
+  <div class="mt-row r"><div class="ic" style="background:#ff375f"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></div>
+    <div class="txt"><b>Draw on screen to show you</b><span>Then ask “how do I…?” or “explain this and draw it”. Esc clears it.</span></div>
+    <label class="sw"><input type="checkbox" data-k="draw" aria-label="Draw on screen to show you"></label></div>
+  <div class="bar2 r"><button class="btn quiet" data-go="pointer">Skip</button><button class="btn" data-go="pointer">Next</button></div>
+</section>
+
+<section class="page" id="pointer">
+  <div class="kicker r">Point at your screen</div>
+  <h2 class="r">Show it what you mean</h2>
+  <p class="sub r">Click the pointer next to the mic in the ask box. Circle, click or scribble on anything, then type or say your question.</p>
+  <div class="stage r" aria-hidden="true">
+    <div id="pa-win"><div class="tb"><i></i><i></i><i></i></div><pre>const user = {
+  name: "Sam"
+  role: "admin",
+}</pre><svg id="pa-mark" width="230" height="146"><ellipse pathLength="1" cx="61" cy="60" rx="50" ry="13" transform="rotate(-4 61 60)"/></svg></div>
+    <div class="fake gone2" id="pa-box"><div id="pa-row"><span id="pa-hint">Click, circle or scribble on anything, then ask</span><span id="pa-chip" hidden><b></b>Marked<i>×</i></span></div>
+      <div id="pa-ask"><span id="pa-q">Ask Atticus…</span><i id="pa-pt"><svg viewBox="0 0 24 24"><path d="M9 8l11 4.5-4.6 1.9L13.5 19z"/><path d="M5.1 11.9A5.5 5.5 0 0 1 12.9 4.1"/></svg></i><i><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></i></div><div id="pa-a" hidden>Line 2 needs a comma after “Sam”.</div></div>
+  </div>
+  <div class="bar2 r"><button class="btn quiet" data-go="work">Skip</button><button class="btn" data-go="work">Next</button></div>
+</section>
+
+<section class="page" id="work">
+  <div class="kicker r">Your plan, your pace</div>
+  <h2 class="r">Quick asks stay quick</h2>
+  <p class="sub r"><span id="wk-plan">Choose how much of your plan Atticus uses. </span>A long ask moves to a background agent by itself, so you keep working. ⌃⌥↩ moves one sooner.</p>
+  <div class="stage r" aria-hidden="true">
+    <div class="fake gone2" id="wk-box"><div class="q">“Find standing desks under $600”</div><div id="wk-line">Searching the web…</div></div>
+    <div class="fake gone2" id="wk-chip"><small id="wk-state">Agent · working</small><b>Standing desks</b><u></u></div>
+  </div>
+  <div class="list r">
+    <div class="row" id="wk-brain"><div class="txt"><b>Intelligence</b><span id="wk-why"></span></div><div class="seg" data-k="routing" role="group" aria-label="Intelligence"><button data-v="cheapest">Cheapest</button><button data-v="balanced">Balanced</button><button data-v="capable">Most capable</button></div></div>
+  </div>
+  <div class="bar2 r"><button class="btn quiet" data-go="meeting">Skip</button><button class="btn" data-go="meeting">Next</button></div>
+</section>
+
+<section class="page" id="meeting">
+  <div class="kicker r">Meeting Copilot · Beta</div>
+  <h2 class="r">Answers while you’re on the call</h2>
+  <p class="sub r">Hear the call, get help with questions, then revisit transcripts, recaps and action items in Settings → Meetings. Saved on this Mac.</p>
+  <div class="stage r" aria-hidden="true">
+    <div id="mt-call"><div data-n="Dana" id="mt-dana"></div><div data-n="Lee"></div></div>
+    <div class="fake" id="mt-panel">
+      <div class="hd"><i></i>Listening · <span id="mt-clock">12:04</span></div><div id="mt-save">Saving transcript on this Mac</div><div id="mt-archive" hidden><b>Your meeting</b><p>Pilot budget approved: $18,000.</p><small>Action item · Send the notes</small></div>
+      <div class="mt-card gone2" id="mt-q"><small>12:05</small><p>What budget did we approve?</p>
+        <span class="mt-think" id="mt-think">Thinking…</span><div class="mt-ans" id="mt-ans"><b>The approved budget is $18,000.</b></div></div>
+    </div>
+  </div>
+  <div class="mt-row r"><div class="ic" style="background:#30b0c7"><svg viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></svg></div>
+    <div class="txt"><b>Turn on Meeting Copilot<span class="beta">Beta</span></b><span id="mt-hint"></span></div>
+    <label class="sw"><input type="checkbox" data-k="meeting" aria-label="Meeting Copilot"></label></div>
+  <div class="bar2 r"><button class="btn quiet" data-go="improve">Skip</button><button class="btn" data-go="improve">Next</button></div>
+</section>
+
+<section class="page" id="improve">
+  <div class="kicker r">Optional</div>
+  <h2 class="r">Help make Atticus better</h2>
+  <p class="sub r">When a task fails, Atticus can tell its maker what went wrong, so the next version gets it right. Change it anytime in Settings.</p>
+  <div class="list r">
+    <div class="row"><div class="ic" style="background:#0a84ff"><svg viewBox="0 0 24 24"><path d="M5 5h14v10H10l-5 4z"/></svg></div>
+      <div class="txt"><b>Only what failed</b><span>What you asked, the steps Atticus took, and why it didn’t work.</span></div></div>
+    <div class="row"><div class="ic" style="background:#30d158"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+      <div class="txt"><b>Anonymous</b><span>A random ID. Never your name, your screen, your files or passwords.</span></div></div>
+    <div class="row"><div class="ic" style="background:#8e8e93"><svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 9 6 9 6a15 15 0 0 1-2.7 3.2M6.6 7.6A15 15 0 0 0 3 12s4 6 9 6a9 9 0 0 0 3.4-.7"/></svg></div>
+      <div class="txt"><b>Cleaned first</b><span>Emails, numbers, file paths and anything typed for you are removed before it leaves your Mac.</span></div></div>
+  </div>
+  <div class="bar2 r"><button class="btn quiet" data-improve="false">Not Now</button><button class="btn" data-improve="true">Help Improve</button></div>
+</section>
+
+<section class="page" id="tip">
+  <div id="tip-heart" class="r" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg></div>
+  <h2 class="r">Atticus is free and open source</h2>
+  <p class="sub r">If you ever find yourself enjoying Atticus, a small tip goes a long way. It keeps Atticus free for everyone, and it would really support me.</p>
+  <div class="bar2 r"><button class="btn" id="kofi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>Leave a Tip</button><button class="btn quiet" data-go="done" id="tip-next">Next</button></div>
+  <p class="done-note r">You can always find “Leave a Tip” in the menu bar later.</p>
+</section>
+
+<section class="page" id="done">
+  <svg id="done-check" class="r" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11"/><path d="M6.5 11.3l3 3 6-6.3"/></svg>
+  <h2 class="r" id="done-title">You’re all set</h2>
+  <p class="sub r" id="done-sub">Hold the keys anytime and just ask. Everything else lives in Settings, in the menu bar.</p>
+  <div class="tips r"><div><kbd>esc</kbd> stops an answer</div><div>Click an answer to copy</div><div>Click away to close</div><div>Hover the box to type</div></div>
+  <p class="done-note r" id="feedback-note">Atticus is new and growing, and your feedback helps a lot. <button class="alt" id="feedback-link">Report feedback ↗</button></p>
+  <button class="btn r" id="finish">Start Using Atticus</button>
+</section>
+
+<div id="prov" hidden role="dialog" aria-modal="true" aria-labelledby="prov-h">
+  <div class="card">
+    <h3 id="prov-h">Choose your AI provider</h3>
+    <p>Atticus thinks with one of these. Change it anytime in Settings.</p>
+    <div role="radiogroup" aria-labelledby="prov-h">
+      <button class="opt" role="radio" data-p="claude"><span class="dot"></span><div class="txt"><b>Claude</b><span>Your Claude Pro or Max plan, through Claude Code.</span></div></button>
+      <button class="opt" role="radio" data-p="devin"><span class="dot"></span><div class="txt"><b>Devin</b><span>Your Devin plan, through the Devin CLI.</span></div></button>
+      <button class="opt" role="radio" data-p="pi"><span class="dot"></span><div class="txt"><b>Pi</b><span>The provider and model set in the Pi CLI, including local models.</span></div></button>
+      <button class="opt" role="radio" data-p="server"><span class="dot"></span><div class="txt"><b>Custom server</b><span>Ollama, LM Studio, DeepSeek or any Claude-style API.</span></div></button>
+    </div>
+    <div class="chips" id="local-offer" hidden><span id="local-running"></span><button class="chip" id="local-use"></button></div>
+    <div id="srv" hidden>
+      <div class="chips"><span>Quick fill</span><button class="chip" data-base="http://localhost:11434">Ollama</button><button class="chip" data-base="http://localhost:1234">LM Studio</button><button class="chip" data-base="https://api.deepseek.com/anthropic">DeepSeek</button></div>
+      <input class="fld" id="srv-base" placeholder="Server address, like http://localhost:11434" spellcheck="false" aria-label="Server address">
+      <input class="fld" id="srv-key" type="password" placeholder="Key (not needed for local servers)" aria-label="Server key">
+      <input class="fld" id="srv-model" list="srv-models" placeholder="Model" spellcheck="false" aria-label="Model"><datalist id="srv-models"></datalist>
+      <div id="srv-note" aria-live="polite"></div>
+    </div>
+    <div class="acts"><button class="btn quiet" id="prov-cancel">Cancel</button><button class="btn" id="prov-use">Use Claude</button></div>
+  </div>
+</div>
+
+<div id="dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+<script type="text/plain" id="orbsrc">/*ORBS*/</script>
+<script type="module">
+  const $ = id => document.getElementById(id);
+  const post = m => window.webkit?.messageHandlers.ob.postMessage(m);
+  const pages = ['welcome', 'perms', 'agents', 'try', 'mac', 'learn', 'text', 'dictate', 'point', 'pointer', 'work', 'meeting', 'improve', 'tip', 'done'];
+  let cur = '', orbWake = null;
+  const skip = id => ['devin', 'pi'].includes(provider) && ['agents', 'work'].includes(id);   // their CLIs run no Atticus agents
+  const go = id => {
+    while (skip(id)) id = pages[pages.indexOf(id) + 1];
+    if (recording) post({ do: 'cancelRecord' });
+    if (cur) { $(cur).classList.remove('on'); $(cur).classList.add('gone'); const c = cur; setTimeout(() => $(c).classList.remove('gone'), 600); }
+    cur = id; orbWake?.(); orbWake = null; $(id).classList.add('on');
+    for (const page of pages) { $(page).inert = page !== id; $(page).setAttribute('aria-hidden', String(page !== id)); }
+    [...$('dots').children].forEach((d, i) => { d.classList.toggle('on', pages[i] === id); d.hidden = skip(pages[i]); });
+    $('back').hidden = pages.indexOf(id) < 1;
+  };
+  document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
+  $('back').onclick = () => { let i = pages.indexOf(cur) - 1; while (skip(pages[i])) i--; go(pages[i]); };
+  $('finish').onclick = () => post({ do: 'done' });
+  $('kofi').onclick = () => post({ do: 'kofi' });
+  $('feedback-link').onclick = () => post({ do: 'feedback' });   // Settings → Report feedback, over this window
+  document.querySelectorAll('[data-improve]').forEach(b => b.onclick = () => { post({ do: 'set', k: 'improve', v: b.dataset.improve }); go('tip'); });
+  document.querySelectorAll('.sw input').forEach(i => i.onchange = () => post({ do: 'set', k: i.dataset.k, v: String(i.checked) }));
+  let prefs = {};
+  const WHY = { cheapest: 'Haiku for every ask. Fastest, and uses the least of your plan.', balanced: 'Haiku for quick asks. Your work model takes over real work.',
+    capable: 'Your work model for every ask. Slower, and uses the most of your plan.' };
+  const paintPrefs = () => {
+    const other = ['devin', 'pi'].includes(provider);
+    document.querySelectorAll('.seg[data-k]').forEach(g => g.querySelectorAll('button').forEach(b => {
+      const on = prefs[g.dataset.k] === b.dataset.v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+    }));
+    $('wk-why').textContent = WHY[prefs.routing] || '';
+    $('safe-note').hidden = prefs.safe === false;
+    $('wk-brain').hidden = $('wk-plan').hidden = provider === 'server';   // a custom server runs one model
+    if (!recording) dcKeys(prefs.dictateHotkeyLabel || '', 'Record Shortcut');
+    if (prefs.hotkeyLabel && prefs.hotkeyLabel !== talkLabel) {   // the talk shortcut as set; redrawn only when it changes, so held keys stay lit
+      talkLabel = prefs.hotkeyLabel;
+      const caps = () => capsOf(talkLabel).map(c => Object.assign(document.createElement('div'), { className: c.length > 3 ? 'key wide' : 'key', textContent: c }));
+      $('welkeys').replaceChildren(...caps()); $('trykeys').replaceChildren(...caps());
+    }
+    const key = prefs.dictateHotkeyLabel;
+    $('dc-sub').textContent = key ? `Hold ${key} to talk. Double-tap to lock.` : 'Give dictation a shortcut. Hold it to talk, double-tap to lock.';
+    $('dc-key').textContent = key || 'fn'; $('dc-globe').hidden = !prefs.globeTaken;
+    $('dc-mode').classList.toggle('dim', !prefs.dictateHotkeyLabel);
+    document.querySelector('[data-k=dictateMode] [data-v=cleanup]').disabled = other;
+    $('dc-mode-hint').textContent = other ? 'Clean up needs Claude.' : 'Clean up tidies it as shown. Verbatim types every word.';
+    $('mt-hint').textContent = other ? `With ${NAMES[provider]}, it saves the transcript on this Mac. Answers and recaps need Claude.` : 'Then start it from the menu bar when a call begins.';
+  };
+  document.querySelectorAll('.seg[data-k]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => {
+    prefs[g.dataset.k] = b.dataset.v; paintPrefs(); post({ do: 'set', k: g.dataset.k, v: b.dataset.v });
+  }));
+  // Dictation's shortcut: Atticus.swift records the next keys (the same recorder as Settings) and answers with ob.rec / ob.taken / ob.recorded.
+  let recording = false, dcWarn = 0;
+  const dcHint = () => prefs.dictateHotkeyLabel ? 'In any text field, your words land at the cursor.' : 'Click, then press the keys you want.';
+  const dcKeys = (label, text) => {
+    $('dc-field').innerHTML = label ? capsOf(label).map(c => `<i>${c.replace(/[&<>]/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[x]))}</i>`).join('') : `<span>${text}</span>`;
+    $('dc-field').classList.toggle('set', !!label && !recording); $('dc-clear').hidden = !label || recording;
+    if (!dcWarn && !recording) { $('dc-hint').textContent = dcHint(); $('dc-hint').className = ''; }
+  };
+  const capsOf = label => { const m = label.match(/^((?:fn|[⌃⌥⇧⌘])*)(.*)$/); return (m[1].match(/fn|./g) || []).concat(m[2] ? [m[2]] : []); };
+  $('dc-field').onclick = () => {
+    if (recording) return post({ do: 'cancelRecord' });
+    recording = true; $('dc-field').classList.add('rec'); dcKeys('', 'Type Shortcut');
+    $('dc-hint').textContent = 'Press a key combo, a modifier on its own, or an F-key. Esc cancels.'; $('dc-hint').className = '';
+    post({ do: 'recordDictate' });
+  };
+  $('dc-clear').onclick = () => { prefs.dictateHotkeyLabel = ''; paintPrefs(); post({ do: 'clearDictate' }); };
+  $('dc-globe-open').onclick = () => post({ do: 'globeKey' });
+  document.addEventListener('pointerdown', e => { if (recording && !e.target.closest('#dc-field')) post({ do: 'cancelRecord' }); });
+
+  // Permissions: icon color + SF-style glyph, why it's needed.
+  const P = [
+    ['claude', 'AI Provider', 'Checking…', '#d97757', '<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/>'],
+    ['mic', 'Microphone', 'Listens when you start a voice request.', '#ff9f0a', '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>'],
+    ['speech', 'Speech Recognition', 'Turns your words into text, on this Mac.', '#8e8e93', '<path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/>'],
+    ['ax', 'Accessibility', 'Moves windows and clicks buttons for you.', '#0a84ff', '<circle cx="12" cy="4.5" r="1.6"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4.5M12 14.5l-3 6M12 14.5l3 6"/>'],
+    ['screen', 'Screen Recording', 'Looks at your screen when you say “this”.', '#bf5af2', '<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/>'],
+    ['chrome', 'Chrome Pages', 'Reads and clicks web pages in Chrome, in the background.', '#34c759', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5h8.2M9 13.7L4.9 6.6M15 13.7l-4.1 7.1"/>'],
+    ['auto', 'Automation', 'Pick the apps Atticus can control, all at once.', '#636366', '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'],
+  ];
+  const rows = (list, prefix, label = 'Allow') => list.map(([id, name, why, color, svg], i) => `
+    <div class="row" id="${prefix}${id}" style="transition-delay:${.25 + i * .06}s">
+      <div class="ic" style="background:${color}"><svg viewBox="0 0 24 24">${svg}</svg></div>
+      <div class="txt"><b>${name}</b><span>${why}</span></div>
+      <button class="allow" data-id="${id}">${label}</button>
+      <svg class="check" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11"/><path d="M6.5 11.3l3 3 6-6.3"/></svg>
+    </div>`).join('');
+  $('list').innerHTML = rows(P, 'p-');
+  // Not everyone has a Claude plan: "Change provider" offers the same clients as Settings → Intelligence.
+  $('p-claude').querySelector('.txt').insertAdjacentHTML('beforeend', '<button class="alt" id="client-alt">Change provider</button>');
+  const NAMES = { claude: 'Claude Plan', devin: 'Devin', pi: 'Pi', server: 'Custom Server' };
+  let want = null, provider = 'claude', saved = { apiBase: '', apiModel: '' }, pick = 'claude', probeTimer = 0;
+  const srvOK = () => /^https?:\/\/\S+$/.test($('srv-base').value.trim()) && !!$('srv-model').value.trim();
+  const paintProv = () => {
+    document.querySelectorAll('.opt').forEach(o => o.setAttribute('aria-checked', String(o.dataset.p === pick)));
+    $('srv').hidden = pick !== 'server';
+    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.base === $('srv-base').value.trim()));
+    $('prov-use').textContent = 'Use ' + { claude: 'Claude', devin: 'Devin', pi: 'Pi', server: 'This Server' }[pick];
+    $('prov-use').disabled = pick === 'server' && !srvOK();
+  };
+  const probe = () => {   // ask the server for its models, so the Model box can offer them
+    clearTimeout(probeTimer);
+    const base = $('srv-base').value.trim();
+    $('srv-note').classList.remove('bad'); $('srv-note').textContent = '';
+    if (!/^https?:\/\/\S+$/.test(base)) return;
+    $('srv-note').textContent = 'Looking for models…';
+    probeTimer = setTimeout(() => post({ do: 'probe', base, key: $('srv-key').value.trim() }), 400);
+  };
+  const closeProv = () => { $('prov').classList.remove('on'); setTimeout(() => { $('prov').hidden = true; }, 250); $('client-alt').focus(); };
+  $('client-alt').onclick = () => {
+    pick = provider;
+    $('srv-base').value = saved.apiBase; $('srv-model').value = saved.apiModel; $('srv-key').value = '';
+    $('srv-key').placeholder = saved.apiBase ? 'Key (leave empty to keep the saved one)' : 'Key (not needed for local servers)';
+    $('srv-note').textContent = ''; paintProv();
+    $('prov').hidden = false; requestAnimationFrame(() => $('prov').classList.add('on'));
+    document.querySelector('.opt[aria-checked="true"]').focus();
+    if (pick === 'server') probe();
+    else if (!saved.apiBase) post({do:'localServers'});
+  };
+  document.querySelectorAll('.opt').forEach(o => o.onclick = () => { pick = o.dataset.p; paintProv(); if (pick === 'server') { if ($('srv-base').value) probe(); else $('srv-base').focus(); } });
+  document.querySelectorAll('.chip').forEach(c => c.onclick = () => { $('srv-base').value = c.dataset.base; $('srv-model').value = ''; paintProv(); probe(); });
+  $('srv-base').oninput = () => { paintProv(); probe(); };
+  $('srv-key').oninput = () => probe();
+  $('srv-model').oninput = paintProv;
+  $('prov-cancel').onclick = closeProv;
+  $('prov').addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); closeProv(); }
+    if (e.key === 'Enter' && e.target.classList.contains('fld') && !$('prov-use').disabled) $('prov-use').click();
+    if (e.key === 'Tab') {   // keep focus inside the sheet
+      const f = [...$('prov').querySelectorAll('button, input')].filter(x => !x.disabled && x.offsetParent);
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+  $('prov-use').onclick = () => {
+    const m = { do: 'provider', client: ['devin', 'pi'].includes(pick) ? pick : 'claude' };
+    if (pick === 'claude') m.apiBase = '';
+    if (pick === 'server') {
+      m.apiBase = $('srv-base').value.trim(); m.apiModel = $('srv-model').value.trim();
+      if ($('srv-key').value.trim() || m.apiBase !== saved.apiBase) m.apiKey = $('srv-key').value.trim();   // empty key + same server keeps the saved key
+      saved = { apiBase: m.apiBase, apiModel: m.apiModel };
+    }
+    if (pick === 'claude') saved.apiBase = '';
+    post(m); want = provider = pick;
+    $('p-claude').classList.remove('ok'); planOK = false;
+    $('p-claude').querySelector('.txt b').textContent = NAMES[pick];
+    $('p-claude').querySelector('.txt span').textContent = 'Checking…';
+    if (last) ob.set(last);
+    closeProv();
+  };
+  // Agents: what Atticus turns on itself, then what only the user can (macOS privacy switches, a claude.ai sign-in). Status is live; done rows show a check.
+  const glyph = id => P.find(p => p[0] === id);
+  const OWN = [['tools', 'Your Claude Code tools', 'MCP servers, skills and plugins you already use.', '#d97757', '<path d="M14.5 5.5l4 4-9 9H5.5v-4z"/><path d="M12.5 7.5l4 4"/>'],
+    ['chrome', 'Page reading in Chrome', 'Reads and clicks pages in the background.', ...glyph('chrome').slice(3)]];
+  const YOURS = [['ax', 'Accessibility', 'Clicks and types in apps for an agent.', ...glyph('ax').slice(3)],
+    ['screen', 'Screen Recording', 'Shows an agent’s window live on its chip.', ...glyph('screen').slice(3)],
+    ['auto', 'Automation', 'Lets an agent script your apps.', ...glyph('auto').slice(3)],
+    ['calendar', 'Calendar', 'Reads and updates events when you ask.', '#ff453a', '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/>'],
+    ['connectors', 'Claude connectors', 'Checking your Claude account…', '#5e5ce6', '<path d="M9 15l6-6M10.5 6.5l1-1a4 4 0 0 1 5.7 5.7l-1 1M13.5 17.5l-1 1a4 4 0 0 1-5.7-5.7l1-1"/>']];
+  $('own').innerHTML = rows(OWN, 'a-', 'Turn On'); $('yours').innerHTML = rows(YOURS, 'a-');
+  $('a-connectors').querySelector('.allow').textContent = 'Connect';
+  let connected = false;
+  $('enable').onclick = () => post({ do: 'enableAll', connected: String(connected) });
+  document.querySelector('[data-go="agents"]').addEventListener('click', () => { if (!['devin', 'pi'].includes(provider)) post({ do: 'connectors' }); });
+  document.querySelectorAll('.allow').forEach(b => b.onclick = () => {   // setup's two lists share ids: the click is the same grant
+    const was = b.textContent; b.classList.add('wait'); b.textContent = 'Waiting';
+    setTimeout(() => { b.classList.remove('wait'); b.textContent = was; }, 12000);   // gave up in System Settings
+    post({ do: 'grant', id: b.dataset.id });
+  });
+
+  let planOK = false, last = null, toggleMode = false, talkLabel = '⌃⌥Space';
+  const paintDone=s=>{
+    const core=[['claude','AI provider'],['mic','Microphone'],['speech','Speech Recognition'],['ax','Accessibility']],missing=core.filter(([id])=>!s[id]).map(([,name])=>name),voice=['claude','mic','speech'].every(id=>s[id]);
+    $('done-title').textContent=!missing.length?'You’re all set':voice?'Voice is ready':'Setup isn’t finished yet';
+    $('done-sub').textContent=!missing.length?(toggleMode?'Press':'Hold')+' the shortcut anytime and just ask. Everything else lives in Settings, in the menu bar.':(voice?'Still needed for full Mac control: ':'Still needed: ')+missing.join(', ')+'. You can allow '+(missing.length===1?'it':'them')+' later in Setup & Permissions.';
+    $('finish').textContent=voice?'Start Using Atticus':'Finish Setup Later';
+  };
+  window.ob = {
+    mode(toggle) {
+      toggleMode = toggle;
+      if (!$('hint').classList.contains('yes')) $('hint').textContent = (toggle ? 'Press the shortcut' : 'Hold the keys') + ' and say “open Calculator”.';
+      $('welcome-talk').textContent = (toggle ? 'Press the shortcut, speak, press again to send.' : 'Hold the shortcut, speak, release to send.') + ' Your Mac does the rest.';
+      $('try-talk').textContent = (toggle ? 'Press the shortcut anywhere. Say what you need, then press again to send.' : 'Hold the keys anywhere, say what you need, then let go.') + ' Try one now.';
+    },
+    keys(held) {   // the modifiers held now ("⌃⌥", "fn"…), many times a second
+      const k = cur === 'try' ? [...$('trykeys').children] : [];   // only the try page reacts; the welcome keys are a demo
+      if (!k.length || k[0].classList.contains('yes')) return;
+      k.forEach(c => c.classList.toggle('lit', /^(fn|[⌃⌥⇧⌘])$/.test(c.textContent) && held.includes(c.textContent)));
+    },
+    tried() {   // the hotkey fired: keys go green, then on to the next step
+      const k = cur === 'try' ? [...$('trykeys').children] : [];
+      if (!k.length || k[0].classList.contains('yes')) return;
+      k.forEach((c, i) => setTimeout(() => { c.classList.remove('lit', 'down'); c.classList.add('yes'); }, i * 70));
+      { $('hint').textContent = 'That’s it. Atticus is on it.'; $('hint').classList.add('yes'); }
+      $('try-skip').hidden = true; $('try-next').hidden = false;
+    },
+    plan(c) {   // the AI client (Claude Code or Devin): installed, signed in, paid plan? The row says which, the button fixes it
+      if (want && c.client !== want) return; want = null;
+      planOK = !!c.ok; provider = c.client || 'claude';
+      paintPrefs();
+      $('p-claude').querySelector('.txt b').textContent = NAMES[provider] || NAMES.claude;
+      $('p-claude').querySelector('.txt span').textContent = c.text;
+      $('p-claude').querySelector('.allow').textContent = { install: 'Install', login: 'Sign In', upgrade: 'Upgrade' }[c.need] || 'Allow';
+      if (last) ob.set(last);
+    },
+    walk(id) {   // Enable All: the step it is on says what to do there; the button waits until the walk ends
+      document.querySelectorAll('#agents .row').forEach(r => {
+        const line = r.querySelector('.txt span'), now = r.id === 'a-' + id;
+        if (now && !r.classList.contains('now')) { line.dataset.why = line.textContent; line.textContent = OWN.some(o => 'a-' + o[0] === r.id) ? 'Turning it on…' : 'Turn on Atticus in System Settings.'; }
+        if (!now && line.dataset.why) { line.textContent = line.dataset.why; delete line.dataset.why; }
+        r.classList.toggle('now', now);
+      });
+      $('enable').disabled = !!id; $('enable').textContent = id ? 'Enabling…' : 'Enable All';
+    },
+    connectors(c) {   // from the user's Claude account: names connected, names that need a sign-in
+      const n = c.connected.length, s = c.signin.length;
+      connected = n > 0; $('a-connectors').classList.toggle('ok', connected);
+      $('a-connectors').querySelector('.txt span').textContent = n ? c.connected.slice(0, 2).join(', ') + (n > 2 ? ` and ${n - 2} more` : '') + ' connected' + (s ? ` · ${s} need sign-in` : '')
+        : s ? `${s} need sign-in in Claude` : 'Gmail, Drive and more, from your Claude account.';
+    },
+    models(list) {   // the custom server's models, from Change provider's probe
+      $('srv-models').replaceChildren(...list.map(m => Object.assign(document.createElement('option'), { value: m })));
+      if (list.length && !$('srv-model').value.trim()) $('srv-model').value = list[0];
+      $('srv-note').classList.toggle('bad', !list.length);
+      $('srv-note').textContent = list.length ? `Found ${list.length} model${list.length > 1 ? 's' : ''}. Screen tasks need one that can see images.` : 'No models found there. Is the server running? You can still type a model name.';
+      paintProv();
+    },
+    local(list) {
+      if (saved.apiBase || $('srv-base').value.trim() || !list[0]) return;
+      const found = list[0]; $('local-offer').hidden = false; $('local-running').textContent = `${found.name} is already running.`;
+      $('local-use').textContent = `Use ${found.name}`;
+      $('local-use').onclick = () => {
+        pick = 'server'; $('srv-base').value = found.base; $('srv-model').value = found.models[0] || '';
+        $('local-offer').hidden = true; paintProv();
+        $('srv-note').textContent = `Found ${found.models.length} model${found.models.length === 1 ? '' : 's'}. Screen tasks need one that can see images.`;
+      };
+    },
+    server(s) { saved = { apiBase: s.apiBase || '', apiModel: s.apiModel || '' }; },
+    prefs(p) { document.querySelectorAll('.sw input').forEach(i => { if (document.activeElement !== i) i.checked = !!p[i.dataset.k]; }); prefs = p; paintPrefs(); },
+    rec(m) { if (recording) /^Add/.test(m) || !m ? dcKeys('', m || 'Type Shortcut') : dcKeys(m); },   // held modifiers, live
+    taken(kind, own) {
+      clearTimeout(dcWarn); $('dc-hint').className = 'warn';
+      $('dc-hint').textContent = own ? 'That’s already your Atticus shortcut. Kept your old one.' : 'Another app already uses that shortcut. Kept your old one.';
+      dcWarn = setTimeout(() => { dcWarn = 0; paintPrefs(); }, 4000);
+    },
+    recorded(label) { recording = false; $('dc-field').classList.remove('rec'); prefs.dictateHotkeyLabel = label; paintPrefs(); },
+    set(s) {
+      last = s; s = { ...s, claude: planOK };
+      let n = 0;
+      for (const [id] of P) {
+        const row = $('p-' + id);
+        row.classList.toggle('ok', !!s[id]);
+        if (s[id]) n++;
+      }
+      for (const [id] of [...OWN, ...YOURS]) if (id !== 'connectors') $('a-' + id).classList.toggle('ok', !!s[id]);
+      const left = [...OWN, ...YOURS].filter(([id]) => !$('a-' + id).classList.contains('ok')).length;
+      $('enable').hidden = !left; $('agents-next').textContent = left ? 'Skip for Now' : 'Continue'; $('agents-next').classList.toggle('quiet', !!left);
+      $('count').textContent = n === P.length ? 'All set' : `${n} of ${P.length} allowed`;
+      $('count').classList.toggle('all', n === P.length);
+      $('next').textContent = n === P.length ? 'Continue' : 'Skip for Now';
+      $('next').classList.toggle('quiet', n !== P.length);
+      paintDone(s);
+    },
+  };
+
+  // Welcome keys press in, hold, let go: the gesture itself.
+  const keys = () => [...$('welkeys').children];   // the welcome demo keys
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const motionChange = () => new Promise(resolve => reduced.addEventListener('change', resolve, { once: true }));
+  let welcomeGeneration = 0;
+  const press = () => {
+    if (reduced.matches) return;
+    if (cur !== 'welcome') return setTimeout(press, 1500);
+    const generation = welcomeGeneration;
+    keys().forEach((k, i) => setTimeout(() => generation === welcomeGeneration && k.classList.add('down'), i * 130));
+    setTimeout(() => generation === welcomeGeneration && keys().forEach(k => k.classList.remove('down')), 2100);
+    setTimeout(() => generation === welcomeGeneration && press(), 3600);
+  };
+  if (!reduced.matches) setTimeout(press, 1200);
+
+  // Feature previews: short scripted loops, run only while their page shows (the final frame under Reduce Motion).
+  const MOTION_CHANGED = {}; let previewGeneration = 0;
+  const wait = ms => {
+    const generation = previewGeneration;
+    return new Promise(r => setTimeout(r, ms)).then(() => { if (generation !== previewGeneration) throw MOTION_CHANGED; });
+  };
+  // Dictate's examples: what you say, then what Clean up types. [Brackets] mark the words that go.
+  const DC = [['Fillers', '[Um,] I was, [like, you know,] thinking we could leave.', 'I was thinking we could leave.'],
+    ['Scratch that', '[Table for six, scratch that,] table for eight.', 'Table for eight.'],
+    ['Actually…', 'Meet me at [four, actually] five.', 'Meet me at five.'],
+    ['Lists', 'Shopping list: eggs, milk, and bread.', 'Shopping list:\n- Eggs\n- Milk\n- Bread'],
+    ['New line', 'Hi Sam [new line] can you review this [question mark]', 'Hi Sam\nCan you review this?']];
+  const said = s => s.match(/\[[^\]]+\]|\S+/g).flatMap(t => t[0] === '[' ? t.slice(1, -1).split(' ').map(w => [w, true]) : [[t, false]]);
+  const word = ([w, x]) => Object.assign(document.createElement('span'), { textContent: w, className: x ? 'x' : '' });
+  let dcAt = 0, dcGen = 0, dcWake = null;
+  const dcPaint = i => $('dc-ex').querySelectorAll('button').forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
+  const dcShow = i => {   // the finished example: what was said with the slips struck, the pill's check, clean text in the note
+    $('dc-said').replaceChildren(...said(DC[i][1]).flatMap(t => [word(t), ' ']).slice(0, -1)); $('dc-said').classList.add('done');
+    $('dc-pill').classList.remove('gone2', 'work'); $('dc-pill').classList.add('done'); $('dc-words').textContent = DC[i][2]; dcPaint(i);
+  };
+  $('dc-ex').replaceChildren(...DC.map(([name, s, out], i) => Object.assign(document.createElement('button'), {
+    textContent: name, ariaLabel: `${name}: you say “${s.replace(/[[\]]/g, '')}”, Clean up types “${out.replace(/\n/g, ' ')}”`,
+    onclick() { dcAt = i; dcPaint(i); if (reduced.matches) dcShow(i); else { dcGen++; dcWake?.(); } } })));
+  const wb = k => {   // whiteboard step k: every layer and caption up to k stays
+    document.querySelectorAll('#ptstage [data-s]').forEach(e => e.classList.toggle('on', +e.dataset.s <= k));
+    $('wb-n').textContent = Math.max(k, 1);
+  };
+  const lead = () => {   // from the box's edge to just outside the spot, measured, so it fits any stage width
+    const s = $('ptstage').getBoundingClientRect(), b = $('pt-box').getBoundingClientRect(), t = $('pt-spot').getBoundingClientRect();
+    const xy = { x1: b.left - s.left, y1: b.top - s.top + b.height / 2, x2: t.right - s.left + 6, y2: t.top - s.top + t.height / 2 };
+    for (const el of [$('pt-lead').querySelector('line'), $('pt-ink')]) for (const k in xy) el.setAttribute(k, xy[k]);
+    $('pt-lead').classList.remove('on'); void $('pt-lead').getBoundingClientRect(); $('pt-lead').classList.add('on');
+  };
+  const WK_STARTED = 'I started an agent. I’ll ping you when it’s done.';
+  const loops = {
+    async text() {
+      const line = $('tx-line'), words = $('tx-words'), box = $('tx-box'), btn = $('tx-go');
+      line.classList.remove('sel'); words.textContent = 'hey can u send me the notes from today, thx'; box.classList.add('gone2');
+      await wait(700); line.classList.add('sel'); await wait(1300); box.classList.remove('gone2'); await wait(1900);
+      btn.classList.add('press'); await wait(220); btn.classList.remove('press'); box.classList.add('gone2'); line.classList.remove('sel');
+      line.style.opacity = 0; await wait(300); words.textContent = 'Hi! Could you send me today’s notes? Thank you.'; line.style.opacity = 1; await wait(2400);
+    },
+    async mac() {
+      const st = $('macstage'), box = $('mac-box'), play = $('mac-play');
+      st.classList.remove('snapped'); box.classList.add('gone2'); play.classList.add('gone2');
+      $('mac-q').textContent = '“Chrome left, Notes right”';
+      await wait(600); box.classList.remove('gone2'); await wait(700); st.classList.add('snapped'); await wait(1500);
+      box.classList.add('gone2'); await wait(400); $('mac-q').textContent = '“Play lo-fi on Spotify”'; box.classList.remove('gone2');
+      await wait(700); play.classList.remove('gone2'); await wait(2600);
+    },
+    async dictate() {   // one example per pass; picking an example wakes the current wait so it starts at once
+      const gen = dcGen, i = dcAt, pill = $('dc-pill'), heard = $('dc-said'), words = $('dc-words'), key = $('dc-key');
+      const ok = ms => new Promise(r => { dcWake = r; setTimeout(r, ms); }).then(() => !reduced.matches && gen === dcGen && cur === 'dictate');
+      dcPaint(i); words.textContent = ''; heard.replaceChildren(); heard.classList.remove('done'); pill.classList.remove('work', 'done'); pill.classList.add('gone2'); key.classList.remove('down');
+      if (!await ok(600)) return; key.classList.add('down'); pill.classList.remove('gone2');   // held: the pill's wave listens
+      for (const [n, t] of said(DC[i][1]).entries()) { heard.append(...(n ? [' '] : []), word(t)); if (!await ok(210)) return; }
+      if (!await ok(350)) return; key.classList.remove('down'); pill.classList.add('work'); heard.classList.add('done');   // let go: the orb cleans up
+      if (!await ok(1000)) return; words.textContent = DC[i][2]; pill.classList.replace('work', 'done');   // the words land, the check shows
+      if (!await ok(800)) return; pill.classList.add('gone2');
+      if (await ok(2400)) dcAt = (i + 1) % DC.length;
+    },
+    async work() {
+      const box = $('wk-box'), line = $('wk-line'), chip = $('wk-chip');
+      box.classList.add('gone2'); chip.classList.add('gone2'); chip.classList.remove('done'); line.textContent = 'Searching the web…'; $('wk-state').textContent = 'Agent · working';
+      await wait(600); box.classList.remove('gone2'); await wait(2000);
+      line.textContent = WK_STARTED; chip.classList.remove('gone2'); await wait(1800);   // the box says it once; the chip shows the steps
+      box.classList.add('gone2'); await wait(2400); chip.classList.add('done'); $('wk-state').textContent = 'Agent · done'; await wait(2400);
+    },
+    async point() {   // a guide marks the spot, then an explanation builds up
+      const st = $('ptstage'), box = $('pt-box'), ring = $('pt-ring');
+      st.classList.remove('wb'); wb(0); box.classList.add('gone2'); ring.classList.remove('on'); $('pt-lead').classList.remove('on');
+      await wait(700); box.classList.remove('gone2'); await wait(1100); lead(); await wait(400); ring.classList.add('on'); await wait(2600);
+      st.classList.add('wb'); for (let k = 1; k <= 3; k++) { await wait(k === 1 ? 500 : 1600); wb(k); } await wait(3200);
+    },
+    async pointer() {
+      const box = $('pa-box'), mark = $('pa-mark'), q = $('pa-q'), pt = $('pa-pt');
+      box.classList.add('gone2'); mark.classList.remove('on'); pt.classList.remove('on'); $('pa-hint').hidden = true; $('pa-chip').hidden = true; $('pa-a').hidden = true;
+      q.textContent = 'Ask Atticus…'; q.classList.remove('on');
+      await wait(600); box.classList.remove('gone2'); await wait(900);
+      pt.classList.add('press'); await wait(220); pt.classList.remove('press'); pt.classList.add('on'); $('pa-hint').hidden = false; await wait(1100);
+      mark.classList.add('on'); await wait(1000);
+      $('pa-hint').hidden = true; $('pa-chip').hidden = false; await wait(900);
+      q.textContent = 'what’s wrong?'; q.classList.add('on'); await wait(900); $('pa-a').hidden = false; await wait(2800);
+    },
+    async meeting() {
+      const q = $('mt-q'), ans = $('mt-ans'), think = $('mt-think'), dana = $('mt-dana');
+      q.classList.add('gone2'); ans.classList.remove('on'); think.hidden = false; dana.classList.remove('talk'); $('mt-clock').textContent = '12:04';
+      await wait(800); dana.classList.add('talk'); $('mt-clock').textContent = '12:05'; await wait(900);
+      dana.classList.remove('talk'); q.classList.remove('gone2'); await wait(1100); think.hidden = true; ans.classList.add('on'); await wait(2200); q.classList.add('gone2'); $('mt-archive').hidden=false; $('mt-save').textContent='Saved · Settings → Meetings'; await wait(2200);
+    },
+  };
+  const finals = { dictate() { dcShow(dcAt); },
+                   pointer() { $('pa-box').classList.remove('gone2'); $('pa-mark').classList.add('on'); $('pa-pt').classList.add('on'); $('pa-hint').hidden = true; $('pa-chip').hidden = false;
+                     $('pa-q').textContent = 'what’s wrong?'; $('pa-q').classList.add('on'); $('pa-a').hidden = false; },
+                   work() { $('wk-line').textContent = WK_STARTED; $('wk-box').classList.remove('gone2'); $('wk-chip').classList.remove('gone2'); },
+                   mac() { $('macstage').classList.add('snapped'); $('mac-play').classList.remove('gone2'); $('mac-box').classList.remove('gone2'); }, point() { $('ptstage').classList.add('wb'); wb(3); }, text() { $('tx-box').classList.remove('gone2'); $('tx-line').classList.add('sel'); },
+                   meeting() { $('mt-q').classList.remove('gone2'); $('mt-think').hidden = true; $('mt-ans').classList.add('on'); } };
+  for (const id of Object.keys(loops)) (async () => {
+    for (;;) {
+      try {
+        if (reduced.matches) { finals[id](); await motionChange(); }
+        else if (cur === id) await loops[id]();
+        else await wait(300);
+      } catch (error) { if (error !== MOTION_CHANGED) throw error; }
+    }
+  })();
+  reduced.addEventListener('change', () => {
+    welcomeGeneration++; previewGeneration++;
+    orbWake?.(); orbWake = null;
+    keys().forEach(k => k.classList.remove('down'));
+    if (reduced.matches) { dcGen++; dcWake?.(); Object.keys(loops).forEach(id => finals[id]()); }
+    else setTimeout(press, 1200);
+  });
+
+  paintPrefs(); go('welcome');
+
+  // The same orb as the overlay, breathing.
+  try {
+    const E = await import(URL.createObjectURL(new Blob([$('orbsrc').textContent], { type: 'text/javascript' })));
+    const cv = $('orb'), ctx = cv.getContext('2d'), S = 64, dpr = 4, preset = E.r('breathing', S);
+    cv.width = cv.height = S * dpr;
+    let t = 0, prev = performance.now();
+    (function frame(now) {
+      const idle = reduced.matches || cur !== 'welcome';   // still under Reduce Motion; the orb only shows on the welcome page
+      if (!idle) t += (now - prev) / 1000 * preset.speed; prev = now;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, S, S);
+      E.p(ctx, E.M[preset.mode](S, t, preset.opts), true, null);
+      if (idle) orbWake = () => requestAnimationFrame(frame); else requestAnimationFrame(frame);
+    })(prev);
+  } catch (e) {}
+</script>
+</body></html>

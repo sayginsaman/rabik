@@ -1,0 +1,13 @@
+name: Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Offline brain and UI syntax regressions
+        run: python3 -m unittest discover -s tests -v
+      - name: Installer syntax
+        run: bash -n build.sh install.sh

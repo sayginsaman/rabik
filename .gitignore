@@ -1,0 +1,40 @@
+Atticus.app/
+__pycache__/
+.DS_Store
+
+# Local credentials and runtime state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+settings.json
+skills.json
+recent.jsonl
+log.jsonl
+memory.md
+license
+# the MIT license file: on macOS "license" above matches it too
+!LICENSE
+app.err
+
+# GitHub holds just the app. Agent instructions, skills and the website stay on this Mac.
+AGENTS.md
+CLAUDE.md
+AGENTS.local.md
+CLAUDE.local.md
+.agents/
+.claude/
+.cursor/
+index.html
+docs/atticus-film.mp4
+docs/film-poster.png
+
+# Nix build result symlinks
+/result
+/result-*
+/test-artifacts/
+# Devbox generated artifacts
+.devbox/

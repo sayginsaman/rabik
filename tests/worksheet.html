@@ -1,0 +1,52 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Long worksheet reading</title></head><body>
+<pre id="results">Running…</pre><iframe id="page" style="width:900px;height:500px"></iframe>
+<script type="module">
+const results=document.getElementById('results'),checks=[];
+const assert=(v,name)=>{if(!v)throw Error(name);checks.push('✓ '+name)};
+try {
+  const frame=document.getElementById('page');
+  const prose='Explain the relationship using the evidence in this unfamiliar worksheet. '.repeat(16);
+  frame.srcdoc='<h1>Worksheet</h1>'+Array.from({length:10},(_,i)=>`<fieldset><legend>Question ${i+1}: ${prose}</legend>${i===2?'<label><input type="radio" name="choice" value="yes">Yes</label><label><input type="radio" name="choice" value="no">No</label>':i===3?'<label>Detailed answer<textarea>Existing answer</textarea></label>':`<label>Answer ${i+1}<input value="Initial ${i+1}"></label>`}</fieldset>`).join('')+'<fieldset><legend>About you form</legend><label>Full name<input></label><label>Email<input></label><label>Phone<input></label><label>Home address<input></label><button>Submit</button></fieldset><div id="passage" contenteditable="true" aria-label="Rich answer">Explain the relationship using evidence:\nNext question stays here.</div><table><tr><td>Describe the pattern shown:</td><td id="table-answer" contenteditable="true"></td></tr><tr><td>Another prompt remains unchanged.</td><td></td></tr></table><iframe id="nested" srcdoc="<label>Frame question<input value=FrameAnswer></label><p>FRAME END</p>"></iframe><p>WORKSHEET END</p>';
+  await new Promise(r=>frame.onload=r);
+  const w=frame.contentWindow;
+  if(w.document.getElementById('nested').contentDocument?.readyState!=='complete')await new Promise(r=>w.document.getElementById('nested').onload=r);
+  const f=w.eval(await(await fetch('../ui/web.js')).text());
+  let offset=0,whole='',pages=0,first='';
+  do {
+    const page=f('read',String(offset)),m=page.match(/\n\[Read (\d+)-(\d+) of (\d+) chars/);
+    assert(!!m,'Page has measured offsets');assert(page.length<8500,'Each text page fits the model budget');
+    if(!pages)first=page;
+    whole+=page.slice(0,m.index);offset=Number(m[2]);pages++;
+    if(offset===Number(m[3]))break;
+    if(pages>20)throw Error('Paging did not finish');
+  } while(true);
+  assert(pages>1&&whole.length>=8000,'Long worksheet is read through multiple pages');
+  assert(/Controls:\n1 box:/.test(first),'First page exposes actionable control numbers');
+  for(let i=1;i<=10;i++)assert(whole.includes(`Question ${i}:`),`Question ${i} survives paging`);
+  assert(whole.includes('WORKSHEET END')&&whole.includes('FRAME END'),'Last body text and same-origin iframe are readable');
+  assert(whole.includes('FrameAnswer')&&whole.includes('Existing answer')&&whole.includes('Next question stays here.'),'Current field values and rich editor text are complete');
+  assert(/\d+ radio: Yes.*checked=false/.test(whole),'Radio answers include their question and current selection');
+  const id=label=>whole.match(new RegExp('(\\d+) (?:box|radio): '+label))[1];
+  const last=id('Answer 10'),nested=id('Frame question');
+  assert(f('fill',last,'Complete final answer').startsWith('Filled'),'Controls on later pages retain actionable numbers');
+  assert(f('fill',nested,'Changed frame answer').startsWith('Filled'),'Same-origin iframe fields can be filled');
+  const profile={'Full name':'Sam Example','Email':'sam@example.test','Phone':'+1 555 0100','Home address':'1 Main St'};
+  Object.entries(profile).forEach(([label,value])=>assert(f('fill',id(label),value).startsWith('Filled'),`Profile fills ${label}`));
+  f('click',id('Yes'));
+  const passage=w.document.getElementById('passage'),passageBefore=passage.innerText;
+  assert(f('fill',id('Rich answer'),'replacement').includes('type-after')&&passage.innerText===passageBefore,'Generic fill cannot overwrite a rich document');
+  const richResult=f('type-after','Explain the relationship using evidence:',' Answer one.');
+  assert(richResult.startsWith('Typed after'),'Exact rich-text insertion verifies: '+richResult);
+  assert(passage.innerText===passageBefore.replace('Explain the relationship using evidence:','Explain the relationship using evidence: Answer one.'),'Rich insertion preserves every other line');
+  assert(f('type-after','Describe the pattern shown:','Answer two.').startsWith('Typed after'),'An empty table answer cell is found from its label');
+  assert(w.document.getElementById('table-answer').innerText==='Answer two.'&&w.document.body.innerText.includes('Another prompt remains unchanged.'),'Table insertion preserves prompts');
+  f('read');
+  const updated=w.__atticusRead.text;
+  assert(updated.includes('Complete final answer')&&updated.includes('Changed frame answer'),'Fresh reads confirm filled values');
+  Object.values(profile).forEach(value=>assert(updated.includes(value),`Fresh read verifies ${value}`));
+  assert(/radio: Yes.*checked=true/.test(updated),'Fresh reads confirm selected answers');
+  assert(!updated.includes('button: Submit | pressed=true'),'Filling profile fields does not submit the form');
+  assert(first.includes('--window --offset'),'First page teaches the single paging command');
+  results.className='pass';results.textContent=checks.join('\n')+'\nMEASURED: '+whole.length+' chars in '+pages+' pages';
+} catch(e) { results.className='fail';results.textContent=checks.concat('✗ '+e.message+'\n'+e.stack).join('\n'); }
+</script></body></html>

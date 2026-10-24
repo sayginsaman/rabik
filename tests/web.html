@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Web control checks</title></head><body><h1>Web control checks</h1><pre id="results">Running…</pre>
+<iframe id="page" srcdoc='<p>Order summary</p><a href="#x">Docs</a><button aria-label="Send">✈</button><button style="display:none">Hidden</button><input placeholder="Email"><input type="password" value="hunter2"><input aria-label="Saved password" autocomplete="current-password" value="saved-secret"><input aria-label="One time code" autocomplete="one-time-code" value="654321"><input id="reveal" aria-label="Shown secret" type="password" value="revealed-secret"><textarea placeholder="Note"></textarea><select><option>Small</option><option>Large</option></select><div contenteditable="true" aria-label="Message"></div><button id="b">Go</button><script>var seen=[];document.querySelector("input").addEventListener("input",e=>seen.push(e.target.value));document.getElementById("b").addEventListener("mousedown",()=>seen.push("down"))</script>'></iframe>
+<script type="module">
+const results=document.getElementById('results'),checks=[];
+const assert=(v,name)=>{if(!v)throw Error(name);checks.push('✓ '+name)};
+try{
+  const fr=document.getElementById('page');if(fr.contentDocument?.readyState!=='complete'||!fr.contentWindow.seen)await new Promise(r=>fr.onload=r);
+  const w=document.getElementById('page').contentWindow,f=w.eval(await(await fetch('../ui/web.js')).text());
+  const page=f('read');
+  const ready=JSON.parse(f('ready'));assert(ready.ready&&ready.signature&&!ready.signature.includes('hunter2'),'Readiness returns a compact state, not private page text');
+  w.document.body.setAttribute('aria-busy','true');assert(!JSON.parse(f('ready')).ready,'Readiness waits for a visibly busy page');w.document.body.removeAttribute('aria-busy');
+  assert(page.includes('Order summary'),'Read returns the page text');
+  assert(/\d+ link: Docs/.test(page)&&/\d+ button: Send/.test(page),'Links and labelled buttons are numbered');
+  assert(!page.includes('Hidden'),'Hidden controls are skipped');
+  assert(!page.includes('hunter2')&&/\d+ box: password/.test(page),'A password is never read out');
+  assert(!f('name',page.match(/(\d+) box: password/)[1]).includes('hunter2'),'A password never shows in the Allow check');
+  const num=label=>page.match(new RegExp('(\\d+) \\w+: '+label))[1];
+  for(const value of ['saved-secret','654321','revealed-secret'])assert(!page.includes(value),'Autocomplete and password values stay secret');
+  assert(JSON.parse(f('state',num('One time code'))).value==='[SECRET]','One-time-code state stays secret');
+  w.document.getElementById('reveal').type='text';const revealed=f('read');
+  assert(!revealed.includes('revealed-secret')&&JSON.parse(f('state',num('Shown secret'))).value==='[SECRET]','A revealed password stays secret');
+  assert(f('fill',num('Email'),'a@b.co').startsWith('Filled')&&w.document.querySelector('input').value==='a@b.co'&&w.seen.includes('a@b.co'),'Fill sets a box and fires input');
+  f('fill',num('Message'),'Hi there');assert(w.document.querySelector('[contenteditable]').innerText==='Hi there','Fill types into a rich editor');
+  f('fill',num('Small'),'large');assert(w.document.querySelector('select').value==='Large','Fill picks a menu option by text');
+  assert(JSON.parse(f('state',num('Email'))).value==='a@b.co','Current field state reads back the actual value');
+  const c=JSON.parse(f('name',num('Send')));assert(c.short==='Send'&&c.url===w.location.href,'Name reads a control and its tab before a click');
+  assert(f('click',num('Go'),'https://elsewhere.test/').startsWith('The tab changed'),'A click in a different tab is refused');
+  f('click',num('Go'));assert(w.seen.includes('down'),'Click sends the full press');
+  assert(f('click','999').startsWith('No control'),'A stale number asks for a fresh read');
+  const go=w.document.getElementById('b'), goNumber=num('Go');
+  let focused=0;go.addEventListener('focus',()=>focused++);f('name',goNumber);
+  assert(focused===0,'Inspecting a control does not focus it or trigger focus handlers');
+  go.textContent='Different action';assert(f('click',goNumber).includes('changed since the read'),'Repurposed nodes cannot keep an old action number');
+  f('read');const replacement=go.cloneNode(true);go.replaceWith(replacement);
+  assert(f('click',goNumber).startsWith('No control'),'Cloned number attributes cannot redirect an old action');
+  const a=w.document.querySelector('a');a.target='_blank';a.addEventListener('click',e=>{w.seen.push(a.target);e.preventDefault()});
+  const reread=f('read'), linkNumber=reread.match(/(\d+) link: Docs/)[1];
+  f('click',linkNumber);assert(w.seen.includes('_self')&&a.target==='_blank','New-window links navigate in the pinned tab and retain their original target');
+  const oldHref=a.href;a.href='#new';assert(f('click',linkNumber).includes('changed since the read'),'Changed destinations require a fresh read');a.href=oldHref;
+  const disabled=w.document.createElement('input');disabled.disabled=true;disabled.setAttribute('aria-label','Unavailable answer');disabled.value='Current disabled value';w.document.body.append(disabled);
+  const state=f('read'), disabledId=state.match(/(\d+) box: Unavailable answer/)[1];
+  assert(state.includes('Current disabled value')&&state.includes('disabled=true'),'Disabled fields remain readable with their current values');
+  assert(f('fill',disabledId,'x').includes('preconditions')&&disabled.value==='Current disabled value','Disabled fields cannot be filled without their preconditions');
+  for(let i=0;i<160;i++){const input=w.document.createElement('input');input.setAttribute('aria-label','Generated '+i);input.value=i?'value':'V'.repeat(120);w.document.body.append(input)}
+  const capped=f('read'),controls=capped.split('\n\nPage text:\n')[0].split('\n').filter(line=>/^\d+ \w+:/.test(line));
+  assert(controls.length===150&&capped.includes('more controls omitted'),'The controls index is capped and reports omissions');
+  assert(!capped.includes('V'.repeat(61)),'Control values are clipped to 60 characters');
+  assert(capped.includes('Page text:\n')&&capped.includes('Order summary'),'Page zero keeps body text after the controls index');
+  results.className='pass';results.textContent=checks.join('\n');
+}catch(e){results.className='fail';results.textContent=checks.concat('✗ '+e.message).join('\n')}
+</script></body></html>

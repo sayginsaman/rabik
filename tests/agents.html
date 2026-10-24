@@ -1,0 +1,98 @@
+<!doctype html><meta charset="utf-8"><title>Atticus agents fixture</title>
+<style>body{background:#151518;color:#f5f5f7;font:13px -apple-system;margin:24px}iframe{border:0;border-radius:13px}#shelf{width:260px;height:650px}#view{width:760px;height:580px}#result{white-space:pre-wrap}</style>
+<h1>Agents</h1><p>Mock bridge only. Hover a chip; select an agent; try approvals, follow-ups and Reduce Motion.</p>
+<iframe id="shelf" title="Agent shelf"></iframe><iframe id="view" title="Agent view"></iframe><pre id="result"></pre><pre id="results"></pre>
+<script type="module">
+const html=await(await fetch('../ui/agents.html')).text(),orb=await(await fetch('../ui/orbs.js')).text(),events=[];
+const named=[{name:'Researcher',brief:'Find reliable sources and write a short brief.',folder:'/tmp/reference',files:['/tmp/reference/style.md']}];
+const rows=[{id:'11111111111111111111111111111111',title:'Prepare report',brief:'Read the supplied material and create the report.',status:'running',step:'Reading the source material',steps:['Checking the brief','Reading the source material'],created:Date.now()/1000-85,sources:[{title:'Source material',url:'https://fixture.example/source',domain:'fixture.example'}],timeline:[{tool:'WebFetch',text:'Read the supplied material.'}],cost:.012},
+{id:'22222222222222222222222222222222',title:'Update document',brief:'Apply the requested changes.',status:'needs-you',step:'Waiting for you',created:Date.now()/1000-20,steps:['Found the document'],question:{q:'Allow this connector action?',cmd:'Change the selected document.',task:true},timeline:[]},
+{id:'33333333333333333333333333333333',title:'Make a file',brief:'Create and verify the deliverable.',status:'done',step:'Done',created:Date.now()/1000-120,ended:Date.now()/1000-2,summary:'The requested file is ready.',changes:'Created the requested content.',links:['/tmp/fixture/result.csv'],cost:.03,timeline:[]},
+{id:'44444444444444444444444444444440',title:'Queued research',brief:'Wait for a worker.',status:'queued',step:'Queued',created:Date.now()/1000-180,timeline:[]}];
+for(const mode of ['shelf','view']){const frame=document.getElementById(mode);frame.srcdoc=html.replace('/*ORBS*/',()=>orb).replace('<script type="module">','<script>window.webkit={messageHandlers:{agents:{postMessage:data=>parent.postMessage({surface:"'+mode+'",data},"*")}}};<\/script><script type="module">');}
+window.addEventListener('message',e=>{if(!e.data?.surface)return;const {surface,data}=e.data;events.push(data);document.getElementById('result').textContent=JSON.stringify(events.slice(-8),null,2);if(data.action==='ready'){const api=document.getElementById(surface).contentWindow.agents;api.mode(surface);api.list(rows);api.named(named);}});
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),out=document.getElementById('results');
+const check=(yes,text)=>{out.textContent+=(yes?'✓ ':'✗ ')+text+'\n';if(!yes)throw Error(text);};
+try{
+ const deadline=performance.now()+8000;while(!document.getElementById('shelf').contentWindow.agents||!document.getElementById('view').contentWindow.agents){if(performance.now()>deadline)throw Error('Agents fixture did not load');await sleep(30);}await sleep(300);
+ const shelf=document.getElementById('shelf').contentDocument,view=document.getElementById('view').contentDocument,api=document.getElementById('view').contentWindow.agents;
+ check(Number(document.getElementById('view').contentWindow.getComputedStyle(view.body).backgroundColor.match(/[\d.]+/g)[3])>=.9,'Agent view keeps a strong dark tint over any backdrop');
+ document.getElementById('shelf').contentWindow.agents.prefs({stack:'open'});await sleep(30);check(shelf.querySelectorAll('.chip').length===1&&shelf.querySelector('.chip').dataset.id===rows[1].id&&shelf.querySelector('.pill').textContent==='2 more · 1 done','A saved open stack is not restored: three working agents fold to the newest, done work into the pill');
+ shelf.querySelector('.pill').click();await sleep(30);check([...shelf.querySelectorAll('.chip')].map(c=>c.dataset.id).join()===[rows[1],rows[0],rows[3],rows[2]].map(r=>r.id).join(),'The pill opens every agent, working newest first, done work last');check(shelf.querySelector('.head').getBoundingClientRect().height<=46,'Collapsed chips stay one line');
+ const shelfApi=document.getElementById('shelf').contentWindow.agents;
+ check(view.querySelector('.named-row b').textContent==='Researcher'&&view.querySelector('.named-row small').textContent.includes('short brief'),'Saved agents are listed in the Agents view');
+ view.querySelector('.named-actions button').click();await sleep(30);const rename=view.querySelector('.named-edit input');rename.value='Scout';rename.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));await sleep(30);
+ check(events.some(e=>e.action==='named-rename'&&e.name==='Researcher'&&e.newName==='Scout'),'A saved agent can be renamed in place');
+ [...view.querySelectorAll('.named-actions button')].at(-1).click();await sleep(30);check([...view.querySelectorAll('.named-actions button')].at(-1).textContent==='Delete?'&&!events.some(e=>e.action==='named-delete'),'Deleting a saved agent asks first');[...view.querySelectorAll('.named-actions button')].at(-1).click();await sleep(30);check(events.some(e=>e.action==='named-delete'&&e.name==='Researcher'),'A saved agent can be deleted from the Agents view');
+ check(view.querySelectorAll('.agent-row .remove').length===1&&!view.querySelector('.agent-row:has(.s-running) .remove'),'Only terminal sidebar rows have a remove button');
+ view.querySelector('.agent-row .remove').click();view.getElementById('clear-failed').click();view.getElementById('clear').click();await sleep(30);
+ check(events.some(e=>e.action==='remove'&&e.id===rows[2].id)&&events.some(e=>e.action==='clear-failed')&&events.some(e=>e.action==='clear'),'Remove, Clear failed and Clear done use distinct actions');
+ shelfApi.state({...rows[0],plan:['Read','Verify'],completed:1});await sleep(30);check(shelf.querySelector('progress').max===2&&shelf.querySelector('progress').value===1,'Only verified known steps show progress');
+ const chip=shelf.querySelector('[data-id="'+rows[0].id+'"]');const views=events.filter(e=>e.action==='view').length;chip.click();await sleep(450);check(chip.classList.contains('expanded')&&events.filter(e=>e.action==='view').length===views,'A click expands in place');
+ const rgba=document.getElementById('shelf').contentWindow.getComputedStyle(chip).backgroundColor.match(/[\d.]+/g).map(Number),fg2=document.getElementById('shelf').contentWindow.getComputedStyle(shelf.documentElement).getPropertyValue('--fg2').trim();
+ const luminance=c=>c.map(x=>x/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((v,x,i)=>v+x*[.2126,.7152,.0722][i],0),foreground=luminance([1,3,5].map(i=>parseInt(fg2.slice(i,i+2),16)));
+ check([0,255].every(wall=>(foreground+.05)/(luminance(rgba.slice(0,3).map(x=>x*rgba[3]+wall*(1-rgba[3])))+.05)>=4.5),'Step text stays readable over light and dark wallpaper');
+ check(chip.querySelector('.step').textContent===rows[0].step&&chip.querySelector('.source').textContent.includes('fixture.example'),'Non-window chip shows the live step and source');
+ chip.querySelector('.head').click();await sleep(30);check(events.some(e=>e.action==='view'&&e.id===rows[0].id),'Click opens the selected agent');
+ const needs=shelf.querySelector('[data-id="'+rows[1].id+'"]');needs.click();await sleep(450);const allow=[...needs.querySelectorAll('button')].find(b=>b.textContent==='Always allow for this task');check(!!allow,'Task approvals stay inside the chip');allow.click();await sleep(30);check(events.some(e=>e.action==='answer'&&e.answer==='task'),'Always allow for this task uses the answer bridge');
+ api.select(rows[2].id);await sleep(30);check(view.querySelector('.result').textContent.includes('file is ready'),'Full Agent view shows the result');check(view.querySelector('.thing b').textContent==='result.csv'&&view.querySelector('.thing small').textContent.includes('In its folder'),'Result files are made-thing cards');view.querySelector('.thing').click();await sleep(30);check(events.some(e=>e.action==='open'&&e.target==='/tmp/fixture/result.csv'),'A made card opens that thing');check(view.querySelector('.cost').textContent.startsWith('≈3.00¢ at API prices · '),'Its cost reads as Usage does');
+ api.state({...rows[2],result:'Full researched answer with verified details.\n[agent-result {"summary":"The requested file is ready."}]'});await sleep(30);check(view.querySelector('.result p').textContent==='Full researched answer with verified details.','Full answer is retained beyond the done-ping summary');
+ api.state({...rows[2],made:[{title:'Comparison',url:'https://docs.google.com/document/d/1abc/edit',type:'application/vnd.google-apps.document'}],result:'Intro\n\n| Item | Price |\n|---|---|\n| **A** | $199 |\n| B | $289 |\n[agent-result {}]'});await sleep(30);
+ check(view.querySelector('.thing.main b').textContent==='Comparison'&&view.querySelector('.thing.main small').textContent==='Document · docs.google.com','A created Google file is the main made card');
+ check(view.querySelectorAll('.result tr:has(td)').length===2&&view.querySelector('.result td strong').textContent==='A'&&view.querySelector('.result td.num').textContent==='$199'&&!view.querySelector('.result').innerHTML.includes('|'),'Markdown tables render as tables');
+ api.state({...rows[2],result:'<img src=x onerror=alert(1)> [x](javascript:alert(1))'});await sleep(30);check(!view.querySelector('.result img')&&!view.querySelector('.result a'),'Agent text never becomes HTML or script links');
+ view.getElementById('followup').value='Add a title';view.getElementById('send').click();await sleep(30);check(events.some(e=>e.action==='followup'&&e.id===rows[2].id&&e.text==='Add a title'),'Follow-up stays with its agent');
+ api.select(rows[0].id);await sleep(30);[...view.querySelectorAll('button')].find(b=>b.textContent==='Stop').click();await sleep(30);check(events.some(e=>e.action==='stop'&&e.id===rows[0].id),'Stop uses the process owner');
+ check(!view.querySelector('.mini')&&view.querySelector('.now .current').textContent===rows[0].step,'Research without a window always has a live view');
+ check(view.querySelector('.now .current').getAttribute('role')==='status'&&view.querySelector('.now .current').getAttribute('aria-live')==='polite','Current activity has a polite accessible status');
+ check(view.querySelector('#timeline .entry').textContent.includes('Read the supplied material.')&&view.querySelector('.now .source').textContent.includes('Source material'),'Non-window Agent view renders its timeline and source title');
+ view.querySelector('.now .source').click();await sleep(30);check(events.some(e=>e.action==='open'&&e.target==='https://fixture.example/source'),'Live source opens through the native bridge');
+ api.state({...rows[0],step:'Checking another source',timeline:[]});await sleep(30);check(view.querySelector('.now .current').textContent==='Checking another source','Empty timelines still show the current step');
+ api.text({id:rows[0].id,text:'Live research text'});await sleep(30);check(view.getElementById('body').textContent.includes('Live research text'),'Research text streams before a tool finishes');
+ api.state({...rows[0],textVersion:1});await sleep(30);check(!view.querySelector('.writing'),'Committed narration clears its streamed copy');
+ api.state({...rows[0],target:{window:'Source window',app:'Fixture'}});await sleep(30);check(view.querySelector('.mini').textContent==='Source window','Window hands retain the mini screen');
+ api.list([rows[2]]);await sleep(30);check(view.getElementById('title').textContent===rows[2].title,'Removing a selected task selects the remaining agent');
+ api.list([]);await sleep(30);check(view.getElementById('title').textContent==='Agents'&&view.getElementById('brief').textContent==='Your tasks, while you do something else.'&&view.querySelector('.empty').textContent.includes('No agents yet'),'Empty Agent view clears the previous brief');
+ shelfApi.state({...rows[1],question:{...rows[1].question,_a:'answers/fixture'}});await sleep(30);const before=events.filter(e=>e.action==='attention').length;
+ shelfApi.state({...rows[1],question:{...rows[1].question,_a:'answers/fixture'}});await sleep(30);check(events.filter(e=>e.action==='attention').length===before,'Permission expands only once per question');
+ [...shelf.querySelector('[data-id="'+rows[1].id+'"]').querySelectorAll('button')].find(b=>b.textContent==='Allow↩').click();await sleep(30);check(events.some(e=>e.action==='answer'&&e.question==='answers/fixture'),'Permission click carries its question identity');
+ const many=Array.from({length:160},(_,i)=>({...rows[2],id:String(i+10).padStart(32,'0'),title:'A very long task title '.repeat(8),created:i}));api.list(many);await sleep(30);
+ check(view.querySelectorAll('.agent-row').length===160&&view.querySelector('aside').scrollWidth<=view.querySelector('aside').clientWidth+1,'Many long titles stay inside the scrollable sidebar');
+ // Round 3: newest on top, × and minimize, the folding pill, the orb's landing slot, leaving, live window thumbnails.
+ shelfApi.prefs({dismissed:[],stack:''});await sleep(30);
+ check([...shelf.querySelectorAll('.chip')].map(c=>c.dataset.id).join()===rows[1].id&&shelf.querySelector('.pill').textContent.includes('2 more'),'Three or more agents fold into a pill, newest kept');
+ shelf.querySelector('.pill').click();await sleep(30);check(shelf.querySelectorAll('.chip').length===4&&shelf.querySelector('.chip').dataset.id===rows[1].id&&!events.some(e=>e.action==='stack'&&e.value==='open'),'The pill opens the stack, newest on top, as a peek it never saves');
+ shelf.querySelector('.hide-all').click();await sleep(30);check(shelf.querySelectorAll('.chip').length===1&&shelf.querySelector('.pill').textContent.includes('2 more')&&events.some(e=>e.action==='stack'&&e.value==='min'),'Minimize folds every chip but a question into one pill');
+ shelfApi.prefs({dismissed:[],stack:''});shelf.querySelector('.pill').click();await sleep(30);
+ shelf.querySelector('[data-id="'+rows[0].id+'"] .ctl button:last-child').click();await sleep(400);
+ check(!shelf.querySelector('.chip[data-id="'+rows[0].id+'"]')&&events.some(e=>e.action==='dismiss'&&e.id===rows[0].id),'× hides a running chip; the agent keeps working');
+ shelfApi.state({...rows[2],seen:true,seenAt:Date.now()/1000});await sleep(30);check(shelf.querySelector('.chip[data-id="'+rows[2].id+'"]'),'An answered done ping keeps its chip on the shelf for a fresh 10 minutes');
+ shelf.querySelector('.tray .clear').click();await sleep(400);check(!shelf.querySelector('.chip[data-id="'+rows[2].id+'"]')&&events.some(e=>e.action==='dismiss'&&e.id===rows[2].id),'× all done sends finished chips away');
+ const fresh={...rows[0],id:'44444444444444444444444444444444',title:'New task',created:Date.now()/1000,started:Date.now()/1000};shelfApi.arrive(fresh.id);shelfApi.state(fresh);await sleep(30);
+ check(shelf.querySelector('.chip').dataset.id===fresh.id&&shelf.querySelector('.chip').classList.contains('waiting'),'A new agent opens the top slot and waits for its orb');
+ shelfApi.land(fresh.id);await sleep(30);check(!shelf.querySelector('.chip.waiting'),'The orb lands into the chip');
+ const win={...fresh,id:'55555555555555555555555555555555',target:{app:'Safari',window:'Desk deals'},started:Date.now()/1000+1};shelfApi.state(win);await sleep(80);
+ check(shelf.querySelector('[data-id="'+win.id+'"] .thumb')&&events.some(e=>e.action==='hover'&&e.id===win.id),'A window agent shows its live window in its chip');
+ shelfApi.pointer([]);await sleep(300);const tr=shelf.querySelector('.chip:not(.expanded) .head').getBoundingClientRect(),target=shelf.elementFromPoint(tr.x+tr.width/2,tr.y+tr.height/2).closest('.chip');
+ shelfApi.pointer([tr.x+tr.width/2,tr.y+tr.height/2]);await sleep(200);check(target.classList.contains('hover')&&!target.classList.contains('expanded'),'The panel’s own pointer drives hover, even while the app is inactive, and never expands');
+ const xr=target.querySelector('.ctl button:last-child').getBoundingClientRect();shelfApi.pointer([xr.x+xr.width/2,xr.y+xr.height/2]);await sleep(350);
+ check(target.classList.contains('hover'),'Moving onto × keeps the chip’s hover');
+ const edge=target.getBoundingClientRect();shelfApi.pointer([edge.right+4,edge.y+22]);await sleep(350);
+ check(target.classList.contains('hover'),'A small hover dead-zone absorbs native/WebKit boundary jitter');
+ shelfApi.pointer([]);await sleep(700);check(!target.classList.contains('hover')&&!target.classList.contains('expanded'),'Leaving the panel clears the hover and opens nothing');
+ check(events.filter(e=>e.action==='size').every((e,i,a)=>i===0||e.h!==a[i-1].h),'The panel resizes only when its height changes');
+ // Round 4: setup asks with keycaps, waiting state, steering glow and the user's words in the timeline
+ const setupRow={...fresh,id:'66666666666666666666666666666666',title:'Fill the form',status:'needs-you',step:'Waiting for you',question:{need:'screen',q:'Turn on Screen Recording',cmd:'To see the receipt.',_a:'answers/s'}};
+ shelfApi.state(setupRow);await sleep(450);let card=shelf.querySelector('[data-id="'+setupRow.id+'"] .pk.setup');
+ check(card&&card.querySelector('button.go').textContent==='Allow↩'&&card.querySelector('[data-esc]').textContent==='Not nowesc'&&card.textContent.includes('macOS only lets you flip this one'),'A macOS setup ask: why, Allow ↩ and Not now esc');
+ card.querySelector('button.go').click();await sleep(30);check(events.some(e=>e.action==='answer'&&e.id===setupRow.id&&e.answer==='y'&&e.question==='answers/s'),'Allow answers the card');
+ shelfApi.state({...setupRow,question:{...setupRow.question,waiting:true}});await sleep(60);card=shelf.querySelector('[data-id="'+setupRow.id+'"] .pk.setup');
+ check(!card.querySelector('button.go')&&card.querySelector('.note.waiting'),'While it waits for the switch, only Not now remains');
+ shelfApi.state({...setupRow,question:{need:'page-js',app:'Google Chrome',q:'I can turn on page reading in Google Chrome for you',_a:'answers/p'}});await sleep(60);card=shelf.querySelector('[data-id="'+setupRow.id+'"] .pk.setup');
+ check(card.querySelector('button.go').textContent==='Do it↩'&&card.querySelector('[data-esc]').textContent==='Noesc','What Atticus can change itself asks Do it / No');
+ const steered={...setupRow,status:'running',question:null,step:'Reading',steer:{ack:'Got it: 12×24, not 24×24',at:Date.now()/1000},timeline:[{user:'I meant 12 x 24'}]};shelfApi.state(steered);await sleep(60);
+ const glow=shelf.querySelector('[data-id="'+steered.id+'"]');check(glow.classList.contains('steered')&&glow.querySelector('.step').textContent==='Got it: 12×24, not 24×24','A steered chip glows and says what it heard');
+ api.state(steered);api.select(steered.id);await sleep(60);check(view.querySelector('.entry.user')?.textContent.includes('I meant 12 x 24'),'The user’s words show in the timeline');
+ out.className='pass';
+}catch(error){out.textContent+=error.stack;out.className='fail';}
+</script>

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Atticus Settings checks</title>
+<style>
+  body { background: #ececf0; color: #1d1d1f; font: 14px system-ui; margin: 24px; }
+  iframe { width: 780px; height: 532px; border: 0; border-radius: 12px; background: #f4f4f7; box-shadow: 0 16px 48px #0002; }
+  pre { white-space: pre-wrap; line-height: 1.6; } .pass { color: #168445; } .fail { color: #c22; }
+  @media (prefers-color-scheme: dark) { body { background: #1c1c1e; color: #f5f5f7; } iframe { background: #29292c; } }
+</style>
+<h1>Atticus Settings checks</h1><p>Mock bridge: no settings files, microphone or app actions.</p>
+<pre id="results">Running…</pre><iframe id="preview" title="Atticus Settings preview"></iframe>
+<script type="module">
+const frame = document.getElementById('preview'), results = document.getElementById('results'), messages = [], checks = [];
+const assert = (condition, name) => { if (!condition) throw Error(name); checks.push('✓ ' + name); };
+window.addEventListener('message', e => { if (e.source === frame.contentWindow) messages.push(e.data); });
+try {
+  const html = await (await fetch('../ui/settings.html')).text();
+  const loaded = new Promise(resolve => frame.onload = resolve);
+  frame.srcdoc = html.replace('<head>', `<head><script>window.webkit = {messageHandlers: {st: {postMessage: m => parent.postMessage(m, '*')}}};<\/script>`);
+  await loaded;
+  const w = frame.contentWindow, d = w.document;
+  const base = {hotkeyLabel:'⌃⌥Space',model:'haiku',volume:.16};
+  w.st.load({prefs:{...base,routing:'balanced'}});
+  assert([...d.querySelectorAll('[data-k=routing] button')].map(b=>b.dataset.v).join()==='cheapest,balanced,capable','One intelligence setting offers three modes');
+  assert(d.querySelector('[data-k=routing] [data-v=balanced]').getAttribute('aria-pressed')==='true','Balanced is selected accessibly');
+  d.querySelector('[data-k=routing] [data-v=cheapest]').click();
+  await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='set'&&m.k==='routing'&&m.v==='cheapest'),'The routing choice is saved');
+  assert(d.querySelector('[data-k=model]').closest('.row').hidden,'Cheapest needs no work model choice');
+  w.st.load({prefs:{...base,routing:'capable',model:'opus'}});
+  assert(d.querySelector('[data-k=model] [data-v=opus]').getAttribute('aria-pressed')==='true','Most capable retains the chosen bigger model');
+  w.st.load({prefs:{...base,routing:'balanced',apiBase:'https://fixture.invalid',apiModel:'main-model',agentApiModel:'agent-model'}});
+  w.st.models({base:'https://fixture.invalid',key:'',list:['main-model','agent-model']});
+  assert(d.querySelector('[data-k=routing]').closest('.row').hidden&&!d.getElementById('agentServerModel').hidden,'Custom servers retain their own models and hide routing');
+  assert(d.getElementById('agentApiModel').value==='agent-model'&&d.getElementById('apimodels').options.length===2,'Server agent models remain available');
+  d.getElementById('agentApiModel').value='main-model';d.getElementById('agentApiModel').dispatchEvent(new w.Event('change'));
+  await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='set'&&m.k==='agentApiModel'&&m.v==='main-model'),'Changing the agent server model saves its own preference');
+  w.st.load({prefs:{...base,routing:'balanced'}});
+  w.st.local([{name:'Ollama',base:'http://localhost:11434',models:['qwen3']}]);
+  assert(!d.getElementById('localserver').hidden&&d.getElementById('uselocal').textContent==='Use Ollama','A running local server is offered');
+  d.getElementById('uselocal').click();await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='set'&&m.k==='apiBase'&&m.v==='http://localhost:11434')&&messages.some(m=>m.do==='set'&&m.k==='apiModel'&&m.v==='qwen3'),'Local offer fills the address and first server model');
+  w.st.load({prefs:{...base,routing:'balanced',client:'devin'}});
+  assert(d.querySelector('[data-k=routing]').closest('.row').hidden,'Other clients hide Claude routing');
+  w.st.load({prefs:{...base,routing:'balanced',client:'pi'}});
+  assert(d.querySelector('[data-k=routing]').closest('.row').hidden&&d.getElementById('agentsettings').hidden,'Pi hides Claude routing and background agents');
+  assert(!d.querySelector('[data-k=longAsks]'),'Long asks always move: no setting');
+  w.st.load({prefs:{...base,routing:'balanced',client:'claude'}});
+  w.st.tab('feedback');
+  await new Promise(r=>setTimeout(r,20));
+  const revision=()=>messages.filter(m=>m.do==='feedbackPreview').at(-1).revision;
+  assert(!d.getElementById('feedbackinclude').checked && d.getElementById('feedbackopen').disabled,'Feedback starts private and waits for preview');
+  w.st.feedback({revision:revision(),include:false,body:'What happened\nVersion: fixture'});
+  assert(!d.getElementById('feedbackopen').disabled && d.getElementById('feedbackbody').textContent.includes('Version: fixture'),'Exact feedback text is shown before GitHub');
+  d.getElementById('feedbackinclude').click();w.st.load({prefs:{hotkeyLabel:'⌃⌥Space',model:'haiku',volume:.16}});assert(d.getElementById('feedbackinclude').checked,'Preference refresh cannot silently change ask inclusion');await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='feedbackPreview'&&m.include===true)&&d.getElementById('feedbackopen').disabled,'Ask opt-in waits for a new preview');
+  w.st.feedback({revision:revision(),include:false,body:'STALE'});assert(d.getElementById('feedbackopen').disabled,'Stale privacy preview cannot enable opening');
+  w.st.feedback({revision:revision(),include:true,body:'My last ask\nPrivate fixture words'});d.getElementById('feedbackopen').click();await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='feedbackOpen'),'Reviewed feedback opens GitHub through native bridge');
+  const stale=revision();d.getElementById('feedbacktext').value='Edited feedback';d.getElementById('feedbacktext').dispatchEvent(new w.Event('input'));
+  assert(d.getElementById('feedbackopen').disabled,'Editing invalidates the draft before debounce');
+  w.st.feedback({revision:stale,include:true,body:'Old typed feedback'});assert(d.getElementById('feedbackopen').disabled,'Old text response cannot enable opening during debounce');
+  await new Promise(r=>setTimeout(r,330));assert(messages.some(m=>m.do==='feedbackInvalidate')&&messages.at(-1).text==='Edited feedback','Native draft is invalidated and current text is requested');
+  w.st.feedback({revision:revision(),include:true,body:'Edited feedback'});assert(!d.getElementById('feedbackopen').disabled,'Only the current text preview enables opening');
+  w.st.tab('feedback');assert(!d.getElementById('feedbackinclude').checked,'Every feedback visit resets ask inclusion');
+  assert(!d.getElementById('screen')&&!d.getElementById('sound')&&d.getElementById('account').querySelector('[data-k=screen]')&&d.getElementById('account').querySelector('[data-k=hideWhenSharing]'),'Screen privacy lives in Account & Access; no Screen or Sound pages');
+  assert(d.getElementById('meetings').innerHTML.includes('two seconds after the app releases the mic'),'Settings disclose supported call auto-end');
+
+  const prefs = {hotkeyLabel: '⌃⌥Space', input: 'voice', talkMode: 'hold', volume: .16, model: 'haiku', meeting: false, login: true, menuIcon: true, safe: true, soundDone: 'Glass'};
+  const load = p => w.st.load({prefs: {...prefs, ...p}});
+  load({});
+  assert([...d.querySelectorAll('.sw input,select[data-k],input[type=range],.seg[data-k]')].every(e=>e.hasAttribute('aria-label')||e.hasAttribute('aria-labelledby')),'Every Settings control has an accessible name');
+  w.st.mics([{uid:'built-in-fixture',name:'MacBook Microphone'},{uid:'usb-fixture',name:'Studio Mic'}]);
+  const microphone=d.querySelector('[data-k="microphone"]');
+  assert(microphone.value==='automatic'&&microphone.options[0].text==='Automatic (recommended)'&&microphone.options.length===3,'Microphone picker starts recommended and lists devices');
+  microphone.value='usb-fixture';microphone.dispatchEvent(new w.Event('change'));await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='set'&&m.k==='microphone'&&m.v==='usb-fixture'),'Microphone choice persists by UID');
+  load({microphone:'unplugged-fixture'});w.st.mics([{uid:'built-in-fixture',name:'MacBook Microphone'}]);
+  assert(microphone.value==='automatic','An unplugged microphone visibly falls back to Automatic');
+  const speak=d.querySelector('[data-k="speak"]');assert(!speak.checked,'Answers are not read aloud by default');
+  speak.click();await new Promise(r=>setTimeout(r,20));assert(messages.some(m=>m.do==='set'&&m.k==='speak'&&m.v===true),'Read answers aloud persists');
+  w.st.tab('meetings');
+  const meetingSwitch = d.querySelector('[data-k="meeting"]');
+  assert(!meetingSwitch.checked && d.getElementById('meetingDemo').hidden && d.getElementById('meetingPrepOpen').hidden && !d.getElementById('meetingOn').hidden, 'Meeting is off by default and its row offers Turn On');
+  d.getElementById('meetingOn').click(); await new Promise(resolve => setTimeout(resolve, 20));
+  assert(messages.some(m => m.do === 'set' && m.k === 'meeting' && m.v === true) && meetingSwitch.checked && !d.getElementById('meetingDemo').hidden && d.getElementById('meetingOn').hidden, 'Turn On uses native settings and brings back Demo and Open');
+  meetingSwitch.click(); await new Promise(resolve => setTimeout(resolve, 20));
+  assert(messages.some(m => m.do === 'set' && m.k === 'meeting' && m.v === false) && d.getElementById('meetingOn').hidden === false, 'Meeting switch uses native settings');
+  meetingSwitch.click(); await new Promise(resolve => setTimeout(resolve, 20));
+  d.getElementById('meetingPrepPrompt').click();await new Promise(resolve=>setTimeout(resolve,20));
+  assert(messages.some(m=>m.do==='meetingPrepPrompt')&&d.getElementById('meetings').innerHTML.includes('prep won’t search connected email or documents'),'Settings copies prep prompt and explains the summary switch');
+  d.getElementById('meetingPrepOpen').click();await new Promise(resolve=>setTimeout(resolve,20));
+  assert(messages.some(m=>m.do==='meetingPrepOpen'),'Settings opens prep before a call');
+  d.getElementById('meetingDemo').click(); await new Promise(resolve => setTimeout(resolve, 20));
+  assert(messages.some(m => m.do === 'meetingDemo'), 'Demo row opens meeting');
+  w.st.tab('general');
+  const mode = d.querySelector('[data-k="talkMode"]'), hold = mode.querySelector('[data-v="hold"]'), toggle = mode.querySelector('[data-v="toggle"]');
+  assert(hold.getAttribute('aria-pressed') === 'true', 'Hold remains the default');
+  toggle.click(); await new Promise(resolve => setTimeout(resolve, 20));
+  assert(messages.some(m => m.do === 'set' && m.k === 'talkMode' && m.v === 'toggle'), 'Toggle choice persists through the native bridge');
+  assert(toggle.getAttribute('aria-pressed') === 'true' && hold.getAttribute('aria-pressed') === 'false', 'Selected mode is accessible');
+  assert(d.getElementById('schint').textContent.includes('again to send'), 'Shortcut hint follows toggle mode');
+  assert(d.getElementById('talkhint').textContent.includes('Pauses keep listening'), 'Toggle explains what a pause does');
+  toggle.focus(); assert(d.activeElement === toggle, 'Mode buttons can receive keyboard focus');
+  assert(d.documentElement.scrollWidth <= 780 && mode.scrollWidth <= mode.clientWidth, 'Controls fit the native Settings width');
+  const row = mode.closest('.row'); assert(row.scrollWidth <= row.clientWidth, 'Mode row does not overflow');
+  frame.style.width = '700px'; await new Promise(resolve => requestAnimationFrame(resolve));
+  assert(d.documentElement.scrollWidth <= 700 && row.scrollWidth <= row.clientWidth, 'Controls fit a narrower window');
+  frame.style.width = '780px';
+  load({input: 'type', talkMode: 'toggle'});
+  assert(mode.closest('.row').hidden && !d.querySelector('[data-k=input]').closest('.row').hidden && d.getElementById('schint').textContent.includes('Return sends'), 'Typing mode shows its own shortcut interaction');
+  load({talkMode: 'toggle'});
+  const change = d.getElementById('change');
+  change.click(); assert(change.textContent === 'Cancel Recording', 'Recording has a visible cancel action');
+  change.click(); await new Promise(resolve => setTimeout(resolve, 20));
+  assert(messages.some(m => m.do === 'cancelRecord') && d.getElementById('caps').textContent.includes('Space'), 'Cancel restores the original shortcut');
+  w.st.agents({count: 2}); assert(d.getElementById('agentcount').textContent === '2 running', 'Agents beside Settings shows the live count');
+  d.getElementById('agentsnav').click(); await new Promise(resolve => setTimeout(resolve, 20)); assert(messages.some(m => m.do === 'agents') && d.querySelector('section.on'), 'Agents opens its own window and leaves the section in place');
+  w.st.agents({count: 0}); assert(d.getElementById('agentcount').textContent === '', 'No count when nothing runs');
+  change.click(); d.querySelector('nav button[data-s="brain"]').click();
+  assert(!d.getElementById('shortcut').classList.contains('rec'), 'Switching tabs cancels recording');
+  d.querySelector('nav button[data-s="general"]').click(); change.click();
+  d.getElementById('talklabel').dispatchEvent(new w.Event('pointerdown', {bubbles: true}));
+  assert(change.textContent === 'Change Shortcut' && d.getElementById('caps').textContent.includes('Space'), 'Clicking away cancels without replacing the shortcut');
+  const use = (asks, usd, secs) => ({asks, usd, secs});
+  w.st.load({prefs, state: {today: use(2, .002, 3), week: use(4, .004, 3.5), all: use(10, .009, 4.2), rules: [], skills: [], plan: {ok: true, text: 'Pro'}}});
+  const stats = d.getElementById('stats').textContent;
+  assert(stats.includes('Avg response4.2 s') && stats.includes('Avg ask cost$0.0009'), 'Usage shows average response time and cost per ask');
+  w.st.state({today:{...use(1,0,2),unknown:1},week:{...use(1,0,2),unknown:1},all:{...use(1,0,2),unknown:1},rules:[],skills:[],plan:{ok:true,text:'Pro'}});
+  assert(d.getElementById('stats').textContent.includes('≥$0.0000')&&d.getElementById('stats').textContent.includes('Avg ask cost≥$0.0000'),'Interrupted usage is shown as a lower bound, including averages');
+  const profileState={today:use(0,0,0),week:use(0,0,0),all:use(0,0,0),rules:[],skills:[],plan:{ok:true,text:'Pro'},me:{version:2,facts:[
+    {id:'name1',category:'basics',kind:'name',value:'Sam Example',source:'you',date:'2026-10-13'},
+    {id:'email1',category:'contact',kind:'home email',value:'sam@example.test',source:'contacts',date:'2026-10-13'}]}};
+  w.st.state(profileState);w.st.tab('memory');
+  const basics=d.querySelector('[data-category="basics"]'),contact=d.querySelector('[data-category="contact"]');
+  assert(basics.querySelector('summary span').textContent==='1'&&!basics.open,'Profile categories start compact with counts');
+  contact.open=true;await new Promise(r=>setTimeout(r,20));assert(contact.querySelector('.source-pill').textContent==='contacts · 2026-10-13','Expanded facts show source and date');
+  const email=contact.querySelector('[data-profile-id]');email.value='home email: new@example.test';email.dispatchEvent(new w.Event('change'));await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='me'&&m.action==='set'&&m.id==='email1'&&m.text.includes('new@example.test')),'Profile facts edit inline');
+  const dropped=()=>messages.some(m=>m.do==='me'&&m.action==='drop'&&m.id==='email1');
+  contact.querySelector('[data-profile-drop]').click();await new Promise(r=>setTimeout(r,20));assert(!dropped(),'Profile deletes wait out Undo');
+  w.st.notice({text:''});await new Promise(r=>setTimeout(r,20));assert(dropped(),'Profile facts delete inline');
+  const add=contact.querySelector('[data-profile-add]');add.value='phone: +1 555 0100';add.nextElementSibling.click();await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='me'&&m.action==='add'&&m.category==='contact'),'Expanded categories add facts');
+  w.st.state({...profileState,rules:['Use Chrome for browsing'],me:{version:2,facts:[...profileState.me.facts,{id:'dad1',category:'people',kind:'dad email',value:'pat@example.test',source:'learned',date:'2026-10-13'}]}});
+  const rule=d.querySelector('[data-rule]');rule.value='Use Chrome for all browsing';rule.dispatchEvent(new w.Event('change'));await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='rule'&&m.old==='Use Chrome for browsing'&&m.text==='Use Chrome for all browsing'),'Rules edit inline like profile facts');
+  rule.value='';rule.dispatchEvent(new w.Event('change'));await new Promise(r=>setTimeout(r,20));assert(messages.some(m=>m.do==='forget'&&m.line==='Use Chrome for browsing'),'An emptied rule is forgotten');
+  w.st.reveal({c:'people',t:'dad email: pat@example.test'});
+  const people=d.querySelector('[data-category="people"]'),glow=d.querySelector('.flash');
+  assert(people.open&&glow&&glow.querySelector('input').value==='dad email: pat@example.test','A receipt opens Memory on its category and highlights the item');
+  w.st.reveal({c:'rules',t:'Something already forgotten'});assert(d.getElementById('rules').classList.contains('flash'),'A forgotten item shows its category');
+  assert(d.getElementById('profileImport').textContent==='Refresh','Imported facts turn Import into Refresh');
+  d.getElementById('profileImport').click();await new Promise(r=>setTimeout(r,20));assert(messages.some(m=>m.do==='profileImport')&&d.getElementById('profileImport').disabled,'Mac import begins only from its button');
+  w.st.profileImport({counts:{contacts:1,mail:2},errors:[]});assert(!d.getElementById('profileImport').disabled&&d.getElementById('profileStatus').textContent.includes('2 from Mail'),'Import reports per-source counts');
+  d.querySelector('[data-profile-source="contacts"]').click();await new Promise(r=>setTimeout(r,20));assert(messages.some(m=>m.do==='me'&&m.action==='forget-source'&&m.source==='contacts'),'A source can be forgotten at once');
+  w.st.tab('meetings');load({});const saving=d.querySelector('[data-k="meetingSave"]');
+  assert(saving.checked,'Transcript saving is on by default');saving.click();await new Promise(r=>setTimeout(r,20));
+  assert(messages.some(m=>m.do==='set'&&m.k==='meetingSave'&&m.v===false),'Saving switch asks native to stop and handle old meetings');
+  w.st.tab('meetings');await new Promise(r=>setTimeout(r,20));assert(messages.some(m=>m.do==='meetings'),'Meetings tab requests the local archive');
+  const list=[{id:'new',title:'Cedar <review>',started:1791745200,duration:3662,app:'Zoom',summary:'Launch agreed.\nNext steps',status:'Ended'},{id:'old',title:'Budget',started:1791658800,duration:62,app:'Teams',summary:'Budget approved.',status:'Ended'}];
+  const $=id=>d.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
+  w.st.meetings({meetings:list,query:''});assert(d.querySelectorAll('.meetingrow').length===2&&d.querySelector('.meetingrow b').textContent==='Cedar <review>','List renders newest-first titles safely');
+  assert(d.querySelector('.meetingrow small').textContent.includes('1 hr 1 min')&&d.querySelector('.meetingrow span').textContent==='Launch agreed.','Rows show date, duration, app and first summary line');
+  d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));assert(d.activeElement===d.querySelectorAll('.meetingrow')[1],'Down arrow selects and focuses the next meeting');
+  d.querySelector('.meetingrow').click();await wait(20);assert(messages.some(m=>m.do==='meetingOpen'&&m.id==='new'),'Return-capable row opens by ID');
+  const detail={...list[0],notes:'Pilot notes',answers:[{question:'When?',lines:['Friday']}],action_items:['Send pilot notes'],transcript:[{seconds:62,speaker:'You',text:'We agreed Friday.'},{seconds:80,speaker:'Zoom',text:'Confirmed <script>.'}]};
+  w.st.meetings({meeting:detail,markdown:'# Cedar\nTranscript'});w.st.meetings({meeting:{...detail,id:'stale'},markdown:'stale'});assert($('meetingtitle').textContent==='Cedar <review>','A stale detail response cannot replace the requested meeting');assert($('meetingbrowse').hidden&&!$('meetingdetail').hidden&&$('meetingsummary').textContent==='Launch agreed.\nNext steps','Open shows summary first');
+  assert($('meetingtranscript').textContent.includes('00:01:02YouWe agreed Friday.')&&$('meetingtranscript').textContent.includes('Confirmed <script>.'),'Full transcript has timestamps, speakers and safe selectable text');
+  assert(!$('meetingactionblock').hidden&&$('meetingactions').textContent.includes('Send pilot notes')&&$('meetingnotes').textContent==='Pilot notes','Detail includes action items and notes');
+  $('meetingcopy').click();$('meetingexport').click();await wait(20);assert(messages.some(m=>m.do==='meetingCopy'&&m.text.includes('Transcript'))&&messages.some(m=>m.do==='meetingExport'&&m.id==='new'),'Copy and export use native clipboard and save dialog');
+  $('meetingdelete').click();await wait(20);assert(messages.some(m=>m.do==='meetingDelete'&&m.id==='new')&&!$('meetingdetail').hidden,'Delete waits for native confirmation before removing anything');
+  w.st.meetings({deleted:'new'});await wait(20);assert(!$('meetingbrowse').hidden&&$('meetingdetail').hidden,'Confirmed deletion returns to the list');w.st.meetings({meetings:[list[1]],query:''});assert(d.querySelectorAll('.meetingrow').length===1,'Deleted meeting disappears after refresh');
+  $('meetingq').value='budget';$('meetingq').dispatchEvent(new w.Event('input'));await wait(200);assert(messages.some(m=>m.do==='meetings'&&m.query==='budget'),'Search covers the native title/transcript index');
+  w.st.meetings({meetings:list,query:'stale'});assert(d.querySelectorAll('.meetingrow').length===1,'Stale search responses cannot replace current matches');
+  w.st.meetings({meetings:[list[1]],query:'budget'});assert($('meetingcount').textContent==='1 meeting found','Search renders filtered matches');
+  $('meetingq').focus();$('meetingq').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));await wait(20);assert(messages.some(m=>m.do==='meetingOpen'&&m.id==='old'),'Return from search opens the selection');
+  d.querySelector('.meetingrow').click();w.st.meetings({meeting:{...detail,id:'old'},markdown:'MD'});d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'f',metaKey:true,bubbles:true,cancelable:true}));assert(!$('meetingbrowse').hidden&&d.activeElement===$('meetingq'),'Command-F returns to search');
+  d.querySelector('.meetingrow').click();w.st.meetings({meeting:{...detail,id:'old'},markdown:'MD'});d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert(!$('meetingbrowse').hidden,'Escape goes back from detail');
+  $('meetingq').value='no-match';w.st.meetings({meetings:[],query:'no-match'});assert($('meetinglist').textContent.includes('No meetings match'),'Empty search gives a calm recovery hint');
+  w.st.meetings({error:'Could not load'});assert($('meetingmessage').textContent==='Could not load','Archive failures have a visible status');w.st.motion(true);assert(d.body.classList.contains('reduce'),'Dashboard respects native Reduce Motion');
+  assert(d.documentElement.scrollWidth<=780,'Meeting dashboard fits Settings');
+  // Agents setup: live status, connectors from the Claude account, Enable All and the step it is on
+  w.st.tab('account');w.st.perms({mic:true,speech:true,ax:true,screen:true,auto:true,chrome:false,calendar:false});
+  assert(d.querySelector('#agentsetup [data-g="calendar"]').hidden===false&&d.querySelector('#agentsetup [data-g="auto"]').hidden===true,'Agents rows show Allowed or Allow, live');
+  w.st.connectors({connected:['Gmail','Google Drive'],signin:['Notion']});assert(d.getElementById('conntext').textContent==='Gmail, Google Drive connected · 1 need sign-in','Connectors row reads the Claude account');
+  d.getElementById('enableAll').click();await new Promise(r=>setTimeout(r,20));assert(messages.some(m=>m.do==='enableAll'&&m.connected==='true'),'Enable All posts with connector state');
+  w.st.walk('calendar');assert(d.querySelector('#agentsetup [data-g="calendar"]').closest('.row').classList.contains('now'),'Enable All marks the current step');
+  w.st.tab('apps');assert(d.getElementById('apps').classList.contains('on')&&d.querySelector('nav button[data-s="account"]').classList.contains('on'),'Apps opens from Account & Access without its own sidebar page');
+  results.textContent = checks.join('\n') + `\n\n${checks.length} checks passed.`; results.className = 'pass';
+} catch (error) { results.textContent = checks.join('\n') + '\n✗ ' + error.message; results.className = 'fail'; }
+</script></html>

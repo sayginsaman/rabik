@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Atticus timer row regression</title>
+<pre id="results">Running…</pre><iframe id="page"></iframe>
+<script type="module">
+const results = document.getElementById('results'), frame = document.getElementById('page');
+try {
+  const html = await (await fetch('../ui/ui.html')).text(), orbs = await (await fetch('../ui/orbs.js')).text();
+  const ready = new Promise(resolve => addEventListener('message', e => e.source === frame.contentWindow && e.data?.ready && resolve()));
+  const bridge = `<script>
+    window.webkit = {messageHandlers: new Proxy({}, {get: () => ({postMessage: value => value?.ready && parent.postMessage(value, '*')})})};
+  <\/script>`;
+  frame.srcdoc = html.replace('/*ORBS*/', () => orbs).replace('<head>', '<head>' + bridge);
+  await ready;
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  const ui = frame.contentWindow.ui, d = frame.contentDocument;
+  ui.listen(true); ui.words('Earlier ask'); ui.think(); ui.line('✓ Earlier answer');
+  ui.dictate(true); ui.listen('dict'); ui.finishing(''); ui.dictated({text: '', ok: true});
+  ui.listen(); ui.dictate(false); ui.words('Why is the sky blue?'); ui.think(); ui.line('▸ Thinking it through');
+
+  const turns = d.querySelectorAll('#thread > .turn');
+  if (turns.length !== 2) throw Error(`new ask did not get its own turn (${turns.length})`);
+  const current = turns[1];
+  if (current.querySelector('.q')?.textContent !== 'Why is the sky blue?') throw Error('question is not in the new turn');
+  if (!current.querySelector('.elapsed')?.offsetHeight) throw Error('new ask has no visible timer row');
+  if (current.querySelector('.step')?.textContent !== 'Thinking it through' || !current.querySelector('.step').offsetHeight) throw Error('new ask has no visible step line');
+  results.className = 'pass'; results.textContent = 'Timer row regression passed';
+} catch (error) {
+  results.className = 'fail'; results.textContent = error.stack || String(error);
+}
+</script>
