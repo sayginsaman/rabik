@@ -38,3 +38,6 @@ docs/film-poster.png
 /test-artifacts/
 # Devbox generated artifacts
 .devbox/
+
+# Release builds (build.sh --release)
+/dist/
