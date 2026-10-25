@@ -75,6 +75,11 @@ Bu build hakkında:
 ## 9. Toplantı (isteğe bağlı)
 - [ ] Settings → Meetings → Meeting Copilot'u aç, demo'yu dene → panel açılır, sürüklenir, küçülür.
 - [ ] Demo bitince "See all meetings" → kayıt arşivde görünür.
+- [ ] Settings → Meetings → Language'ı Turkish yap, Türkçe konuşulan bir görüşme (ya da video) aç → satırlar Türkçe yazılır. Automatic'te Mac'in dili kullanılır.
+- [ ] "Translate the call"u aç → karşı tarafın her satırının altında Mac'in dilinde çevirisi çıkar. Dil paketi yoksa bir kez "Translation Languages" uyarısı gelir.
+- [ ] Takvimde tek kişiyle olan bir görüşmede satırlar o kişinin adıyla görünür. Kalabalık bir görüşmede birkaç dakika sonra, adı geçen kişilerin satırlarında italik isimler belirir; emin olunmayanlar "Them" kalır.
+- [ ] Görüşme bitince "Share recap…" → Paylaş menüsü açılır; Notes'a gönderince başlık, özet ve maddeler gelir, transkript gelmez. Settings → Meetings'teki "Share…" de aynısını yapar.
+- [ ] "Remind me before calls"u aç → linkli bir takvim görüşmesinden yaklaşık iki dakika önce küçük bir kart çıkar. Kapalıyken çıkmaz.
 
 ## 10. Settings ve modlar
 - [ ] Spotlight'tan "Rabik" → Settings açılır; açık/koyu görünüme uyar.
