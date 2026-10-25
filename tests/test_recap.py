@@ -6,13 +6,15 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
-import brain.agents, brain.calendar, brain.interaction, brain.macos, brain.meeting, brain.policy, brain.prefs, brain.recap, brain.routine
+import brain.agents, brain.calendar, brain.instant, brain.interaction, brain.macos, brain.meeting, brain.policy, brain.prefs, brain.recap, brain.routine
 from tests import native_source, scratch_dir
 import plistlib
 
@@ -265,14 +267,108 @@ class RecapScheduleTests(unittest.TestCase):
 
     def test_the_app_asks_on_the_job_a_launch_a_wake_and_a_settings_change(self):
         swift = native_source()
-        recap = swift[swift.index('final class Recap {'):]
+        recap = swift[swift.index('final class Recap:'):]
         self.assertIn('NSWorkspace.didWakeNotification', recap)
-        self.assertIn('py(["--recap", "catch-up"])', recap)
+        self.assertIn('brain(["catch-up"])', recap)
         self.assertIn('ids.forEach { $0 == "recap" ? dailyRecap.catchUp() : agentsUI.send(["action":"routine","id":$0]) }', swift)
         self.assertIn('let dailyRecap = Recap()\nlet routineWake = RoutineWake()\ndailyRecap.catchUp()', swift)
         self.assertIn('if k == "recap" || k == "recapAt" { dailyRecap.sync() }', swift)
         defaults = swift[swift.index('static let defaults'):swift.index('static let retiredKeys')]
         self.assertIn('"recap": true, "recapAt": "21:00", "remindersList": ""', defaults)
+
+
+class RecapShowTests(unittest.TestCase):
+    def setUp(self):
+        self.root = scratch_dir(self)
+
+    def test_summarize_my_day_shows_the_card_without_the_model(self):
+        made = {'day': DAY, 'headline': 'A sync and three hubs.', 'actions': []}
+        with patch.object(brain.recap, 'recap_make', return_value=made) as make, patch('sys.stdout', new_callable=io.StringIO) as out, \
+             patch.dict(os.environ, {'RABIK_UI': '1'}):
+            self.assertEqual(brain.instant.fast('Summarize my day.').reply, 'A sync and three hubs.')
+        make.assert_called_once_with()
+        self.assertIn('▦ ' + DAY, out.getvalue())   # the app opens the card when this ask ends
+        with patch.object(brain.recap, 'recap_make', return_value={'day': DAY, 'empty': True}):
+            self.assertEqual(brain.instant.fast('günümü özetle').reply, 'Nothing to recap yet today.')
+        with patch.object(brain.recap, 'recap_make') as make, patch.dict(os.environ, {'RABIK_LIVE': '1'}):
+            self.assertIsNone(brain.instant.fast('daily recap').reply)   # still talking: nothing yet
+        make.assert_not_called()
+        for other in ('recap the meeting', 'summarize this article', 'open recap'):
+            with self.subTest(other=other): self.assertIsNone(brain.instant.RECAP_ASK.fullmatch(brain.wording.plain(other)))
+
+    def test_reading_a_saved_recap_never_makes_one(self):
+        with patch.object(brain.recap, 'recap_make') as make:
+            self.assertEqual(brain.recap.recap_command(['read', DAY]), {})
+            (self.root / 'recaps').mkdir(); (self.root / 'recaps' / f'{DAY}.json').write_text('{"day": "%s", "headline": "x"}' % DAY)
+            self.assertEqual(brain.recap.recap_command(['read', DAY])['headline'], 'x')
+        make.assert_not_called()
+
+    def test_the_app_notifies_opens_and_asks_reminders_access_in_place(self):
+        swift = native_source()
+        recap = swift[swift.index('final class Recap:'):]
+        recap = recap[:recap.index('\n}\n')]
+        self.assertIn('UNUserNotificationCenter.current().delegate = self', recap)
+        self.assertIn('case .notDetermined:   // asked with the first recap, not at setup', recap)
+        self.assertIn('UNNotificationRequest(identifier: "recap." + day', recap)
+        self.assertIn('default: showWhenFree(recap)', recap)   # notifications off: the card, when the box is free
+        self.assertIn('func open(_ day: String) { brain(["read", day])', recap)
+        self.assertIn('calendar.requestFullAccessToReminders', recap)
+        self.assertIn('default: reply(["need": "reminders"])', recap)
+        self.assertIn('if line.hasPrefix("▦ ") { self.showRecap = String(line.dropFirst(2)); continue }', swift)
+        self.assertIn('if !self.showRecap.isEmpty { dailyRecap.open(self.showRecap); self.showRecap = "" }', swift)
+        self.assertIn('dailyRecap.add(source, keys) { [weak self] in self?.js("recapAdded", $0) }', swift)
+
+
+CARD = r"""
+const sample = {day: '2026-10-25', headline: 'A sync and three hubs.', highlights: ['Agreed to ship Monday'], decisions: ['Ship Monday'], tomorrow: ['10:00 Design review'],
+  actions: [{key: 'send the deck', text: 'Send the deck', source: 'Weekly sync', due: '2026-10-31', added: ''},
+            {key: 'book the room', text: 'Book the room', source: 'Weekly sync', due: '', added: ''},
+            {key: 'order the hub', text: 'Order the hub', source: 'Hubs', due: '', added: 'r1'}]};
+const st = document.createElement('style'); st.textContent = '*,*::before,*::after{animation:none!important;transition:none!important}'; document.head.append(st);
+ui.reset(); ui.size(420); ui.limit(900); ui.visible(true); ui.recap(sample);
+const card = document.querySelector('.recap-card'), out = {}, add = () => card.querySelector('[data-add]');
+out.heads = [...card.querySelectorAll('h4')].map(h => h.textContent);
+out.rows = [...card.querySelectorAll('.todo')].map(b => [b.getAttribute('aria-checked'), b.disabled, b.querySelector('small')?.textContent]);
+out.before = [add().disabled, add().textContent];
+const first = card.querySelector('.todo'), r = first.getBoundingClientRect(); ui.tap([r.x + 20, r.y + 8]);   // the box's own click path
+out.after = [first.getAttribute('aria-checked'), add().disabled, add().querySelector('span').textContent];
+add().click(); out.sent = add().disabled;
+ui.recapAdded({need: 'reminders'}); out.need = card.querySelector('.recap-msg').textContent;
+ui.recapAdded({added: 1, list: 'Work', fellBack: false, items: [{...sample.actions[0], added: 'r2'}, sample.actions[1], sample.actions[2]]});
+out.done = [card.querySelector('.recap-msg').textContent, [...card.querySelectorAll('.todo')].map(b => b.classList.contains('added')), add().disabled];
+ui.recapAdded({added: 1, list: 'Work', items: sample.actions.map(a => ({...a, added: 'x'}))}); out.allAdded = !add();
+ui.recap({...sample, actions: [], note: 'The AI recap could not be made, so this is the plain list.'});
+out.plain = [!!document.querySelector('.recap-card [data-add]'), document.querySelector('.recap-card .note').textContent, document.querySelectorAll('.recap-card').length];
+return out;
+"""
+
+
+@unittest.skipUnless(sys.platform == 'darwin', 'macOS WebKit page check')
+class RecapCardTests(unittest.TestCase):
+    def test_the_card_picks_to_dos_and_shows_what_was_added(self):
+        from tests.test_shelf_page import HARNESS
+        root = Path(__file__).resolve().parents[1]
+        harness = HARNESS.replace('cfg.userContentController.add(h, name: "agents")', 'cfg.userContentController.add(h, name: "c"); cfg.userContentController.add(h, name: "h")')
+        harness = harness.replace('?["action"] as? String == "ready"', '?["ready"] != nil')
+        with tempfile.TemporaryDirectory() as tmp:
+            page, src, binary = Path(tmp) / 'ui.html', Path(tmp) / 'page.swift', Path(tmp) / 'page'
+            page.write_text((root / 'ui/ui.html').read_text().replace('/*ORBS*/', (root / 'ui/orbs.js').read_text()))
+            src.write_text(harness)
+            built = subprocess.run(['swiftc', str(src), '-o', str(binary)], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            run = subprocess.run([str(binary), str(page), CARD], capture_output=True, text=True, timeout=30)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        got = json.loads(run.stdout.strip().splitlines()[-1]); out = got['result']
+        self.assertEqual(out['heads'], ['Today', 'Decisions', 'To do', 'Tomorrow'])
+        self.assertEqual(out['rows'], [['false', False, 'Weekly sync · due Oct 31'], ['false', False, 'Weekly sync'], ['true', True, 'Hubs · Added']])
+        self.assertEqual(out['before'][0], True)   # nothing picked: nothing to add
+        self.assertEqual(out['after'], ['true', False, 'Add 1 to Reminders'])
+        self.assertIn({'recapAdd': {'source': 'recap:2026-10-25', 'keys': ['send the deck']}}, got['posts'])
+        self.assertTrue(out['sent'])
+        self.assertIn('System Settings → Privacy & Security → Reminders', out['need'])
+        self.assertEqual(out['done'], ['Added 1 to Work.', [True, False, True], True])
+        self.assertTrue(out['allAdded'])   # all in Reminders: no Add button
+        self.assertEqual(out['plain'], [False, 'The AI recap could not be made, so this is the plain list.', 1])
 
 if __name__ == '__main__':
     unittest.main()

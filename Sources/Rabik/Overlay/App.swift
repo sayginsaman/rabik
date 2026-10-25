@@ -52,6 +52,7 @@ final class App: NSObject, WKScriptMessageHandler {
     var agentCard = ""   // the hand-off or done card on screen: Esc picks its quiet choice
     var replyAgent = ""   // the agent whose done card was up when this ask began: talking clears the card, so it is kept here
     var showAgent = ""   // the task this ask showed (--agent-show): its work comes up when the ask ends
+    var showRecap = ""   // the day this ask recapped ("summarize my day"): its card comes up when the ask ends
     var defaultKeys: [EventHotKeyRef] = []
     var defaultWanted = false, defaultObservers: [NSObjectProtocol] = []
     var proc: Process?, escRef: EventHotKeyRef?, warm: (p: Process, input: FileHandle, commit: String)?
@@ -429,6 +430,10 @@ final class App: NSObject, WKScriptMessageHandler {
             }
             if ["agentOpen","agentLater","agentConnect"].contains(where:{ b[$0] != nil }) { agentCard = ""; defaultKey(false) }
             if b["agentGone"] != nil { agentCard = ""; escape() }   // the card left another way: Esc does its usual job
+            if let add = b["recapAdd"] as? [String: Any], let source = add["source"] as? String, let keys = add["keys"] as? [String] {
+                dailyRecap.add(source, keys) { [weak self] in self?.js("recapAdded", $0) }
+            }
+            if b["recapLater"] != nil { pinned = false; hide(after: 1) }
             if let id = b["agentOpen"] as? String {
                 if let target = b["target"] as? String { agentsUI.open(id,target:target) }
                 else { agentsUI.openView(id) }   // the done card's Return action opens the report; its artifact buttons open artifacts
@@ -1532,6 +1537,7 @@ final class App: NSObject, WKScriptMessageHandler {
                         self.askNeed = [:]; self.askFile = j["a"] as? String ?? ""; self.show(); self.js("pick", j); continue
                     }
                     if line.hasPrefix("▤ ") { self.showAgent = String(line.dropFirst(2)); continue }
+                    if line.hasPrefix("▦ ") { self.showRecap = String(line.dropFirst(2)); continue }
                     if line.hasPrefix("⇢ "), let value = try? JSONSerialization.jsonObject(with:Data(line.dropFirst(2).utf8)) as? [String:Any] {   // movable: ⌃⌥↩ moves it / {}: no longer movable
                         self.agentMoveFile = self.busy ? value["a"] as? String ?? "" : ""; continue
                     }
@@ -1575,6 +1581,7 @@ final class App: NSObject, WKScriptMessageHandler {
                 self.lastDone = Date()
                 if !self.answer.isEmpty { self.cue("soundDone") }
                 if !self.showAgent.isEmpty { agentsUI.show(self.showAgent); self.showAgent = "" }
+                if !self.showRecap.isEmpty { dailyRecap.open(self.showRecap); self.showRecap = "" }
                 Apps.q.async { Apps.sync() }
                 self.hide(after: self.linger(max(6, min(30, Double(self.answer.count) / 12))))   // longer answers stay longer
             }
@@ -1589,7 +1596,7 @@ final class App: NSObject, WKScriptMessageHandler {
         let point = pointContext, drawn = drawing.summary
         pointContext = nil; unpoint(false)
         if point != nil { js("point", false) }   // the mark went with this ask (its picture is in the bubble): the chip must not wait for the next one
-        drawing.clearInput(); drawing.deselect(); mini.reset(); if !busy && !engine.isRunning { noteHidden() }; busy = true; agentMoveFile = ""; answer = ""; showAgent = ""; try? FileManager.default.removeItem(atPath: focusFile)
+        drawing.clearInput(); drawing.deselect(); mini.reset(); if !busy && !engine.isRunning { noteHidden() }; busy = true; agentMoveFile = ""; answer = ""; showAgent = ""; showRecap = ""; try? FileManager.default.removeItem(atPath: focusFile)
         if !speculative { js("think") }
         if let w = warm, !w.p.isRunning { try? w.input.close(); warm = nil }
         if warm != nil && warmSel != selKey { unwarm() }   // spawned before the selection changed

@@ -6,9 +6,14 @@ import subprocess
 import time
 import urllib.parse
 from pathlib import Path
-from brain import apps, environ, hands, macos, paths, prefs, protocol, skills, spotify, telemetry, tips, web, windows, wording
+from brain import apps, environ, hands, macos, paths, prefs, protocol, recap, skills, spotify, telemetry, tips, web, windows, wording
 
-__all__ = ['FastResult', 'fast']
+__all__ = ['FastResult', 'RECAP_ASK', 'fast']
+
+
+# "Summarize my day", "daily recap", "günümü özetle": the day's recap card, made by brain/recap.py, not by the model
+RECAP_ASK = re.compile(r"(?:show (?:me )?)?(?:my |today'?s |the )?(?:daily |day'?s )?recap(?: of (?:my|the|to) ?day)?|(?:summari[sz]e|recap) (?:my|the|to) ?day"
+                       r"|what did i do today|g[üu]n[üu]m[üu]n? [öo]zet(?:le|i)|bug[üu]n[üu] [öo]zetle")
 
 
 class FastResult:
@@ -49,6 +54,12 @@ def _fast(text, result):
             return reply
         return None
     t = wording.plain(text)
+    if RECAP_ASK.fullmatch(t):
+        if environ.live(): return None
+        made = recap.recap_make()
+        if made.get('empty'): return 'Nothing to recap yet today.'
+        if environ.in_box(): print('▦ ' + made['day'], flush=True)   # the app shows its card when this ask ends
+        return made['headline']
     if t in ('report feedback', 'report a bug'):
         if environ.live(): return None
         protocol.say('!', 'feedback')

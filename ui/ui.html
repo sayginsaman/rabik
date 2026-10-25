@@ -375,6 +375,21 @@
   .agent-card .keys button:not(:has(kbd)) { padding:0 11px; }
   .agent-card .made .out { width:12px; height:12px; flex:none; stroke:var(--fg2); } .agent-card .made button:is(:hover,.hot) .out { stroke:#fff; }
   /* the agent's answer leads the done card, read like any answer; long ones scroll inside so its actions stay in view */
+  /* the daily recap: the agent card's frame; its to-dos are checkbox rows the user picks for Reminders */
+  .agent-card.recap-card .a { max-height:min(460px, calc(var(--screen-height, 10000px) - 220px)); }   /* the to-dos, the point of it, stay in view */
+  .recap-card h4 { margin:10px 0 3px; font-size:10.5px; line-height:14px; font-weight:600; letter-spacing:.2px; color:var(--fg2); }
+  .recap-card h4:first-child { margin-top:2px; }
+  .recap-card ul { margin:0; padding-left:16px; } .recap-card li { margin:2px 0; font-size:13px; line-height:1.45; }
+  .recap-card .todos { display:grid; gap:1px; margin:2px 0 0 -6px; }
+  .recap-card .todo { flex:none; display:flex; align-items:flex-start; gap:8px; width:100%; height:auto; padding:5px 6px; border-radius:8px; text-align:left;
+    background:none; box-shadow:none; font:400 13px/1.4 -apple-system, system-ui, sans-serif; color:#fff; cursor:pointer; }
+  .recap-card .todo:is(:hover,.hot) { transform:none; background:rgba(255,255,255,.07); } .recap-card .todo:active { transform:none; }
+  .recap-card .todo > i { flex:none; display:grid; place-items:center; width:15px; height:15px; margin-top:1px; border-radius:4.5px; box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.45); }
+  .recap-card .todo svg { width:11px; height:11px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; opacity:0; }
+  .recap-card .todo[aria-checked=true] > i { background:var(--accent); box-shadow:none; } .recap-card .todo[aria-checked=true] svg { opacity:1; }
+  .recap-card .todo small { display:block; margin-top:1px; color:var(--fg2); font-size:11px; }
+  .recap-card .todo.added { cursor:default; opacity:.6; } .recap-card .todo.added > i { background:#30d158; }
+  .recap-card .note { margin:8px 0 0; font-size:12px; line-height:1.4; color:var(--fg2); }
   .agent-card { max-height:900px; }   /* not none: a card folding away (.gone) can only animate from a length */
   .agent-card .a { display:block; margin-top:8px; max-height:min(260px, calc(var(--screen-height, 10000px) - 300px)); overflow-y:auto; font-size:13.5px; line-height:1.55; cursor:default; }
   .agent-card .a::-webkit-scrollbar { width:0; } .agent-card .a.more { -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
@@ -728,6 +743,41 @@
     if(over>0)answer.style.maxHeight=Math.max(60,answer.clientHeight-over)+'px';
     answer.onscroll();working=false;clockStop();setState('breathing');status('Done');fit();
   };
+  // The daily recap (brain/recap.py): the day in a few lines and the to-dos the user picks for Reminders. The AI only suggested them;
+  // nothing is added until Add, and an added one stays ticked and greyed.
+  const recapCount=d=>{const add=d.querySelector('[data-add]');if(!add)return;const n=d.querySelectorAll('.todo[aria-checked=true]:not(.added)').length;
+    add.querySelector('span').textContent=n?'Add '+n+' to Reminders':'Add to Reminders';add.disabled=!n;};
+  const recapTodos=(d,items)=>{const box=d.querySelector('.todos');if(!box)return;box.textContent='';
+    for(const a of items){const b=document.createElement('button');b.className='todo'+(a.added?' added':'');b.dataset.key=a.key;b.setAttribute('role','checkbox');b.setAttribute('aria-checked',a.added?'true':'false');
+      b.innerHTML='<i aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6 9.6 3.6"/></svg></i><span><span class="t"></span><small></small></span>';
+      b.querySelector('.t').textContent=a.text;
+      const due=a.due?'due '+new Date(a.due+'T12:00').toLocaleDateString('en',{month:'short',day:'numeric'}):'';
+      const meta=[a.source,due,a.added?'Added':''].filter(Boolean).join(' · ');if(meta)b.querySelector('small').textContent=meta;else b.querySelector('small').remove();
+      if(a.added){b.disabled=true;b.setAttribute('aria-disabled','true');}else b.onclick=e=>{e.stopPropagation();b.setAttribute('aria-checked',b.getAttribute('aria-checked')==='true'?'false':'true');recapCount(d);};
+      box.append(b);}
+    recapCount(d);};
+  const recapCard=r=>{
+    $('thread').querySelectorAll('.recap-card').forEach(e=>e.remove());
+    const d=document.createElement('div');d.className='ok offer agent-card done recap-card';d.dataset.day=r.day;
+    d.innerHTML='<div class="eyebrow"><i></i><span></span></div><b></b><div class="a"></div><div class="agent-actions keys"></div>';
+    d.querySelector('.eyebrow span').textContent='Daily recap · '+new Date(r.day+'T12:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+    d.querySelector('b').textContent=r.headline||'Your day';
+    const body=d.querySelector('.a');body.tabIndex=0;
+    const list=(title,rows)=>{if(!rows?.length)return;const h=document.createElement('h4');h.textContent=title;const ul=document.createElement('ul');
+      for(const t of rows){const li=document.createElement('li');li.textContent=t;ul.append(li);}body.append(h,ul);};
+    list('Today',r.highlights);list('Decisions',r.decisions);
+    if(r.actions?.length){const h=document.createElement('h4');h.textContent='To do';const box=document.createElement('div');box.className='todos';body.append(h,box);}
+    list('Tomorrow',r.tomorrow);
+    if(r.note){const n=document.createElement('p');n.className='note';n.textContent=r.note;body.append(n);}
+    const actions=d.querySelector('.agent-actions');
+    const later=keyButton('Later','esc');later.dataset.esc='';later.onclick=()=>{d.remove();post({recapLater:true});fit();};actions.append(later);
+    if(r.actions?.some(a=>!a.added)){const add=keyButton('Add to Reminders','↩',true);add.dataset.add='';actions.append(add);
+      add.onclick=()=>{const keys=[...d.querySelectorAll('.todo[aria-checked=true]:not(.added)')].map(b=>b.dataset.key);if(!keys.length)return;
+        add.disabled=true;status('Adding to Reminders…',true);post({recapAdd:{source:'recap:'+r.day,keys}});};}
+    recapTodos(d,r.actions||[]);
+    (turn()||$('thread')).append(d);
+    working=false;clockStop();setState('breathing');status('');fit();
+  };
   $('agents-pill').onclick=()=>post({agents:true});
   document.addEventListener('click', e => { const a = e.target.closest?.('a[href]'); if (a) { e.preventDefault(); e.stopPropagation(); post({ link: a.href }); } }, true);   // links open in the browser, never in the box
   document.addEventListener('keydown',e=>{const b=defaultButton();if(b&&e.key==='Enter'&&!e.isComposing&&!e.target.closest('button,input,textarea,select,a,[contenteditable=true]')){e.preventDefault();e.stopPropagation();b.click();}},true);
@@ -749,6 +799,14 @@
       (turn()||$('thread')).append(d);fit();
     },
     agentDone(row){agentCard(row);},
+    recap(r){recapCard(r);},
+    recapAdded(res){const d=$('thread').querySelector('.recap-card');if(!d)return;const add=d.querySelector('[data-add]');d.querySelector('.recap-msg')?.remove();
+      const msg=document.createElement('p');msg.className='note recap-msg';msg.setAttribute('role','status');
+      if(res.need)msg.textContent='Rabik can’t use Reminders yet. Allow it in System Settings → Privacy & Security → Reminders, then press Add again.';
+      else if(res.error)msg.textContent=res.error;
+      else{recapTodos(d,res.items||[]);msg.textContent=res.added?'Added '+res.added+' to '+(res.list||'Reminders')+(res.fellBack?' (your chosen list is gone, so the default one)':'')+'.':'Those are in Reminders already.';
+        if(!(res.items||[]).some(a=>!a.added))add?.remove();}
+      d.querySelector('.a').append(msg);if(d.contains(add)){recapCount(d);}status(res.added?'Added to Reminders':'');fit();},
     agentCancelled(){$('thread').querySelectorAll('.agent-card').forEach(e=>e.remove());status('Ready');clockStop();fit();},
     // The box says plainly that an agent took the ask (its orb swims to the chip meanwhile), then fades; the chip shows its steps.
     agentStarted(row){$('thread').querySelectorAll('.agent-card').forEach(e=>{e.classList.add('gone');setTimeout(()=>{e.remove();fit();},360);});working=listening=false;settle();part('q')?.classList.remove('live','hear');setState('breathing');clockStop();

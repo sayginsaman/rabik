@@ -146,7 +146,7 @@ def recap_make(day=None, force=False, evening=False):
         titles.update({a['id']: a['title'] for a in inputs['agents']})
         added = {recap_key(a.get('text', '')): a['added'] for a in (old or {}).get('actions', []) if isinstance(a, dict) and a.get('added')}
         for action in recap['actions']:
-            action.update(source=titles.get(action['from'], ''), added=added.get(recap_key(action['text']), ''))
+            action.update(key=recap_key(action['text']), source=titles.get(action['from'], ''), added=added.get(recap_key(action['text']), ''))
         result = {'day': day, 'made': time.time(), 'source': source, 'note': note, 'fingerprint': fingerprint,
                   'evening': evening or bool((old or {}).get('evening')), **recap}
         storage.private_json(recap_path(day), result)
@@ -207,10 +207,11 @@ def recap_remind(source, keys):
 
 
 def recap_command(args):
-    """--recap [YYYY-MM-DD] [--force] | catch-up | schedule | items <source> | remind <source> '<json keys>'; prints JSON.
+    """--recap [YYYY-MM-DD] [--force] | catch-up | schedule | read <day> | items <source> | remind <source> '<json keys>'; prints JSON.
     catch-up: the evening recap if it is due (the job, a launch or a wake), else {}; schedule: the job follows Settings."""
     if args[:1] == ['catch-up']: return recap_make(evening=True) if recap_due() else {}
     if args[:1] == ['schedule']: return {'scheduled': routine.routine_recap_sync()}
+    if args[:1] == ['read'] and len(args) == 2 and re.fullmatch(r'\d{4}-\d{2}-\d{2}', args[1]): return recap_read(args[1]) or {}
     if args[:1] == ['items'] and len(args) == 2:
         title, day, items = recap_items(args[1]); return {'title': title, 'day': day, 'items': items}
     if args[:1] == ['remind'] and len(args) == 3:
