@@ -3,13 +3,14 @@
 _APPS_CACHE is rebound when it refreshes, so it is not in __all__: rabik.py's facade reads it here, live."""
 import difflib
 import os
+import plistlib
 import re
 import subprocess
 import time
 from pathlib import Path
 from brain import macos, paths, wording
 
-__all__ = ['installed_apps', 'app_words', 'app_named', 'app_heard', 'proc_of', 'app_id', 'app_running', 'quit_app', 'app_up']
+__all__ = ['installed_apps', 'app_words', 'default_browser', 'app_named', 'app_heard', 'proc_of', 'app_id', 'app_running', 'quit_app', 'app_up']
 
 
 _APPS_CACHE = (0.0, set())
@@ -40,9 +41,22 @@ def app_words(words):
     return re.sub(r'\s+(app|application)$', '', words.lower().strip(' .!?').removeprefix('the ').removeprefix('my '))
 
 
+def default_browser():
+    """The app macOS opens web links with (System Settings → Desktop & Dock → Default web browser); Safari if none was picked."""
+    try:
+        with open(os.path.join(paths.HOME, 'Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist'), 'rb') as f:
+            saved = plistlib.load(f)
+    except (OSError, ValueError):
+        saved = {}
+    handlers = saved.get('LSHandlers', []) if isinstance(saved, dict) else []
+    bid = next((h.get('LSHandlerRoleAll') for h in handlers if isinstance(h, dict) and h.get('LSHandlerURLScheme') == 'https'), None)
+    return isinstance(bid, str) and macos.osa(f'name of application id "{macos.osa_quote(bid)}"') or 'Safari'
+
+
 def app_named(words):
     """Spoken name -> installed app name, or None. Whole-name matches only, so "chrome history" is not Chrome."""
     w = app_words(words)
+    if w in ('browser', 'web browser', 'internet browser'): return default_browser()   # "my browser" is the one links open in, never Tor Browser by its last word
     key = lambda n: re.sub(r'[^a-z0-9]', '', n.lower())   # "trading view" = "TradingView"
     apps = installed_apps()
     exact = [a for a in apps if key(a) == key(w)]

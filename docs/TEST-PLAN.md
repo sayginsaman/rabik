@@ -28,6 +28,8 @@ Bu build hakkında:
 - [ ] "Night Shift'i nerede açarım?" → ekranda doğru yeri gösteren bir halka/çizim çıkar.
 - [ ] Aynı yeni isteği ikinci kez söyle → ikinci sefer çok daha hızlı (öğrenilmiş kısayol, AI yok).
 - [ ] "Remember my favorite color is blue", sonra "what's my favorite color?" → hatırlar.
+- [ ] "Open my browser" → varsayılan tarayıcı açılır (System Settings → Desktop & Dock → Default web browser), adı "Browser" ile biten başka bir uygulama değil.
+- [ ] "Okay, so every time I say work mode, open Notes and put it on the left" → yapar; sonra "work mode" deyince AI olmadan, anında tekrarlar.
 
 ## 4. Safe mode ve sandbox (bu sürümün asıl yeniliği)
 - [ ] "Spotify'ı aç", "Chrome'u sağ ekrana al", "github.com'u aç" → **kart çıkmadan** çalışır.

@@ -99,6 +99,43 @@ class LearningEndToEndTests(Ask):
         self.assertEqual(said, 'Opened it.')
         self.assertEqual(set(brain.skills.skills()), {'open the fixture board site'})   # "study time" was never said: not a trigger
 
+    def test_a_taught_alias_is_saved_even_when_the_model_forgets_its_tag(self):
+        # Oct 25, 2026: "Okay, so now every time when I say open my browser, I meant the browser Dia…" — Haiku opened Dia and said
+        # "From now on…" with no [shortcut] tag; the long spoken lead hid the trigger from the code, so nothing was saved.
+        said, pill, model = self.ask('Okay, so now every time when I say open my browser, I meant the browser Fixture Board. So open that and save this to your memory.',
+                                     'Fixture Board is open. From now on, "open my browser" will mean Fixture Board.', [f'{brain.paths.SHOW} "Fixture Board"'])
+        self.assertTrue(model)
+        self.assertEqual(set(brain.skills.skills()), {'open my browser'})
+        self.assertEqual(pill, 'Learned: Say “open my browser” any time.')
+        self.show.reset_mock()
+        said, pill, model = self.ask('Open my browser.')
+        self.assertFalse(model)
+        self.show.assert_called_once_with('Fixture Board', False)
+
+    def test_my_browser_is_the_default_browser_not_an_app_named_browser(self):
+        # The same day, "Open my browser." opened Tor Browser: "browser" matched the last word of its name.
+        with patch.object(brain.apps, 'installed_apps', return_value=APPS | {'Tor Browser'}), patch.object(brain.apps, 'default_browser', return_value='Safari'):
+            for words in ('Open my browser.', 'open the web browser', 'Can you open my browser'):
+                self.shell.reset_mock()
+                said, pill, model = self.ask(words)
+                self.assertFalse(model, words)
+                self.assertEqual(said, 'Opened Safari.')
+                self.shell.assert_called_once_with(['open', '-a', 'Safari'])
+            self.assertEqual(brain.apps.app_named('tor browser'), 'Tor Browser')   # its own name still opens it
+
+    def test_the_default_browser_comes_from_the_users_link_setting(self):
+        import plistlib
+        prefs = self.root / 'Library/Preferences/com.apple.LaunchServices'; prefs.mkdir(parents=True)
+        handlers = [{'LSHandlerURLScheme': 'mailto', 'LSHandlerRoleAll': 'com.example.mail'}, {'LSHandlerURLScheme': 'https', 'LSHandlerRoleAll': 'com.example.dia'}]
+        names = {'name of application id "com.example.dia"': 'Dia'}
+        with patch.object(brain.paths, 'HOME', str(self.root)), patch.object(brain.macos, 'osa', side_effect=lambda script, *a, **k: names.get(script, '')):
+            self.assertEqual(brain.apps.default_browser(), 'Safari')   # never picked one: macOS uses Safari
+            (prefs / 'com.apple.launchservices.secure.plist').write_bytes(plistlib.dumps({'LSHandlers': handlers}, fmt=plistlib.FMT_BINARY))
+            self.assertEqual(brain.apps.default_browser(), 'Dia')
+            self.assertEqual(brain.apps.app_named('my browser'), 'Dia')
+            (prefs / 'com.apple.launchservices.secure.plist').write_bytes(b'not a plist')
+            self.assertEqual(brain.apps.default_browser(), 'Safari')
+
     def test_named_shortcut_on_the_instant_path_replays_in_front(self):
         said, pill, model = self.ask('When I say browse time, open Safari')
         self.assertFalse(model)

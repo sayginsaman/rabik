@@ -221,6 +221,14 @@ class NightTests(unittest.TestCase):
                 self.assertEqual(brain.instant.fast(request).reply,'Fixture: left.')
                 self.assertIn('quiet time',brain.skills.skills())
         self.assertIsNone(brain.skills.named_shortcut('Do not save when I say quiet time, open fixture'))
+        for request, name in (('Okay, so now every time when I say open my browser, I meant Dia. So open that.', 'open my browser'),
+                              ('Every time I say quiet time, open fixture', 'quiet time'), ('From now on, whenever I say focus, open fixture', 'focus'),
+                              ('Anytime I say "deep work", open fixture', 'deep work')):
+            with self.subTest(request=request):
+                named = brain.skills.named_shortcut(request)
+                self.assertEqual((named[1] or named[2]).strip(), name)
+        for other in ('Open Chrome and every time I say quiet time, open fixture', 'I say quiet time, open fixture', 'Tell her that when I say yes, I mean it'):
+            with self.subTest(other=other): self.assertIsNone(brain.skills.named_shortcut(other))
 
     def test_helper_aliases_and_resource_directory_do_not_leak_into_replay(self):
         command=f'{brain.paths.PLACE} Fixture fullscreen monitor'

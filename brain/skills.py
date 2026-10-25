@@ -9,7 +9,7 @@ import tempfile
 import time
 from brain import apps, environ, hands, macos, memory, paths, policy, prefs, web, windows, wording
 
-__all__ = ['SKILLS', 'INTERNAL_TASK_MARKERS', 'UNSAFE', 'NAMED', 'named_shortcut', 'TRIGGER', 'shortcut_name', 'skills',
+__all__ = ['SKILLS', 'INTERNAL_TASK_MARKERS', 'UNSAFE', 'NAMED', 'SPOKEN_LEAD', 'named_shortcut', 'TRIGGER', 'shortcut_name', 'skills',
            'PLACING', 'LOOKUPS', 'shortcut_commands', 'save_skills', 'learn', 'unlearn', 'app_in', 'like', 'swapped',
            'replay_quit', 'ReplayResult', 'replay', 'outcome', 'workflows', 'replayable', 'remember_workflow']
 
@@ -26,13 +26,20 @@ INTERNAL_TASK_MARKERS = ('\nAlready completed:', '\nRemaining words:')
 UNSAFE = re.compile(r'(^|[;&|(`\s])(rm|rmdir|sudo|dd|diskutil|shutdown|reboot|halt|srm|trash|mv|find|curl|wget)\s|git push|\$\(|`|>|\|\s*(ba|z)?sh\b|\bdelete\b|--draw\b')
 
 
-NAMED = re.compile(r'(?:from now on,? )?when(?:ever)? i say (?:["“\']([^"”\']{2,40})["”\']|([^,:;"“]{2,40}?)\s*(?:[,:;]|\b(?:do|then|can you|please|you)\b))', re.I)   # "When I say work mode, …"
+NAMED = re.compile(r'(?:from now on,? )?(?:(?:every|each|any) ?time(?: that| when)?|when(?:ever)?) i say (?:["“\']([^"”\']{2,40})["”\']|([^,:;"“]{2,40}?)\s*(?:[,:;]|\b(?:do|then|can you|please|you)\b))', re.I)   # "When I say work mode, …"
+
+
+# Words people start a sentence with ("Okay, so now every time I say …"): a lead of only these still teaches a shortcut.
+SPOKEN_LEAD = {'okay', 'ok', 'so', 'now', 'and', 'alright', 'right', 'well', 'hey', 'rabik', 'um', 'uh', 'hmm', 'please', 'also', 'then',
+               'from', 'on', 'no', 'yes', 'yeah', 'wait', 'listen', 'remember', 'that'}
 
 
 def named_shortcut(text):
     match = NAMED.search(text)
     lead = text[:match.start()] if match else ''   # "No, when I say …" re-teaches it; a longer lead is another instruction
-    return match if match and (wording.plain(lead + 'shortcut') == 'shortcut' or len(re.findall(r"[\w']+", lead)) <= 2 and re.search(r'[,.!?]\s*$', lead)) else None
+    words = re.findall(r"[\w']+", lead.lower())
+    return match if match and (wording.plain(lead + 'shortcut') == 'shortcut' or set(words) <= SPOKEN_LEAD
+                               or len(words) <= 2 and re.search(r'[,.!?]\s*$', lead)) else None
 
 
 TRIGGER = r'\s*\[shortcut ([^\]\n]{2,40})\]'   # the model names X of "when I say X, do Y"; never shown
