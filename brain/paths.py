@@ -9,8 +9,9 @@ import shlex
 from pathlib import Path
 
 __all__ = ['HOME', 'DIR', 'ME', 'PLACE', 'LOOK', 'SEARCH', 'READ', 'SHOW', 'REMEMBER', 'FORGET', 'TYPE', 'PLAY', 'QUEUE', 'ABOUT',
-           'SHORTCUT', 'FRONT', 'WATCH', 'PICK', 'SET', 'WEB', 'HISTORY', 'HANDS', 'WINDOW', 'ROUTINE', 'DRAW', 'MEMORY', 'RECENT', 'PREFS',
-           'REPOSITORY', 'APP_VERSION', 'SHOT', 'APP', 'question_path', 'agent_gate_dir', 'request_file']
+           'SHORTCUT', 'FRONT', 'WATCH', 'PICK', 'SET', 'WEB', 'HISTORY', 'HANDS', 'WINDOW', 'ROUTINE', 'DRAW', 'MEMORY',
+           'RECENT', 'PREFS', 'REPOSITORY', 'APP_VERSION', 'SHOT', 'APP', 'question_path', 'agent_gate_dir', 'request_file',
+           'LAST', 'WORKED', 'hands_state']
 
 HOME = os.path.expanduser('~')
 DIR = os.environ.get('RABIK_DIR') or os.path.join(HOME, '.config/rabik')   # RABIK_DIR: tests keep off the user's chat and rules
@@ -46,3 +47,13 @@ def request_file(directory):
     an agent's gate folder, or DIR/answers beside the ask's Allow card (the ask folder itself is in the writable $TMPDIR)."""
     gate = agent_gate_dir(directory)
     return os.path.join(gate, 'request') if gate != directory else question_path(directory)[:-2] + '.request'
+
+
+LAST = os.path.join(DIR, 'last_app')
+
+
+WORKED = os.path.join(DIR, 'worked.json')   # the window the last task worked in (mini screen target)
+
+
+def hands_state():
+    return os.environ.get('RABIK_HANDS_STATE', os.path.join(DIR, 'hands.json'))

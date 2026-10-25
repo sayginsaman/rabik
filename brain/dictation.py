@@ -7,13 +7,11 @@ import re
 import signal
 import sys
 import threading
-import unicodedata
-from functools import lru_cache
-from brain import clients, meeting, memory, prefs, prompts
+from brain import clients, meeting, memory, prefs, prompts, wording
 
-__all__ = ['DICTATE_WORD', 'DICTATE_FILLER', 'DICTATE_DISCOURSE', 'dictate_words', 'DICTATE_MERGE', 'dictate_sound',
-           'dictate_distance', 'dictate_sounds', 'dictate_hints', 'dictate_spellings', 'dictate_request', 'dictate_fallback',
-           'dictate_chunks', 'dictate_result', 'dictate_cleanup', 'dictate_warmed', 'dictate_cleanup_wait']
+__all__ = ['DICTATE_WORD', 'DICTATE_FILLER', 'DICTATE_DISCOURSE', 'dictate_words', 'dictate_distance', 'dictate_sounds',
+           'dictate_hints', 'dictate_spellings', 'dictate_request', 'dictate_fallback', 'dictate_chunks', 'dictate_result',
+           'dictate_cleanup', 'dictate_warmed', 'dictate_cleanup_wait']
 
 
 DICTATE_WORD = re.compile(r"[\w]+(?:['’.-][\w]+)*", re.UNICODE)
@@ -30,23 +28,6 @@ def dictate_words():
     return [w for w in words if isinstance(w, str) and 0 < len(w) <= 80 and not any(ord(c) < 32 for c in w)][:500] if isinstance(words, list) else []
 
 
-DICTATE_MERGE = str.maketrans('dbfvngcqzx', 'tpppmkkkss')
-
-
-@lru_cache(maxsize=4096)
-def dictate_sound(text):
-    """How a word sounds, roughly (same rule as DictationData.sound): "Saarth", "Sarda", "sort" → "srt"."""
-    s = ''.join(c for c in unicodedata.normalize('NFKD', text.lower()) if c.isalpha())
-    for a, b in (('ph', 'f'), ('th', 't'), ('ck', 'k'), ('sh', 's'), ('qu', 'k')):
-        s = s.replace(a, b)
-    out = ''
-    for i, c in enumerate(s):
-        k = ('a' if i == 0 else '') if c in 'aeiouyhw' else c.translate(DICTATE_MERGE)
-        if k and not out.endswith(k):
-            out += k
-    return out
-
-
 def dictate_distance(a, b):
     row = list(range(len(b) + 1))
     for i, c in enumerate(a, 1):
@@ -58,7 +39,7 @@ def dictate_distance(a, b):
 
 
 def dictate_sounds(a, b):
-    x, y = dictate_sound(a), dictate_sound(b)
+    x, y = wording.dictate_sound(a), wording.dictate_sound(b)
     return len(x) >= 2 and x[:1] == y[:1] and (x == y or min(len(x), len(y)) >= 3 and abs(len(x) - len(y)) <= 1 and dictate_distance(x, y) <= 1)
 
 
@@ -69,7 +50,7 @@ def dictate_hints(text, words):
     heard = DICTATE_WORD.findall(text)
     spans = heard + [f'{a} {b}' for a, b in zip(heard, heard[1:])] + [f'{a} {b} {c}' for a, b, c in zip(heard, heard[1:], heard[2:])]
     present = {s.casefold() for s in spans}
-    sounds = {w: dictate_sound(w) for w in words}
+    sounds = {w: wording.dictate_sound(w) for w in words}
     by_sound = {}   # first sound → words not already said right
     for w in words:
         if w.casefold() not in present and ' ' not in w:
@@ -78,7 +59,7 @@ def dictate_hints(text, words):
     for span in spans:
         if len(hints) >= 20:
             break
-        sound = dictate_sound(span)
+        sound = wording.dictate_sound(span)
         near = (lambda w: sound == sounds[w]) if ' ' in span else (lambda w: len(sound) >= 2 and sound[:1] == sounds[w][:1] and
                 (sound == sounds[w] or min(len(sound), len(sounds[w])) >= 3 and abs(len(sound) - len(sounds[w])) <= 1 and
                  dictate_distance(sound, sounds[w]) <= 1))   # several words: only an exact sound or a learned fix

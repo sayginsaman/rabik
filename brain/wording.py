@@ -1,8 +1,11 @@
-"""Plain-text matching for spoken requests: normalizing, stop and filler words, "this/that", failure replies."""
+"""Plain-text matching for spoken requests: normalizing, stop and filler words, "this/that", failure replies, and how a
+word sounds (dictate_sound: misheard app names, the user's spellings)."""
 import re
+import unicodedata
+from functools import lru_cache
 
 __all__ = ['dashes', 'plain', 'STOP', 'FILLER', 'gist', '_words', 'DEICTIC', 'MORE', 'FAILED', 'failed_action_reply', 'NUMS',
-           'norm']
+           'norm', 'DICTATE_MERGE', 'dictate_sound']
 
 
 def _words(value):
@@ -51,3 +54,20 @@ def gist(text):
 
 
 STOP = set('a an the to of in on and or for my me i you it is be do can could would please with at this that what how'.split())
+
+
+DICTATE_MERGE = str.maketrans('dbfvngcqzx', 'tpppmkkkss')
+
+
+@lru_cache(maxsize=4096)
+def dictate_sound(text):
+    """How a word sounds, roughly (same rule as DictationData.sound): "Saarth", "Sarda", "sort" → "srt"."""
+    s = ''.join(c for c in unicodedata.normalize('NFKD', text.lower()) if c.isalpha())
+    for a, b in (('ph', 'f'), ('th', 't'), ('ck', 'k'), ('sh', 's'), ('qu', 'k')):
+        s = s.replace(a, b)
+    out = ''
+    for i, c in enumerate(s):
+        k = ('a' if i == 0 else '') if c in 'aeiouyhw' else c.translate(DICTATE_MERGE)
+        if k and not out.endswith(k):
+            out += k
+    return out

@@ -13,6 +13,7 @@ import rabik
 import brain.paths
 import brain.prefs
 import brain.prompts
+import brain.apps
 import brain.turn
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,14 +76,34 @@ class BrainTests(unittest.TestCase):
                   for n in ast.walk(node) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store) and n.id in rabik._OWNERS]
         self.assertEqual(stores, [])
 
+    def test_rabik_py_is_only_the_entry_script(self):
+        # Its code is the facade, the hooks and the __main__ block; anything else belongs to a brain module.
+        tree = ast.parse((ROOT / 'rabik.py').read_text())
+        self.assertEqual([n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))], ['_Facade'])
+
+    def test_rebound_globals_are_read_live_through_the_facade(self):
+        # A `global X` that its module rebinds would go stale as a copy here: the facade reads and writes it in its owner.
+        declared = {name: path.stem for path in MODULES for node in ast.walk(ast.parse(path.read_text()))
+                    if isinstance(node, ast.Global) for name in node.names}
+        self.assertEqual({name: module.__name__.split('.')[-1] for name, module in rabik._LIVE.items()}, declared)
+        for name, module in rabik._LIVE.items():
+            self.assertNotIn(name, module.__all__)
+            self.assertNotIn(name, vars(rabik))
+        before = brain.apps._APPS_CACHE
+        with patch.object(rabik, '_APPS_CACHE', (0, {'Fixture'})):   # what test_universal does
+            self.assertEqual(brain.apps._APPS_CACHE, (0, {'Fixture'}))
+            self.assertEqual(rabik._APPS_CACHE, (0, {'Fixture'}))
+        self.assertIs(brain.apps._APPS_CACHE, before)
+        self.assertFalse(hasattr(rabik, 'no_such_name'))
+
     def test_a_cancel_lives_in_turn_and_reaches_rabik(self):
-        # STOPPING is rebound when an ask is cancelled: a copy on the facade would go stale, so rabik reads turn.STOPPING.
-        self.assertNotIn('STOPPING', vars(rabik))
+        # STOPPING is rebound when an ask is cancelled: rabik reads turn.STOPPING, and so does every brain module.
         with patch.object(brain.turn, 'STOPPING', True), self.assertRaises(InterruptedError):
+            self.assertTrue(rabik.STOPPING)
             rabik.hands_call(['state'])
 
     def test_log_turn_still_falls_back_to_the_last_replay(self):
-        # replay stays in rabik.py for now; turn reads its steps through the hook rabik sets
+        # turn sits below skills: it reads the last replay's steps through the hook rabik.py sets
         with patch.object(rabik, 'TURN', {}), patch.object(rabik.replay, 'ran', ['open -a Notes'], create=True), \
                 patch.object(rabik, 'append_log') as log:
             rabik.log_turn('open notes', 'Done.', time.time())

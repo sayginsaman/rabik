@@ -475,9 +475,10 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
         self.assertEqual(runs.read_text(), 'x\n')   # cached by (path, mtime): --help ran once
 
     def test_main_never_waits_for_background_tool_help(self):
-        source = Path(rabik.ME).read_text()
-        critical = source[source.index('help_ = tool_help(task, cached_only=True)'):source.index('reply, cost, steps = run(', source.index('help_ = tool_help(task, cached_only=True)'))]
-        self.assertIn('threading.Thread(target=tool_help', critical)
+        source = (Path(rabik.ME).parent / 'brain/cli.py').read_text()   # main()
+        start = source.index('help_ = toolhelp.tool_help(task, cached_only=True)')
+        critical = source[start:source.index('reply, cost, steps = ask.run(', start)]
+        self.assertIn('threading.Thread(target=toolhelp.tool_help', critical)
         self.assertNotIn('helping.join', critical)
 
     def test_miss_and_learned_tips(self):

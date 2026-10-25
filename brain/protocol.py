@@ -3,10 +3,14 @@
   · note   ▸ step   ✓ answer   ! error/setup/feedback/improve   … streamed answer so far   i tip
   ? Allow card (tab-separated)   ◇ choices card   ⤴ hand-off   ⇢ move-to-agent control   ▣ work window
   @ x y pointer ring   ✎ drawing or memory receipt   ↺ replace/insert text   ⚙ key value   ▤ show an agent's card"""
+import json
 import os
 import sys
+import tempfile
+import time
+from brain import paths
 
-__all__ = ['say']
+__all__ = ['say', 'emit']
 
 on_stdout_closed = lambda: None   # rabik.py: stop this ask's workers once nobody reads its output
 
@@ -24,3 +28,19 @@ def say(tag, text):   # one line per message; an answer's own line breaks (lists
     except BrokenPipeError:
         sys.stdout = open(os.devnull, 'w')
         on_stdout_closed()
+
+
+def emit(lines, directory=None):
+    for line in lines[:1]:
+        if line.startswith('▣ '):   # "click into it" next turn means this window, not whatever is in front
+            try:
+                with open(paths.WORKED, 'w') as f: json.dump({k: json.loads(line[2:]).get(k) for k in ('app', 'window')}, f)
+            except (OSError, ValueError): pass
+    ask = directory or os.environ.get('RABIK_ASK')
+    if ask and os.environ.get('RABIK_RELAY_OWNER') != str(os.getpid()):
+        # Atomic, ordered events: the relay sees the window before its point, even for a fast chain.
+        with tempfile.NamedTemporaryFile(mode='w', dir=ask, prefix='.hands-', delete=False) as f:
+            f.write('\n'.join(lines)); name = f.name
+        os.replace(name, os.path.join(ask, f'hands-{time.time_ns()}'))
+    else:
+        for line in lines: say(line[0], line[2:])

@@ -393,40 +393,45 @@ Asıl boşluk macOS köprüsü. osascript, AX, WebKit ve Chrome her yerde mock'l
 
 > Rename sonrası isimlerle (`rabik.py`). Giriş dosyasının adı ve yolu dış sözleşme olduğu için (§2) **aynı kalır**. Paket aynı klasörde ama farklı bir isimle durur: `rabik/` adında bir paket `import rabik`'te script'in önüne geçer.
 
+Faz 4'ten sonra yapı bu (öneri hâline göre farklar: `show` ile `web()` birbirini çağırdığı için ikisi `web.py`'de; `context` ve
+`handoff` modülleri `main()`/`run()` içindeki aynı adlı yerellerle çakışmasın diye `situation` ve `handoffs`; `routine`, `watcher`,
+`support` adları da dışa açılan fonksiyonlarla çakışmasın diye seçildi):
+
 ```
-rabik.py            ← CLI girişi + uyumluluk cephesi (facade); ~60 satır
+rabik.py            ← giriş script'i + uyumluluk cephesi (~170 satır, çoğu --selftest)
                        • sys.pycache_prefix = ~/Library/Caches/Rabik (imzalı .app'e .pyc yazılmaz)
                        • ME = bu dosyanın yolu (helper komutları, gate, kaydedilmiş kısayollar buna bağlı)
-                       • eski düz isimleri sahibi olan modüle yönlendirir (testler için)
-brain/
-  paths.py          HOME, DIR, ME, APP; DIR'den türetilen yollar fonksiyon olarak (memory_path() …)
-  prefs.py          pref/save_pref (mtime önbellekli), routing_mode, main/work model, server, models
-  storage.py        atomic_write_json/text, append_jsonl, read_jsonl (rotation), file_lock
-  protocol.py       stdout etiketleri (· ▸ ✓ ! ? ◇ ⤴ ⇢ ▣ @ ✎ ↺ ⚙ ▤ i …) + say/emit; ortam değişkeni adları
-  prompts.py        SYSTEM, ASK_FIRST, AGENT_SYSTEM, MEETING, DICTATE, DRAW_HELP, CALENDAR_HELP + compose()
-  telemetry.py      posthog, clean, report, exception hook'ları
-  turn.py           Turn sınıfı (TURN dict'i yerine; kilitli), checkpoint, log_turn
-  policy.py         risk tabloları, risky(), action_kind(), gate(), URL izin listesi  ← tek güvenlik kaynağı
-  interaction.py    ask_user, relay, pick, set_switch, seçim kartı
-  macos.py          osa (argv ile), screens (önbellekli), front, odak koruma, uygulama adları
-  windows.py        place, place_many, move_target
-  apps.py           show, background_tab, quit_app
-  hands.py          hands_call/action/map, menü çubuğu
-  screen.py         look, window_text, window_summary
-  web.py            get, search, browser_adapter, web(), page_ready
-  skills.py         learned shortcuts, shortcut_commands, learn, replay, workflows
-  instant.py        fast() — AI'siz hızlı yol
+                       • her modülün __all__'ını düz isim olarak açar, yazmaları sahibine iletir; _LIVE global'lerini canlı okur
+                       • PATH ve alt katmanların yukarı çağırdığı iki kanca (protocol → clients.stop_workers, turn → skills.replay)
+brain/              (bağımlılıklar önce)
+  paths.py          HOME, DIR, ME, APP, helper komutları; DIR'den türetilen yollar (request_file, hands_state, LAST, WORKED)
+  wording.py        konuşulan isteği eşleme: plain, norm, gist, STOP/FILLER, DEICTIC, dictate_sound (fonetik anahtar)
+  protocol.py       stdout etiketleri (· ▸ ✓ ! ? ◇ ⤴ ⇢ ▣ @ ✎ ↺ ⚙ ▤ i …) + say, emit
+  labels.py         kutudaki adım etiketleri (label)
+  storage.py · prefs.py · telemetry.py · prompts.py · turn.py
+  toolhelp.py       kullanıcının kendi CLI'larının yardımı (yol + mtime ile önbellekli)
   memory.py         profil (About you), kurallar, recent, history
-  spotify.py · routine.py · watcher.py · calendar.py · drawing.py · meeting.py · dictation.py · support.py (geri bildirim)
-  wording.py        konuşulan isteği eşleme: plain, norm, gist, STOP/FILLER, DEICTIC
-  clients.py        claude/devin/pi süreç yönetimi, plan(), tek bir süreç yaşam döngüsü sahibi
-  handoff.py        direktif ayrıştırma, MainMove, isimli ajanlar
+  situation.py      isteğin kelimeler dışındaki bağlamı: seçim, işaret, çizim, devam edilen tur
+  messages.py       modele giden istek blokları ve akıştan gelen içerik blokları
+  macos.py          osa, screens, front, odak koruma, iş penceresi önizlemesi (▣)
+  apps.py           kurulu/çalışan uygulamalar, adlar, quit_app, app_up
+  interaction.py    ask_user, relay, pick, set_switch, need, seçim kartı
+  windows.py        place, place_many, move_target
+  policy.py         risk tabloları, risky(), gate(), action_kind(), ajan URL izin listesi  ← tek güvenlik kaynağı
+  hands.py          hands_call/action/map, menü çubuğu
+  web.py            get, search, show + arka plan sekmeleri, web(), page_ready
+  screen.py · drawing.py · spotify.py · calendar.py · routine.py · watcher.py · support.py · meeting.py · dictation.py
+  skills.py         öğrenilmiş kısayollar, replay, workflow'lar
+  clients.py        plan(), start_claude, Devin/Pi ayarları, stop_claude, stop_workers
+  handoffs.py       direktifler, isimli ajanlar, MainMove
   agents.py         ajan yardımcıları + Agents servisi
-  ask.py            run() → RunResult; istek orkestrasyonu (main()'in ikinci yarısı)
-  cli.py            bayrak → handler tablosu (54 dallı if zinciri yerine)
+  ask.py            run(), run_devin, run_pi
+  tips.py · instant.py (fast)
+  cli.py            main(): bayrak dağıtımı + istek orkestrasyonu
 ```
 
-**Bağımlılık yönü** (döngü olmamalı): `paths → prefs/storage/protocol → macos/telemetry → policy/hands/web → skills/instant → clients/handoff → ask/agents → cli`.
+**Bağımlılık yönü:** döngü yok; `tests/test_brain.py` her modülün `from brain import …` satırlarından grafiği kurup döngüyü
+reddediyor. Gerçek sıra `rabik.py`'deki `_MODULES` listesinde.
 
 **Kurallar:**
 
@@ -434,6 +439,8 @@ brain/
 2. Standart kütüphane modül olarak kullanılır (`subprocess.run(...)`). Testlerdeki 321 stdlib patch'i buna dayanıyor.
 3. Fonksiyon attribute'u ile dönüş yok: `RunResult`, `FastResult` ve `ReplayResult` dataclass'ları kullanılır.
 4. `os.environ` yalnızca süreç sınırında okunur ya da yazılır. Süreç içinde `AskContext` nesnesi taşınır.
+
+1 ve 2 Faz 2–4'te uygulandı; 3 ve 4 Faz 5'in işi.
 
 ### 7.2 Swift
 
@@ -485,7 +492,8 @@ Faz 2–5 Python, Faz 6 Swift üzerinde. Aynı dosyalara dokunmadıkları için 
 | 1 — Acil düzeltmeler | ✅ (SW-SEC1 hariç) | **P1:** yönlendirme kontrolü sessiz helper'lardan önce; yorumlayıcılar (python/perl/node/sh -c/eval…), dosya değiştiren programlar (cp, truncate, sed -i, wget…), yıkıcı git ve sistem komutları program konumunda yakalanıyor — `$(…)`, backtick, `find -exec`, `xargs`, `env` içinde de; `tests/test_gate.py` 23 atlatma + 12 normal komut. **P2:** Gumroad kodu silindi. **SW-S1:** dört çağrı önce okuyup sonra bekliyor; kaynak testi eski dört satırı yakalıyor. **SW-S2:** `Prefs.d` `NSLock` arkasında; ThreadSanitizer altında eski kod çöktü (SEGV), yeni kod temiz. |
 | 2 — Python iskeleti | ✅ | `brain/` paketi: `paths`, `storage`, `prefs`, `protocol`, `telemetry`, `prompts` (~580 satır `rabik.py`'den taşındı, kod değişmeden). `rabik.py` giriş script'i ve uyumluluk cephesi olarak kaldı: taşınan isimleri yeniden dışa açıyor ve `patch.object(rabik, …)` yazmalarını sahibi olan modüle iletiyor. Eşdeğerlik ölçüldü: 115 sabit ve 321 fonksiyon imzası aynı, `system_prompt()` 2.048 ayar kombinasyonunda birebir aynı. `ME` hâlâ `rabik.py`; `python3 rabik.py` ile başlatılsa bile `brain/` bytecode'u imzalı paketin içine yazılmıyor. `build.sh`, `flake.nix` ve testler `brain/`'i de kopyalıyor. |
 | 3 — Python alanları | ✅ (6/11) | `memory`, `routine`, `watcher`, `support` (geri bildirim), `meeting`, `dictation` ve dayandıkları temel katman `wording` (metin eşleme), `macos` (`osa`), `clients` (`stop_claude`), `turn` (TURN, checkpoint, log_turn) `brain/`'e taşındı; istek dosyası yolları (`request_file` …) `paths`'e eklendi (~1.300 satır, kod değişmeden). Modül adları `routines`/`watch`/`feedback` fonksiyonlarıyla çakışmasın diye §7'dekinden farklı. `STOPPING` iptalde yeniden bağlandığı için cephede kopyası yok: `turn.STOPPING` okunuyor. `log_turn` skills'teki `replay.ran`'a `turn.replayed` kancasıyla ulaşıyor. Taşıma betiği kapsam farkında (symtable): `text`/`turn` adlı yereller dokunulmadan kaldı. Eşdeğerlik ölçüldü: 444 üst düzey tanım (Faz 2 modülleri dahil) yeniden yazımlar geri alınınca AST olarak birebir aynı; cephede 446 isim aynı tür, imza ve değerde (yalnızca `STOPPING` çıktı); hiçbir fonksiyon tanımsız bir global okumuyor. Bulunan tek davranış farkı düzeltildi: `--selftest` `ME_FILE`'ı modül seviyesinde yeniden bağlıyordu, bu artık `brain.memory`'ye ulaşmadığı için selftest gerçek profile yazacaktı. Şimdi `memory.ME_FILE`, ve `tests/test_brain.py` böyle bir modül seviyesi atamayı yakalıyor (Faz 4'te `SKILLS`, `screens`, `show` taşınınca da). Kaynak metne bakan iki test (`test_onboarding_copy`, Gumroad kontrolü) artık `brain/`'i de okuyor. **Ertelenenler:** `calendar`, `drawing`, `spotify`, `skills`, `instant` çekirdeğe (`ask_user`, `need`, `wait_commit`, `hands_*`, `screens`, `emit`, `risky`, `show`, `place_*` …) bağlı; `brain` `rabik`'i import edemediği için bu katmanlarla birlikte Faz 4'te taşınacaklar. |
+| 4 — Python çekirdeği | ✅ | `rabik.py`'de kalan ~5.100 satır 21 yeni modüle taşındı (apps, situation, interaction, labels, policy, hands, windows, web, drawing, screen, spotify, skills, messages, calendar, toolhelp, handoffs, agents, ask, tips, instant, cli); `paths`, `protocol`, `macos`, `clients` büyüdü. Faz 3'ün ertelediği beş alan da bunlarla taşındı. `rabik.py` artık yalnızca giriş script'i: cephe, `PATH`, iki kanca ve `__main__` (selftest), ~170 satır. Fonksiyon düzeyinde yalnızca üç küçük karşılıklı özyineleme vardı (`run`↔`run_devin`/`run_pi`, `show`↔`web()`, `hands`↔`menu_bar_click`), her biri tek modülde. Yanlış katmandaki birkaç küçük yardımcı yerine alındı (`WORKED`/`LAST`/`hands_state` → paths, `emit` → protocol, `managed_agent` ve ajan URL yardımcıları → policy, `preview_app` → macos, `need` → interaction, `dictate_sound` → wording) ve modül grafiği döngüsüz. Cephe her modülün `__all__`'ını programla açıyor; `STOPPING` ve `_APPS_CACHE` kopyalanmıyor, `_LIVE` ile sahibinde okunup yazılıyor (`patch.object(rabik, '_APPS_CACHE', …)` dahil). Taşıma betiği kapsamı symtable ile tam izliyor (aynı satırdaki lambdalar, inline comprehension'lar); bir yerelin modül adını gölgelediği 4 yerde `brain.paths.HOME` gibi paket yolu kullanılıyor. Selftest'in sahteleri (`installed_apps`, `SKILLS`, `screens`, `show`, `ME_FILE`) sahibine yazıyor. **Eşdeğerlik:** Faz 3'e göre 445 üst düzey tanım AST olarak aynı; cephede 446 isim aynı tür, imza ve değerde (`STOPPING` yine okunabilir); tanımsız global yok. **Testler:** Python 3.14 ve Apple 3.9 (boşluklu yol) tam paket geçti; selftest geçti ve profile yazmıyor; `--gate` başlangıcı 66 → 68 ms. İmzalı release build tüm modülleri taşıyor; paketteki helper çalışıyor, pakete bytecode yazmıyor, imza geçerli kalıyor. |
 
 Açık kalanlar: SW-SEC1 (WebView CSP/navigasyon politikası) ve ana istekleri sandbox'ta çalıştırma kararı (P1'in kalıcı çözümü); ortak `runJSON` yardımcısı Faz 6'da.
 
-**Faz 3+ için kurallar (brain/):** modüller `rabik`'i import etmez; birbirini modül adıyla çağırır (`prefs.pref()`), `from brain.x import isim` ile değil (yalnızca import anında hesaplanan sabitler istisna: `prompts`'taki helper komutları); her modül sahip olduğu isimleri `__all__`'da listeler, cephe bu listeden yönlendirir. Çalışma anında yeniden bağlanan global'ler (`STOPPING`) `__all__`'a girmez ve modül üzerinden okunur. `rabik.py`'nin kendi modül seviyesi kodu taşınmış bir ismi yeniden bağlamaz; sahibine yazar (`memory.ME_FILE = …`). `brain/` içinde import döngüsü yoktur. Bu kuralları `tests/test_brain.py` denetler.
+**brain/ kuralları:** modüller `rabik`'i import etmez; birbirini modül adıyla çağırır (`prefs.pref()`), `from brain.x import isim` ile değil (yalnızca import anında hesaplanan sabitler istisna: `prompts`'taki helper komutları); her modül sahip olduğu isimleri `__all__`'da listeler, cephe bu listeden yönlendirir. Çalışma anında yeniden bağlanan global'ler (`STOPPING`, `_APPS_CACHE`) `__all__`'a girmez; cephe onları `_LIVE` üzerinden sahibinde okur ve yazar. Bir yerel değişken bir modülün adını gölgeliyorsa o fonksiyon modüle paket yoluyla ulaşır (`brain.paths.HOME`). `rabik.py`'nin kendi kodu (selftest) taşınmış bir ismi modül seviyesinde yeniden bağlamaz; sahibine yazar (`brain.skills.SKILLS = …`). `rabik.py`'de fonksiyon ya da sınıf yoktur (yalnızca `_Facade`). `brain/` içinde import döngüsü yoktur. Bu kuralları `tests/test_brain.py` denetler.
