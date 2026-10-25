@@ -123,6 +123,17 @@ class LearningEndToEndTests(Ask):
                 self.shell.assert_called_once_with(['open', '-a', 'Safari'])
             self.assertEqual(brain.apps.app_named('tor browser'), 'Tor Browser')   # its own name still opens it
 
+    def test_a_half_said_app_name_waits_for_the_final_words(self):
+        # Oct 25: the live words "Okay, now open my brows" opened Tor Browser ("brows" is near its last word); "browser" came a moment later.
+        with patch.object(brain.apps, 'installed_apps', return_value=APPS | {'Tor Browser'}), patch.object(brain.apps, 'default_browser', return_value='Safari'):
+            with patch.dict(os.environ, {'RABIK_LIVE': '1'}):
+                self.assertIsNone(brain.instant.fast('Okay, now open my brows').reply)
+                self.assertEqual(brain.instant.fast('Okay, now open Obsidian').reply, 'Opened Obsidian.')   # an exact name still acts while talking
+            self.shell.assert_called_once_with(['open', '-a', 'Obsidian'])
+            self.assertIsNone(brain.apps.app_heard('brows'))   # "browser" alone is no app's name, in the final words too
+            self.assertEqual(brain.apps.app_heard('tor brows'), 'Tor Browser')
+            self.assertEqual(brain.instant.fast('Okay, now open my browser').reply, 'Opened Safari.')
+
     def test_the_default_browser_comes_from_the_users_link_setting(self):
         import plistlib
         prefs = self.root / 'Library/Preferences/com.apple.LaunchServices'; prefs.mkdir(parents=True)

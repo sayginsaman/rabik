@@ -142,7 +142,8 @@ def _fast(text, result):
                 return None
             result.cmds = ['open ' + shlex.quote(site if site.startswith(('https://', 'http://')) else 'https://' + site)]
             return f'Opened {target}.'
-        app = apps.app_named(target) or apps.app_heard(target)
+        # While the user still talks the last word may be half said ("open my brows"): only an exact name acts; a near miss waits for the final words
+        app = apps.app_named(target) or (None if environ.live() else apps.app_heard(target))
         if not app:
             return None
         if prefs.pref('openOn', 'here') == 'other':

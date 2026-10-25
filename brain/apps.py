@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from brain import macos, paths, wording
 
-__all__ = ['installed_apps', 'app_words', 'default_browser', 'app_named', 'app_heard', 'proc_of', 'app_id', 'app_running', 'quit_app', 'app_up']
+__all__ = ['installed_apps', 'app_words', 'BROWSER_WORDS', 'default_browser', 'app_named', 'app_heard', 'proc_of', 'app_id', 'app_running', 'quit_app', 'app_up']
 
 
 _APPS_CACHE = (0.0, set())
@@ -41,6 +41,9 @@ def app_words(words):
     return re.sub(r'\s+(app|application)$', '', words.lower().strip(' .!?').removeprefix('the ').removeprefix('my '))
 
 
+BROWSER_WORDS = ('browser', 'web browser', 'internet browser')   # "my browser": the default browser, never an app named "… Browser"
+
+
 def default_browser():
     """The app macOS opens web links with (System Settings → Desktop & Dock → Default web browser); Safari if none was picked."""
     try:
@@ -56,7 +59,7 @@ def default_browser():
 def app_named(words):
     """Spoken name -> installed app name, or None. Whole-name matches only, so "chrome history" is not Chrome."""
     w = app_words(words)
-    if w in ('browser', 'web browser', 'internet browser'): return default_browser()   # "my browser" is the one links open in, never Tor Browser by its last word
+    if w in BROWSER_WORDS: return default_browser()
     key = lambda n: re.sub(r'[^a-z0-9]', '', n.lower())   # "trading view" = "TradingView"
     apps = installed_apps()
     exact = [a for a in apps if key(a) == key(w)]
@@ -71,8 +74,8 @@ def app_heard(words):
     words = app_words(words)
     w = re.sub(r'[^a-z0-9]', '', words)
     if len(w) < 3 or len(words.split()) > 3: return None
-    def score(app):   # its whole name or last word ("Google Chrome" -> chrome); "gmail" never opens Mail, "spotify web" is more than Spotify
-        names = {re.sub(r'[^a-z0-9]', '', n.lower()) for n in (app, app.split()[-1])}
+    def score(app):   # its whole name or last word ("Google Chrome" -> chrome, never "Tor Browser" -> browser); "gmail" never opens Mail
+        names = {re.sub(r'[^a-z0-9]', '', n.lower()) for n in (app, app.split()[-1]) if n == app or n.lower() not in BROWSER_WORDS}
         return max((difflib.SequenceMatcher(None, w, n).ratio() for n in names if n and n not in w and wording.dictate_sound(n)[:1] == wording.dictate_sound(w)[:1]), default=0)
     ranked = sorted(((score(a), a) for a in installed_apps()), reverse=True)
     return ranked[0][1] if ranked and ranked[0][0] >= .75 and (len(ranked) < 2 or ranked[1][0] < ranked[0][0]) else None
