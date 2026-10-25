@@ -87,6 +87,8 @@
   p.lede { color: var(--fg2); margin: 0 0 22px; line-height: 1.45; }
   h3 { font: 700 13px/16px system-ui; color: var(--fg); margin: 26px 2px 8px; }   /* macOS Headline */
 
+  .goaladd { display:flex; gap:8px; margin-top:8px; } #goalnew { flex:1; height:28px; box-sizing:border-box; background:var(--ctl); color:var(--fg); border:0; border-radius:7px; padding:0 10px; font:13px system-ui; box-shadow:inset 0 0 0 .5px var(--line); outline:none; -webkit-user-select:text; }
+  #goalnew:focus { box-shadow:inset 0 0 0 .5px var(--line),0 0 0 3px rgba(10,132,255,.35); }
   .chip { font: 500 11px -apple-system, system-ui; color: var(--fg); background: var(--ctl); border: 0; border-radius: 9px; padding: 2px 8px; margin: 2px 4px 0 0; box-shadow: inset 0 0 0 .5px var(--line); cursor: pointer; }
   #recapat { font: 13px -apple-system, system-ui; color: var(--fg); background: var(--ctl); border: 0; border-radius: 6px; padding: 3px 6px; box-shadow: inset 0 0 0 .5px var(--line), 0 1px 1px rgba(0,0,0,.04); }
   .remindbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin: 8px 2px 0; } .remindbar span { color: var(--fg3); font-size: 11.5px; }
@@ -363,6 +365,10 @@
       <div class="row"><div class="t"><b>Time</b><span>A notification, once a day. Say “summarize my day” any time.</span></div><input type="time" id="recapat" step="300" aria-label="Recap time"></div>
       <div class="row"><div class="t"><b>Reminders list</b><span id="remindershint">Where added to-dos go.</span></div><select id="reminderslist" aria-label="Reminders list"></select></div>
     </div>
+    <h3>Goals</h3>
+    <div class="group" id="goals"></div>
+    <div class="goaladd"><input id="goalnew" type="text" maxlength="160" placeholder="Add a goal, like “ship the beta by Friday”" aria-label="New goal" autocomplete="off"><button class="btn" id="goaladd">Add</button></div>
+    <p class="lede" style="margin:6px 2px 0;font-size:11.5px">The daily recap says when your day moves one forward. Or say “my goal is…”.</p>
     <h3>Voice</h3>
     <div class="group">
       <div class="row"><div class="t"><b>Microphone</b></div><select data-k="microphone"></select></div>
@@ -643,6 +649,7 @@
     $(s).classList.add('on'); document.querySelector('main').scrollTop = 0;
     if (s === 'meetings') { meetingBack(false); requestMeetings(); }
     if (s === 'people') { personBack(false); post({ do: 'people' }); }
+    if (s === 'general') post({ do: 'goals', args: ['list'] });
     if (s === 'feedback') { $('feedbackinclude').checked=false; feedbackPreview(); }
     if (s === 'apps') post({ do: 'apps' });   // fresh list and statuses each visit
     if (s === 'brain') probe();
@@ -694,6 +701,22 @@
   $('meetinglanguage').onchange = e => set('meetingLanguage', e.target.value);
   $('voice').onchange = e => set('voice', e.target.value);
   $('activityadd').onclick = () => post({do: 'activityExcludeAdd'});
+  // Goals (brain/goals.py): tick one done, × removes it; open ones first
+  const goalAdd = () => { const t = $('goalnew').value.trim(); if (!t) return; post({do: 'goals', args: ['add', t]}); $('goalnew').value = ''; };
+  $('goaladd').onclick = goalAdd; $('goalnew').onkeydown = e => { if (e.key === 'Enter') goalAdd(); };
+  post({do: 'goals', args: ['list']});   // General is the first page
+  const paintGoals = list => {
+    const box = $('goals'); box.replaceChildren();
+    if (!list.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No goals yet.'; box.append(e); return; }
+    for (const g of [...list].sort((a, b) => !!a.done - !!b.done)) {
+      const row = document.createElement('label'); row.className = 'row todo'; const tick = document.createElement('input'); tick.type = 'checkbox'; tick.checked = !!g.done;
+      tick.onchange = () => post({do: 'goals', args: [tick.checked ? 'done' : 'undo', g.id]});
+      const t = document.createElement('div'); t.className = 't'; const b = document.createElement('b'); b.textContent = g.text; t.append(b);
+      const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'Remove goal: ' + g.text);
+      x.onclick = e => { e.preventDefault(); post({do: 'goals', args: ['drop', g.id]}); };
+      row.append(tick, t, x); if (g.done) row.style.opacity = .6; box.append(row);
+    }
+  };
   $('activityclear').onclick = () => post({do: 'activityClear'});
   const paintActivity = () => {   // Don't record: each app a chip whose × takes it off the list
     const list = Array.isArray(P.activityExclude) ? P.activityExclude : [], box = $('activityexclude');
@@ -1079,6 +1102,7 @@
     reveal(item) { want = item; reveal(); },
     showMeeting(id) { expectedMeeting = id; post({do: 'meetingOpen', id}); },   // a source chip under an answer
     showPerson(id) { wantedPerson = id; post({ do: 'people' }); },
+    goals(r) { if (r.note && !/^Goal added|^Done|^Back/.test(r.note)) showNotice(r.note); if (r.goals) paintGoals(r.goals); },
     people(r) { if (r.error) { $('peoplecount').textContent = r.error; return; } savedPeople = r.people || []; paintPeople();
       if (wantedPerson) { const p = savedPeople.find(x => x.id === wantedPerson); wantedPerson = null; if (p) openPerson(p); } },
     apps(list) {

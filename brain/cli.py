@@ -13,7 +13,7 @@ import threading
 import time
 from pathlib import Path
 from brain import (
-    activity, agents, apps, ask, calendar, clients, dictation, drawing, environ, hands, instant, interaction, macos, meeting, memory,
+    activity, agents, apps, ask, calendar, clients, dictation, drawing, environ, goals, hands, instant, interaction, macos, meeting, memory,
     paths, people, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, sources, spotify, storage, support, telemetry, tips,
     toolhelp, turn, watcher, web, windows, wording)
 
@@ -59,6 +59,9 @@ def main():
         return agents.agents_service()
     if args == ['--feedback']:
         return print(json.dumps(support.feedback(json.load(sys.stdin))))
+    if args[:1] == ['--goals']:
+        try: return print(json.dumps(goals.goals_command(args[1:]), ensure_ascii=False))
+        except ValueError as e: return print(json.dumps({'error': str(e)}))
     if args[:1] == ['--people'] and len(args) > 1:
         found = people.people_command(args[1:])
         return print(json.dumps(found, ensure_ascii=False) if isinstance(found, dict) else found)

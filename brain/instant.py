@@ -6,14 +6,21 @@ import subprocess
 import time
 import urllib.parse
 from pathlib import Path
-from brain import apps, environ, hands, macos, paths, prefs, protocol, recap, skills, spotify, telemetry, tips, web, windows, wording
+from brain import apps, environ, goals, hands, macos, paths, prefs, protocol, recap, skills, spotify, telemetry, tips, web, windows, wording
 
-__all__ = ['FastResult', 'RECAP_ASK', 'fast']
+__all__ = ['FastResult', 'RECAP_ASK', 'GOAL_ADD', 'GOAL_DONE', 'GOAL_LIST', 'fast']
 
 
 # "Summarize my day", "daily recap", "günümü özetle": the day's recap card, made by brain/recap.py, not by the model
 RECAP_ASK = re.compile(r"(?:show (?:me )?)?(?:my |today'?s |the )?(?:daily |day'?s )?recap(?: of (?:my|the|to) ?day)?|(?:summari[sz]e|recap) (?:my|the|to) ?day"
                        r"|what did i do today|g[üu]n[üu]m[üu]n? [öo]zet(?:le|i)|bug[üu]n[üu] [öo]zetle")
+
+
+# Goals (brain/goals.py), said in English or Turkish; a question ("my goal is X, how do I…?") goes to the AI.
+GOAL_ADD = re.compile(r"(?:my (?:new )?goal is(?: to)?|(?:add|set) (?:a |new )?goal(?: to)?:?|new goal:?|hedefim:?|yeni hedef:?)\s+(?P<g>[^?]{3,})", re.I)
+GOAL_DONE = re.compile(r"(?:i (?:finished|completed|reached|hit|met) (?:the |my )?(?P<a>.+?) goal|(?:mark|tick) (?:the |my )?(?P<b>.+?) goal (?:as )?(?:done|complete|finished)"
+                       r"|(?P<c>.+?) hedefini (?:tamamladım|bitirdim))", re.I)
+GOAL_LIST = re.compile(r"what are my goals|(?:show|list) (?:me )?my goals|my goals|hedeflerim(?: neler)?|hedeflerimi göster", re.I)
 
 
 class FastResult:
@@ -54,6 +61,13 @@ def _fast(text, result):
             return reply
         return None
     t = wording.plain(text)
+    goal = GOAL_ADD.fullmatch(text.strip(' .!')) or GOAL_DONE.fullmatch(text.strip(' .!')) or GOAL_LIST.fullmatch(t)
+    if goal:
+        if environ.live(): return None
+        if goal.re is GOAL_ADD: return goals.goal_add(goal['g'])
+        if goal.re is GOAL_DONE: return goals.goal_done(goal['a'] or goal['b'] or goal['c'])
+        open_ = goals.goals_open()
+        return ('Your goals: ' + '; '.join(g['text'] for g in open_) + '.') if open_ else 'No goals yet. Say “my goal is …”.'
     if RECAP_ASK.fullmatch(t):
         if environ.live(): return None
         made = recap.recap_make()

@@ -280,6 +280,12 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         case "set":
             guard let k = b["k"] as? String, let v = b["v"] else { return }
             apply(k, v)
+        case "goals":   // Settings → General → Goals: list, add, done, undo, drop (brain/goals.py)
+            guard let args = b["args"] as? [String], let first = args.first, ["list", "add", "done", "undo", "drop"].contains(first), args.count <= 2 else { return }
+            DispatchQueue.global().async { [weak self] in
+                let p = py(["--goals"] + args), out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
+                self?.send("goals", (try? JSONSerialization.jsonObject(with: runToEnd(p, out))) as? [String: Any] ?? ["error": "Could not save goals."])
+            }
         case "people":   // Settings → People: everyone met in saved meetings or told about, built fresh by brain/people.py
             DispatchQueue.global().async { [weak self] in
                 let p = py(["--people", "list"]), out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice

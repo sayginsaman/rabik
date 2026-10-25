@@ -8,7 +8,7 @@ import re
 import subprocess
 import time
 from datetime import date, datetime, timedelta
-from brain import activity, agents, calendar, meeting, paths, prefs, routine, storage, wording
+from brain import activity, agents, calendar, goals, meeting, paths, prefs, routine, storage, wording
 
 __all__ = ['RECAP_SYSTEM', 'RECAP_DATE_CUE', 'recap_path', 'recap_day', 'recap_tomorrow', 'recap_inputs', 'recap_local',
            'recap_check', 'recap_read', 'recap_make', 'recap_due', 'recap_items', 'recap_remind', 'recap_command']
@@ -18,7 +18,8 @@ RECAP_SYSTEM = ('You write the evening recap of what the user did with Rabik tod
                 'Reply with only a JSON object: {"headline": one line under 90 characters, "highlights": up to 5 short lines on what got done, '
                 '"decisions": decisions made in meetings, "actions": [{"text": one task still to do, "from": the id of the meeting or agent it '
                 'comes from, "due": "YYYY-MM-DD" only when the source states a date, else ""}], "tomorrow": up to 5 of tomorrow\'s events worth '
-                'preparing for}. Use only facts in the data. Actions come only from meeting action items and agent results that need a '
+                'preparing for, "goals": [{"goal": one of the user\'s goals word for word, "note": one short line on what today did toward it}] only for '
+                'goals today clearly moved forward}. Use only facts in the data. Actions come only from meeting action items and agent results that need a '
                 'follow-up. Never invent tasks, people or dates.')
 
 
@@ -69,7 +70,7 @@ def recap_inputs(day):
                          'at': datetime.fromtimestamp(m['started']).strftime('%H:%M'), 'summary': m['summary'][:1200],
                          'actions': [str(a)[:300] for a in m['action_items']][:12]})
     return {'day': day, 'asks': asks[-40:], 'instant': instant, 'agents': done[:10], 'meetings': meetings[:8],
-            'tomorrow': recap_tomorrow(day), 'private': not prefs.pref('meetingSummary', True)}
+            'tomorrow': recap_tomorrow(day), 'private': not prefs.pref('meetingSummary', True), 'goals': [g['text'] for g in goals.goals_open()]}
 
 
 def recap_local(inputs):
@@ -99,8 +100,11 @@ def recap_check(text, inputs):
         try: due = due if due and today <= date.fromisoformat(due) <= today + timedelta(days=366) and RECAP_DATE_CUE.search(sources[item['from']]) else ''
         except ValueError: due = ''
         actions.append({'text': item['text'].strip()[:300], 'from': item['from'], 'due': due})
+    known = {wording.casekey(g): g for g in inputs.get('goals', [])}   # a goal line only for a goal the user has, never a new one
+    moved = [{'goal': known[wording.casekey(g['goal'])], 'note': g['note'].strip()[:160]} for g in (data.get('goals') if isinstance(data.get('goals'), list) else [])
+             if isinstance(g, dict) and isinstance(g.get('goal'), str) and isinstance(g.get('note'), str) and g['note'].strip() and wording.casekey(g['goal']) in known]
     return {'headline': data['headline'].strip()[:120], 'highlights': lines('highlights', 5, 200), 'decisions': lines('decisions', 8, 240),
-            'actions': actions[:20], 'tomorrow': lines('tomorrow', 5, 160)}
+            'actions': actions[:20], 'tomorrow': lines('tomorrow', 5, 160), 'goals': moved[:5]}
 
 
 def recap_read(day):
@@ -121,7 +125,7 @@ def recap_make(day=None, force=False, evening=False):
         inputs = recap_inputs(day)
         if not (inputs['asks'] or inputs['agents'] or inputs['meetings']): return {'day': day, 'empty': True}
         fingerprint = json.dumps([len(inputs['asks']), inputs['asks'][-1:], [a['id'] for a in inputs['agents']],
-                                  [[m['id'], len(m['summary']), len(m['actions'])] for m in inputs['meetings']], inputs['tomorrow']])
+                                  [[m['id'], len(m['summary']), len(m['actions'])] for m in inputs['meetings']], inputs['tomorrow'], inputs.get('goals', [])])
         old = recap_read(day)
         focus = activity.activity_day(day)   # where the day went: from Activity history, never the AI
         if old and old.get('fingerprint') == fingerprint and not force:
@@ -131,7 +135,7 @@ def recap_make(day=None, force=False, evening=False):
         recap, source, note = recap_local(inputs), 'local', ''
         if prefs.client() == 'claude':
             shared = {**inputs, 'meetings': [] if inputs['private'] else inputs['meetings']}   # AI meeting summaries off: meetings stay on this Mac
-            request = json.dumps({k: shared[k] for k in ('asks', 'instant', 'agents', 'meetings', 'tomorrow')}, ensure_ascii=False)
+            request = json.dumps({k: shared[k] for k in ('asks', 'instant', 'agents', 'meetings', 'tomorrow', 'goals')}, ensure_ascii=False)
             try:
                 text, _ = meeting.meeting_call(RECAP_SYSTEM, f'Today is {day}. Activity (data):\n{request}', label='Daily recap')
                 ai = recap_check(text, shared)

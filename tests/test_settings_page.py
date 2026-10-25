@@ -142,6 +142,19 @@ class SettingsPageTests(unittest.TestCase):
         self.assertIn({'do': 'people'}, out['posts'])
         self.assertIn({'do': 'set', 'k': 'peopleHidden', 'v': ['sam@acme.com']}, out['posts'])
 
+    def test_goals_add_tick_and_remove(self):
+        out = self.page("""st.goals({goals: [{id: 'aaaaaaaa', text: 'Ship the beta', done: 0}, {id: 'bbbbbbbb', text: 'Run 3 times a week', done: 1792929600}], note: ''});
+            const rows = [...document.querySelectorAll('#goals .row')].map(r => [r.querySelector('b').textContent, r.querySelector('input').checked]);
+            $('goalnew').value = 'Read 2 books'; $('goaladd').click();
+            document.querySelector('#goals .row input').click(); document.querySelector('#goals .row .x').click();
+            st.goals({note: 'You have 5 goals. Finish or remove one first (Settings → General → Goals).'});
+            return {rows, notice: $('notice').hidden ? '' : $('notice').textContent};""")
+        r = out['result']
+        self.assertEqual(r['rows'], [['Ship the beta', False], ['Run 3 times a week', True]])
+        self.assertIn('You have 5 goals', r['notice'])
+        for args in (['list'], ['add', 'Read 2 books'], ['done', 'aaaaaaaa'], ['drop', 'aaaaaaaa']):
+            self.assertIn({'do': 'goals', 'args': args}, out['posts'])
+
     def test_notice_shows_and_its_action_runs_once(self):
         out = self.page('''st.notice({text: 'Couldn’t save that change, so the old setting is back.'});
             const shown = !$('notice').hidden && $('noticebtn').hidden;
