@@ -391,6 +391,7 @@ final class App: NSObject, WKScriptMessageHandler {
 
     // The page reports its height; grow the box down from the top-left corner. "c": the typing box.
     func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) {
+        guard m.frameInfo.isMainFrame else { return }   // the page itself, never a frame inside it
         if m.name == "c", let b = m.body as? [String: Any] {
             if b["learnedUndo"] != nil, let word = learnedWord {
                 if DictationData.forget(word) {

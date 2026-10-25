@@ -211,6 +211,7 @@ final class Onboarding: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     }
 
     func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) {
+        guard m.frameInfo.isMainFrame else { return }   // the page itself, never a frame inside it
         guard let b = m.body as? [String: String] else { return }
         if b["do"] == "done" { return finish() }
         if b["do"] == "feedback" { Rabik.settings.open(tab: "feedback"); return }

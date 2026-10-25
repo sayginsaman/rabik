@@ -701,6 +701,7 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
         }
     }
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.frameInfo.isMainFrame else { return }   // the page itself, never a frame inside it
         guard message.webView === web else { return }
         guard let b = message.body as? [String: Any], let action = b["do"] as? String else { return }
         switch action {

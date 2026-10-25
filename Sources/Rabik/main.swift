@@ -208,8 +208,11 @@ func loadPage(_ web: WKWebView, _ name: String) {
     var html = (try? String(contentsOfFile: dir + "/ui/" + name, encoding: .utf8)) ?? "missing " + name
     if html.contains("/*ORBS*/") { html = html.replacingOccurrences(of: "/*ORBS*/", with: (try? String(contentsOfFile: dir + "/ui/orbs.js", encoding: .utf8)) ?? "") }
     if html.contains("/*LOGO*/") { html = html.replacingOccurrences(of: "/*LOGO*/", with: (try? Data(contentsOf: URL(fileURLWithPath: dir + "/ui/logo.png")))?.base64EncodedString() ?? "") }
+    if web.navigationDelegate == nil { web.navigationDelegate = LocalPageOnly.shared }   // its own page, nothing else
     web.loadHTMLString(html, baseURL: nil)
 }
+
+// final class LocalPageOnly lives in Core/WebPolicy.swift
 
 // The screen under the mouse, else the main one.
 var mouseScreen: NSScreen { NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main! }

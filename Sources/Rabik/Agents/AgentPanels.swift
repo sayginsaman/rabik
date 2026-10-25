@@ -451,6 +451,7 @@ final class AgentPanels: NSObject, WKScriptMessageHandler {
         else { openView(id) }
     }
     func userContentController(_ controller:WKUserContentController,didReceive message:WKScriptMessage) {
+        guard message.frameInfo.isMainFrame else { return }   // the page itself, never a frame inside it
         guard let body = message.body as? [String:Any], let action = body["action"] as? String else { return }
         let surface = message.webView === viewWeb ? "view" : "shelf", id = body["id"] as? String ?? ""
         switch action {

@@ -495,5 +495,27 @@ print("visible ok")
         self.assertNotIn(">Show me where<", self.settings)
 
 
+    def test_web_views_keep_to_their_own_page(self):
+        # SW-SEC1: a script, link or form must never take a web view to another page, and a frame inside the page never
+        # speaks for it, so nothing but Rabik's own UI can post to its message handlers (the Allow card among them).
+        self.assertIn('if web.navigationDelegate == nil { web.navigationDelegate = LocalPageOnly.shared }', self.swift)
+        self.assertIn('decisionHandler(LocalPageOnly.allows(a) ? .allow : .cancel)', self.swift)   # Settings is its own delegate
+        handlers = self.swift.split('func userContentController(')[1:]
+        self.assertEqual(len(handlers), 5)
+        for handler in handlers:
+            self.assertIn('frameInfo.isMainFrame', handler.split('\n')[0] + handler.split('\n')[1])
+
+    def test_local_page_policy_stops_scripts_links_and_forms(self):
+        policy = self.swift[self.swift.index('final class LocalPageOnly'):]
+        policy = policy[:policy.index('\n}\n') + 3]
+        out = run_swift(self, 'import Cocoa\nimport WebKit\n' + policy + PROBE, timeout=30)
+        self.assertEqual(out.splitlines(), ['loaded: about:blank|page', 'after script navigation: about:blank|page',
+                                            'after link click: about:blank|page', 'after form submit: about:blank|page',
+                                            'message frames (main?): [true, false]'])
+
+
+PROBE = '\n// The page loads; a script, a link and a form that try to leave it are stopped; a frame\'s message says it is not the main frame.\nfinal class Probe: NSObject, WKScriptMessageHandler, WKNavigationDelegate {\n    var mainFrames: [Bool] = []\n    func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) { mainFrames.append(m.frameInfo.isMainFrame) }\n}\n_ = NSApplication.shared\nlet probe = Probe(), cfg = WKWebViewConfiguration()\ncfg.userContentController.add(probe, name: "c")\nlet web = WKWebView(frame: NSRect(x: 0, y: 0, width: 200, height: 200), configuration: cfg)\nweb.navigationDelegate = LocalPageOnly.shared\nweb.loadHTMLString("<p id=m>page</p><a id=l href=\'https://example.com/x\'>x</a><form id=f action=\'https://example.com/f\'></form>" +\n                   "<script>webkit.messageHandlers.c.postMessage(\'top\')</script>" +\n                   "<iframe srcdoc=\\"<script>webkit.messageHandlers.c.postMessage(\'frame\')</script>\\"></iframe>", baseURL: nil)\nfunc spin(_ s: Double) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }\nfunc page() -> String { var r = ""; var done = false\n    web.evaluateJavaScript("location.href + \'|\' + (document.getElementById(\'m\') ? \'page\' : \'gone\')") { v, _ in r = v as? String ?? "?"; done = true }\n    while !done { spin(0.05) }; return r }\nspin(1.5)\nprint("loaded:", page())\nweb.evaluateJavaScript("location.href = \'https://example.com/\'", completionHandler: nil); spin(1)\nprint("after script navigation:", page())\nweb.evaluateJavaScript("document.getElementById(\'l\').click()", completionHandler: nil); spin(1)\nprint("after link click:", page())\nweb.evaluateJavaScript("document.getElementById(\'f\').submit()", completionHandler: nil); spin(1)\nprint("after form submit:", page())\nprint("message frames (main?):", probe.mainFrames.sorted { $0 && !$1 })\n'
+
+
 if __name__ == "__main__":
     unittest.main()

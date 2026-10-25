@@ -58,6 +58,10 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         }
     }
 
+    func webView(_ v: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(LocalPageOnly.allows(a) ? .allow : .cancel)   // its own page, nothing else (LocalPageOnly)
+    }
+
     func webView(_ v: WKWebView, didFinish n: WKNavigation!) { push(); refresh(); DispatchQueue.global().async { [weak self] in self?.send("perms", Onboarding.perms()) }; if !tab.isEmpty { js("st.tab('\(tab)')"); tab = "" }; if let r = revealing { send("reveal", r); revealing = nil } }
 
     func send(_ call: String, _ v: Any) {
@@ -242,7 +246,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         }
     }
 
-    func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) { if let b = m.body as? [String: Any] { handle(b) } }
+    func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) { if m.frameInfo.isMainFrame, let b = m.body as? [String: Any] { handle(b) } }
 
     func confirm(_ title: String, _ detail: String, _ button: String) -> Bool {
         let alert = NSAlert(); alert.messageText = title; alert.informativeText = detail; alert.addButton(withTitle: button); alert.addButton(withTitle: "Cancel")
