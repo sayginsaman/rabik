@@ -501,6 +501,16 @@ Faz 2–5 Python, Faz 6 Swift üzerinde. Aynı dosyalara dokunmadıkları için 
 
 **SW-S1 ✅ (devamı)**: "çalıştır, sonuna kadar oku, bekle" artık tek bir yardımcıda, `runToEnd(p, out)` (main.swift); 10 çağrı yeri ona geçti, sıra kuralı tek yerde yazılı. Pipe sırası testi değişmeden geçiyor.
 
-Açık kalanlar: ana istekleri sandbox'ta çalıştırma kararı (P1'in kalıcı çözümü).
+**Açık kalanlar** (kod dışı ya da senin kararını bekleyen):
+
+| Konu | Neden açık | Kimde |
+|---|---|---|
+| P1'in kalıcı çözümü: ana istekleri Claude Code sandbox'ında çalıştırmak | Gated helper'ların uygulama ve site açabilmesi için sandbox dışında çalışıyorlar; sandbox içinde neyin bozulacağı ürün kararı | Sen |
+| Login item (SMAppService) | `.dmg` kurulumunda Rabik açılışta başlamıyor (LaunchAgent'ı yalnızca `build.sh` kuruyor); kullanıcıya sormadan login item eklemek UX kararı | Sen |
+| python3 / Command Line Tools bağımlılığı | Yeni bir Mac'te `python3` CLT ister; Python'u pakete gömmek boyut ve imza kararı | Sen |
+| Güncelleyici (Sparkle) | İmza anahtarı ve appcast barındırma gerekiyor | Sen |
+| demo.gif / video | Hâlâ Atticus arayüzünü gösteriyor; yeni kayıt gerekiyor | Sen |
+| Notarization gönderimi | Apple'a gönderim dışa dönük bir adım; komut hazır (`RABIK_NOTARY_PROFILE=rabik-notary ./build.sh --release`) | Senin onayın |
+| F2 log döndürme, S1 kqueue, SW-P1, tek SIGTERM sahibi | Faz 5 ve 7 satırlarında nedenleriyle | Ayrı iş |
 
 **brain/ kuralları:** modüller `rabik`'i import etmez; birbirini modül adıyla çağırır (`prefs.pref()`), `from brain.x import isim` ile değil (yalnızca import anında hesaplanan sabitler istisna: `prompts`'taki helper komutları); her modül sahip olduğu isimleri `__all__`'da listeler, cephe bu listeden yönlendirir. Çalışma anında yeniden bağlanan global'ler (`STOPPING`, `_APPS_CACHE`) `__all__`'a girmez; cephe onları `_LIVE` üzerinden sahibinde okur ve yazar. Bir yerel değişken bir modülün adını gölgeliyorsa o fonksiyon modüle paket yoluyla ulaşır (`brain.paths.HOME`). `rabik.py`'nin kendi kodu (selftest) taşınmış bir ismi modül seviyesinde yeniden bağlamaz; sahibine yazar (`brain.skills.SKILLS = …`). `rabik.py`'de fonksiyon ya da sınıf yoktur (yalnızca `_Facade`). `brain/` içinde import döngüsü yoktur. Bu kuralları `tests/test_brain.py` denetler.
