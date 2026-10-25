@@ -1,27 +1,26 @@
 """Instant commands: the no-AI path for simple asks (open, place, play, replay a shortcut)."""
-import hashlib
 import os
 import re
 import shlex
 import subprocess
 import time
 import urllib.parse
-from dataclasses import dataclass, field
 from pathlib import Path
 from brain import apps, environ, hands, macos, paths, prefs, protocol, skills, spotify, telemetry, tips, web, windows, wording
 
 __all__ = ['FastResult', 'fast']
 
 
-@dataclass
 class FastResult:
     """What an instant command did: its reply (None hands the ask to the AI), the commands a shortcut may learn from it,
     the shortcut it replayed or taught, a replay that failed for the AI to redo, and the steps a replay ran (ask log)."""
-    reply: object = None
-    cmds: list = field(default_factory=list)
-    shortcut: object = None
-    failed: object = None
-    ran: list = field(default_factory=list)
+
+    def __init__(self, reply=None, cmds=None, shortcut=None, failed=None, ran=None):
+        self.reply, self.cmds, self.shortcut, self.failed = reply, [] if cmds is None else cmds, shortcut, failed
+        self.ran = [] if ran is None else ran
+
+    def __repr__(self):
+        return f'{type(self).__name__}({", ".join(f"{k}={v!r}" for k, v in vars(self).items())})'
 
 
 def fast(text):
@@ -89,6 +88,7 @@ def _fast(text, result):
         if replayed.ran:   # it acted, then a step failed or its check contradicted: never another instant reply, the AI redoes it
             result.failed = {'key': k, 'commands': replayed.commands, 'output': replayed.ran, 'failed_at': replayed.failed_at}
             if telemetry.telemetry_enabled():
+                import hashlib   # only for this report: not on every helper start
                 telemetry.report_error('replay', shortcut=hashlib.sha256((telemetry.install_id() + '\0' + k).encode()).hexdigest()[:16],
                              failed_at=replayed.failed_at)
             return None

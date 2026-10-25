@@ -4,7 +4,6 @@ import os
 import subprocess
 import urllib.error
 import urllib.parse
-import urllib.request
 from brain import environ, paths, storage
 
 __all__ = ['pref', 'save_pref', 'routing_mode', 'work_model', 'main_model', 'server', '_models_at', 'models', 'LOCAL_SERVERS',
@@ -55,6 +54,7 @@ def server(model=None):
 
 
 def _models_at(url, key='', timeout=4):
+    import urllib.request   # here, not at the top: with http.client and ssl it costs every helper start ~9 ms (the tool gate runs before each tool call)
     req = urllib.request.Request(url, headers={'Authorization': f'Bearer {key}', 'x-api-key': key, 'anthropic-version': '2023-06-01'})
     try:
         response = urllib.request.urlopen(req, timeout=timeout)

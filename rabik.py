@@ -26,7 +26,7 @@ All requests and interrupted steps go to ~/.config/rabik/log.jsonl with their co
 import shlex
 import platform
 import fcntl
-import atexit, base64, difflib, hashlib, html, json, plistlib, shutil, threading, os, re, select, signal, stat, subprocess, sys, tempfile, time, types, urllib.parse, urllib.request
+import atexit, base64, difflib, html, json, plistlib, shutil, threading, os, re, select, signal, stat, subprocess, sys, tempfile, time, types, urllib.parse
 import unicodedata
 import uuid
 from functools import lru_cache, wraps

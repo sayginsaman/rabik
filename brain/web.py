@@ -8,8 +8,8 @@ import shutil
 import subprocess
 import tempfile
 import time
+import urllib.error
 import urllib.parse
-import urllib.request
 from brain import apps, environ, hands, interaction, macos, paths, policy, prefs, protocol, storage, windows
 
 __all__ = ['get', 'text_of', 'search', 'WEB_JS', 'RISKY_CLICK', 'browser_terms', 'browser_adapter', 'close_agent_window',
@@ -127,6 +127,7 @@ def show(target, bg=False):
 
 
 def get(url, timeout=10):
+    import urllib.request   # here, not at the top: with http.client and ssl it costs every helper start ~9 ms (the tool gate runs before each tool call)
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh) AppleWebKit/605 Safari/605'})
     try:
         response = urllib.request.urlopen(req, timeout=timeout)

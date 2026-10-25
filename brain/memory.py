@@ -1,7 +1,6 @@
 """What Rabik keeps about the user: the About-you profile (me.json), the saved rules (memory.md), the last few turns
 of chat (recent.jsonl) and the request history search."""
 import fcntl
-import hashlib
 import json
 import os
 import re
@@ -65,6 +64,7 @@ def _fact(category_, kind, value, source='you', date=None, identifier=None, sens
         value = _mask(value)
     source = source if source in SOURCES else 'you'
     key = '\0'.join((source, category_, kind.lower(), value.lower()))
+    import hashlib   # here, not at the top: ~3 ms on every helper start, for the few that save a fact
     return {'id': identifier or hashlib.sha256(key.encode()).hexdigest()[:12], 'category': category_, 'kind': kind,
             'value': value, 'source': source, 'date': date if re.fullmatch(r'\d{4}-\d{2}-\d{2}', str(date or '')) else _profile_date(),
             **({'sensitive': True} if private else {})}

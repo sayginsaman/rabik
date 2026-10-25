@@ -144,6 +144,15 @@ class BrainTests(unittest.TestCase):
             brain.turn.log_turn('open notes', 'Done.', time.time())
         self.assertEqual([c.args[0]['ran'] for c in log.call_args_list], [['open -a Notes  => ok'], []])
 
+    def test_a_helper_start_leaves_heavy_modules_unloaded(self):
+        # Every tool call starts rabik.py once (the gate): these cost ~16 ms together and only a fetch or a saved fact
+        # needs them, so they load where they are used. -S: the check is about Rabik's imports, not this Python's site.
+        import subprocess
+        heavy = ('urllib.request', 'http.client', 'ssl', 'dataclasses', 'hashlib')
+        code = f'import sys; sys.path.insert(0, {str(ROOT)!r}); import rabik; print(sorted(m for m in {heavy!r} if m in sys.modules))'
+        out = subprocess.run([sys.executable, '-S', '-c', code], capture_output=True, text=True, timeout=60)
+        self.assertEqual(out.stdout.strip(), '[]', out.stderr)
+
     def test_the_helper_path_is_the_entry_script(self):
         self.assertEqual(brain.paths.ME, str(ROOT / 'rabik.py'))
         self.assertIn(brain.paths.ME, brain.paths.PLACE)

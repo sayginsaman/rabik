@@ -7,7 +7,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass, field
 from brain import apps, environ, hands, macos, memory, paths, policy, prefs, web, windows, wording
 
 __all__ = ['SKILLS', 'INTERNAL_TASK_MARKERS', 'UNSAFE', 'NAMED', 'named_shortcut', 'TRIGGER', 'shortcut_name', 'skills',
@@ -252,14 +251,15 @@ def replay_quit(tokens):
     return m[2] if m[1] else apps.app_id(apps.app_named(m[2]) or m[2])
 
 
-@dataclass
 class ReplayResult:
     """One replay of a learned shortcut: its reply (None: the AI takes over), the commands it chose, what each step said
     (ran, for the ask log and a redo), and the step that failed."""
-    reply: object = None
-    commands: list = field(default_factory=list)
-    ran: list = field(default_factory=list)
-    failed_at: object = None
+
+    def __init__(self, reply=None, commands=None, ran=None, failed_at=None):
+        self.reply, self.commands, self.ran, self.failed_at = reply, [] if commands is None else commands, [] if ran is None else ran, failed_at
+
+    def __repr__(self):
+        return f'{type(self).__name__}({", ".join(f"{k}={v!r}" for k, v in vars(self).items())})'
 
 
 def replay(k, swap=None):

@@ -10,7 +10,6 @@ import sys
 import tempfile
 import threading
 import time
-from dataclasses import dataclass, field
 from brain import (
     agents, clients, environ, handoffs, interaction, labels, macos, messages, paths, policy, prefs, prompts, protocol,
     situation, storage, telemetry, turn, web)
@@ -18,21 +17,27 @@ from brain import (
 __all__ = ['RunResult', 'run', 'run_devin', 'run_pi']
 
 
-@dataclass
 class RunResult:
-    """One attempt through the AI client: its answer, and what main() reads after it. Unpacks as (reply, cost, steps)."""
-    reply: str = ''
-    cost: object = 0                                # USD; None when the client gave no terminal usage
-    steps: list = field(default_factory=list)      # the step labels the box showed
-    cmds: list = field(default_factory=list)       # the commands a shortcut may learn: only from a verified success
-    ran: list = field(default_factory=list)        # every command, for the ask log
-    error: str = ''
-    ok: bool = False
-    handoff: object = None                          # the first hand-off to a background agent, if any
-    handoffs: list = field(default_factory=list)
-    observed: list = field(default_factory=list)   # tool results, for a continuation
-    work: bool = False                              # it ran a command that acts, not one that only reads
-    why: str = ''                                   # why it failed, one fixed word for PostHog
+    """One attempt through the AI client: its answer, and what main() reads after it. Unpacks as (reply, cost, steps).
+    A plain class, not a dataclass: importing dataclasses costs every helper start ~4 ms."""
+
+    def __init__(self, reply='', cost=0, steps=None, *, cmds=None, ran=None, error='', ok=False, handoff=None, handoffs=None,
+                 observed=None, work=False, why=''):
+        self.reply = reply
+        self.cost = cost                                     # USD; None when the client gave no terminal usage
+        self.steps = [] if steps is None else steps          # the step labels the box showed
+        self.cmds = [] if cmds is None else cmds             # the commands a shortcut may learn: only from a verified success
+        self.ran = [] if ran is None else ran                # every command, for the ask log
+        self.error = error
+        self.ok = ok
+        self.handoff = handoff                               # the first hand-off to a background agent, if any
+        self.handoffs = [] if handoffs is None else handoffs
+        self.observed = [] if observed is None else observed  # tool results, for a continuation
+        self.work = work                                     # it ran a command that acts, not one that only reads
+        self.why = why                                       # why it failed, one fixed word for PostHog
+
+    def __repr__(self):
+        return f'{type(self).__name__}({", ".join(f"{k}={v!r}" for k, v in vars(self).items())})'
 
     def __iter__(self):
         return iter((self.reply, self.cost, self.steps))
