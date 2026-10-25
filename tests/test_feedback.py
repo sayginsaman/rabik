@@ -43,10 +43,18 @@ class FeedbackTests(unittest.TestCase):
 
     def test_feedback_always_waits_for_confirmation_and_skips_ai(self):
         for request in ('report feedback', 'report a bug'):
-            with patch('sys.argv', ['rabik.py', request]), patch.object(rabik, 'start_claude') as ai, patch.object(rabik, 'licensed') as license, patch.object(rabik, 'wait_commit', return_value=True) as gate, patch('sys.stdout', new_callable=io.StringIO) as out, patch.object(rabik, 'look', return_value=[]), patch.object(rabik, 'hands_map', return_value=None):
+            with patch('sys.argv', ['rabik.py', request]), patch.object(rabik, 'start_claude') as ai, patch.object(rabik, 'wait_commit', return_value=True) as gate, patch('sys.stdout', new_callable=io.StringIO) as out, patch.object(rabik, 'look', return_value=[]), patch.object(rabik, 'hands_map', return_value=None):
                 rabik.main()
-                ai.assert_not_called(); license.assert_not_called(); gate.assert_called_once()
+                ai.assert_not_called(); gate.assert_called_once()
                 self.assertIn('! feedback', out.getvalue())
                 self.assertIn('Review your feedback', out.getvalue())
             with patch.dict(os.environ, {'RABIK_LIVE': '1'}, clear=True), patch('sys.stdout', new_callable=io.StringIO) as out:
                 self.assertIsNone(rabik.fast(request)); self.assertEqual(out.getvalue(), '')
+
+    def test_a_request_about_keys_is_an_ordinary_ask(self):
+        # Atticus kept an unused $5 Gumroad check on every ask: "key bindings" went to Gumroad's license API and got
+        # "That key did not work" back. Rabik has no license check, so nothing but the model sees such a request.
+        for name in ('licensed', 'activate', 'GUMROAD_PRODUCT', 'BUY', 'KEY_FILE'):
+            self.assertFalse(hasattr(rabik, name), name)
+        with open(rabik.ME, encoding='utf-8') as f:
+            self.assertNotIn('gumroad', f.read().lower())

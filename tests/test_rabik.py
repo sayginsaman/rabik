@@ -196,7 +196,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
             prior = Path(os.environ['RABIK_ASK'], 'prior-work.json'); brain.prior = json.loads(prior.read_text()) if prior.exists() else None   # the ask folder goes with main()
             return reply, .001, actions[:]
         brain = unittest.mock.Mock(side_effect=attempt)
-        with patch.multiple(rabik, licensed=lambda: True, ping=lambda: None, fast=lambda _: quick,
+        with patch.multiple(rabik, ping=lambda: None, fast=lambda _: quick,
                             front=lambda: ('Fixture', 'Scratch'), osa=lambda *a: '', screens=lambda: [],
                             describe=lambda *a: '', selection_context=lambda: '', relevant_rules=lambda _: '',
                             recent=lambda: [], workflows=lambda *a: '', screen_for=lambda *a: None, wait_commit=lambda: True,
@@ -328,7 +328,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                     brain.handoff = brain.handoffs[0] if brain.call_count == 2 else None
                     return ('', None, ['moved']) if brain.handoff else (first, .001, [])
                 brain = unittest.mock.Mock(side_effect=attempt)
-                with patch.multiple(rabik, licensed=lambda: True, ping=lambda: None, fast=lambda _: None,
+                with patch.multiple(rabik, ping=lambda: None, fast=lambda _: None,
                                     front=lambda: ('Fixture', 'Scratch'), osa=lambda *a: '', screens=lambda: [],
                                     selection_context=lambda: '', relevant_rules=lambda _: '', recent=lambda: [],
                                     workflows=lambda *a: '', screen_for=lambda *a: None, wait_commit=lambda: True,
@@ -348,7 +348,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
     def test_partial_request_handoff_keeps_one_original_log_row(self):
         brain=unittest.mock.Mock(return_value=('',None,[]));brain.handoff={'accepted':True};brain.handoffs=[brain.handoff];brain.ran=[];brain.ok=True
         request=json.dumps({'front':'Fixture','task':'Original request','done':['Opened fixture.'],'remaining':'Finish it'})
-        with patch.multiple(rabik,licensed=lambda:True,ping=lambda:None,fast=lambda _:None,allow_focus=lambda _:None,
+        with patch.multiple(rabik,ping=lambda:None,fast=lambda _:None,allow_focus=lambda _:None,
                             front=lambda:('Fixture','Scratch'),osa=lambda *a:'',screens=lambda:[],selection_context=lambda:'',
                             relevant_rules=lambda _:'',recent=lambda:[],workflows=lambda *a:'',screen_for=lambda *a:None,
                             wait_commit=lambda:True,run=brain,start_ai=lambda *a:None), \
@@ -366,7 +366,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
             def start(self): self.starts += 1
             def join(self, *_): pass
         brain = unittest.mock.Mock(return_value=('Done.', 0, [])); brain.ok = True; brain.cmds = brain.ran = []; brain.observed = []
-        with patch.multiple(rabik, licensed=lambda: True, ping=lambda: None, fast=lambda _: None,
+        with patch.multiple(rabik, ping=lambda: None, fast=lambda _: None,
                             front=lambda: ('Fixture', 'Scratch'), osa=lambda *a: '', screens=lambda: [],
                             describe=lambda *a: '', me_line=lambda: '', selection_context=lambda: '',
                             relevant_rules=lambda _: '', recent=lambda: [], workflows=lambda *a: '',
@@ -382,7 +382,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
     def test_a_correction_reports_the_ask_not_the_answer_it_corrects(self):
         brain = unittest.mock.Mock(return_value=('Done.', 0, [])); brain.ok = True; brain.cmds = brain.ran = []; brain.observed = []
         earlier = [{'t': time.time(), 'q': 'Summarize my inbox', 'a': 'Dana wrote about the lawsuit settlement'}]
-        with patch.multiple(rabik, licensed=lambda: True, ping=lambda: None, fast=lambda _: None,
+        with patch.multiple(rabik, ping=lambda: None, fast=lambda _: None,
                             front=lambda: ('Fixture', 'Scratch'), osa=lambda *a: '', screens=lambda: [],
                             describe=lambda *a: '', me_line=lambda: '', selection_context=lambda: '',
                             relevant_rules=lambda _: '', recent=lambda: earlier, workflows=lambda *a: '',
@@ -402,7 +402,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
         def osa(script, *_): calls.append(script); return 'Q3 plan, draft, -1400, 30' if 'of front window' in script else ''
         brain = unittest.mock.Mock(return_value=('Done.', 0, [])); brain.ok = True; brain.cmds = brain.ran = []; brain.observed = []
         displays = unittest.mock.Mock(return_value=[('Built-in', 0, 0, 1470, 956, True), ('Acer', -1920, 0, 1920, 1080, False)])
-        with patch.multiple(rabik, licensed=lambda: True, ping=lambda: None, fast=lambda _: None, osa=osa, screens=displays,
+        with patch.multiple(rabik, ping=lambda: None, fast=lambda _: None, osa=osa, screens=displays,
                             window_summary=lambda *a: {'text': 'Readable'}, tool_help=lambda *a, **k: '', selection_context=lambda: '',
                             relevant_rules=lambda _: '', recent=lambda: [], workflows=lambda *a: '', wait_commit=lambda: True, run=brain,
                             remember_turn=lambda *a: None, restore_focus=lambda *a: None, remember_workflow=lambda task, reply, *a: (reply, False),
@@ -1087,7 +1087,7 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
 
     def test_fast_action_is_logged_once_at_zero_cost(self):
         with tempfile.TemporaryDirectory() as root, patch.object(rabik, 'DIR', root), \
-             patch.multiple(rabik, licensed=lambda: True, ping=lambda: None,
+             patch.multiple(rabik, ping=lambda: None,
                             fast=lambda _: 'Opened Spotify.', remember_turn=lambda *_: None), \
              patch.object(rabik.os, 'setpgrp'), patch.object(rabik.signal, 'signal'), \
              patch('sys.argv', ['rabik.py', '--fast', 'open Spotify']), \
@@ -1134,13 +1134,12 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
 
     def test_confirmed_instant_command_skips_context_work(self):
         with patch.multiple(rabik, **{name: unittest.mock.DEFAULT for name in
-                            ['start_ai', 'licensed', 'ping', 'fast', 'remember_turn', 'say', 'front', 'stop_claude', 'allow_focus']}) as mocks, \
+                            ['start_ai', 'ping', 'fast', 'remember_turn', 'say', 'front', 'stop_claude', 'allow_focus']}) as mocks, \
              patch.object(rabik.threading, 'Thread') as threads, patch.object(rabik.os, 'setpgrp'), \
              patch.object(rabik.signal, 'signal'), patch('sys.argv', ['rabik.py', '--wait']), \
              patch('sys.stdin', io.StringIO('Notes\topen Notes\n')), patch.dict(os.environ, {'RABIK_COMMIT': ''}):
             # Even without a CLI, --wait must read the request instead of treating its flag as a question.
             mocks['start_ai'].return_value = None
-            mocks['licensed'].return_value = True
             mocks['fast'].return_value = 'Opened Notes.'
             rabik.main()
             mocks['fast'].assert_called_once_with('open Notes')
@@ -1545,7 +1544,6 @@ time.sleep(30)
             action = f'import time; from pathlib import Path; Path({str(ready)!r}).touch(); time.sleep(.5); Path({str(marker)!r}).touch()'
             script = f'''import rabik, subprocess, sys, time
 rabik.ping = lambda: None
-rabik.licensed = lambda: True
 def fast(_):
     subprocess.Popen([sys.executable, '-c', {action!r}])
     time.sleep(30)

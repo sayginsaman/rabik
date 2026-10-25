@@ -41,10 +41,6 @@ PLACE, LOOK, SEARCH, READ, SHOW, REMEMBER, FORGET, TYPE, PLAY, QUEUE, ABOUT, SHO
 DRAW = shlex.quote(ME) + " --draw"
 MEMORY, RECENT = os.path.join(DIR, 'memory.md'), os.path.join(DIR, 'recent.jsonl')
 PREFS = os.path.join(DIR, 'settings.json')   # written by the Settings window
-# $5 once, sold on Gumroad. shortcut: the source is public, so a coder can delete this check; fine for a $5 app.
-GUMROAD_PRODUCT = ''   # Gumroad product ID (4o1C13Q132kPu-TW7b-sAA== when sales start); empty = free
-BUY = 'https://3370759087892.gumroad.com/l/rabik'
-KEY_FILE = os.path.join(DIR, 'license')
 # Anonymous counts, timings and error locations under a random install ID; never asks or screen content. Off in Settings → Privacy. Empty key = off.
 POSTHOG_KEY = os.environ.get('RABIK_POSTHOG_KEY', '')   # your PostHog project's public capture token; empty = telemetry off
 REPOSITORY = 'https://github.com/YOUR_GITHUB/rabik'   # feedback opens a new issue here; keep Rabik.swift's `repository` the same
@@ -588,10 +584,20 @@ RISKY = [('Delete something?', r'\b(rm|rmdir|srm|unlink|shred|trash|mv)\s|\bdele
          ('Send this?', r'\bsend\b|\bsendmail\b|curl\b.*\s((?-i:-[a-zA-Z]*X)\s*[\'"]?(POST|PUT|PATCH|DELETE)|--request[\s=]*[\'"]?(POST|PUT|PATCH|DELETE)|--data|--form|--json|--upload-file|(?-i:-[a-zA-Z]*[dFT]))'),
          ('Buy this?', r'\b(buy|purchase|checkout|check out|place (an |the )?order|pay)\b'),
          # every way curl, sort and AppleScript/JXA write a file: they run outside the sandbox
-         ('Change a file?', r'(?<![0-9&])>>?\s*(?!/dev/null|&|/tmp/)\S|\btee\s|curl\b.*\s((?-i:-[a-zA-Z]*[oODcK])|--(output|remote-name|dump-header|cookie-jar|trace|stderr|libcurl|etag-save|hsts|alt-svc|config)\b)|%output\{'
+         ('Change a file?', r'\btee\s|curl\b.*\s((?-i:-[a-zA-Z]*[oODcK])|--(output|remote-name|dump-header|cookie-jar|trace|stderr|libcurl|etag-save|hsts|alt-svc|config)\b)|%output\{'
                             r'|\bsort\b.*\s((?-i:-[a-zA-Z]*o)|--output)|\bwrite\b.*\bto\b|write permission|writeTo(File|URL)'),
          # AppleScript and JXA can run shell text: Terminal's do script, do shell script, run/load script, ObjC tasks
          ('Run a system command?', r'\bdo ?(shell ?)?script\b|\b(run|load) ?script\b|\bNSTask\b|\$\.(system|popen)\b|\bsudo\b|\bkillall\b|\bdefaults write\b')]
+# A redirect that writes a file; not one to /dev/null, to a file descriptor (2>&1, >&2) or into the scratch /tmp.
+REDIRECT = r'(?<!&)>>?\|?\s*(?!/dev/(?:null|stdout|stderr)\b|&|(?:/private)?/tmp/(?!\S*\.\.))\S'
+# Programs judged by their command position, never by words in their arguments (a search for "install python" runs nothing).
+SCRIPT_RUNNERS = re.compile(r'python[\d.]*|perl[\d.]*|ruby|node(?:js)?|deno|bun|php|lua|tclsh|swift|(?:ba|da|z|k|c|tc|fi)?sh|eval|source|\.')
+FILE_CHANGERS = {'truncate', 'cp', 'ditto', 'rsync', 'install', 'ln', 'chmod', 'chown', 'chgrp', 'chflags', 'xattr', 'touch', 'mkfile',
+                 'wget', 'patch', 'tar', 'unzip', 'zip', 'gzip', 'gunzip', 'bzip2', 'xz'}
+SYSTEM_CHANGERS = {'kill', 'pkill', 'launchctl', 'networksetup', 'scutil', 'pmset', 'systemsetup', 'tmutil', 'spctl', 'csrutil', 'nvram', 'profiles', 'dscl'}
+GIT_DESTROYS = re.compile(r'clean|reset --hard|checkout --|restore|stash (?:drop|clear)|branch -D')
+WRAPPERS = {'env': ('-u', '-S', '-P'), 'command': (), 'nohup': (), 'exec': ('-a',), 'xargs': ('-I', '-J', '-L', '-n', '-P', '-E', '-s'),
+            'time': (), 'nice': ('-n',), 'timeout': ('-s', '-k'), 'builtin': (), 'caffeinate': ('-t', '-w')}
 # Rabik.swift's riskyPattern: a raw System Events click asks for the same controls --hands does
 RISKY_LABEL = r"(?i)\b(buy|purchase|pay|payment|checkout|order|send|delete|remove|trash|submit|publish|post|sign.?out|log.?out|unsubscribe|subscribe|transfer|bid|erase|withdraw|donate|authorize|grant access|allow access|logout|book|reserve|merge|deploy|discard|wipe|format|apply(?! filters| changes| settings| coupon| code| promo| discount| theme| style| formatting)|confirm)\b"
 RUNS = ('.command', '.tool', '.terminal', '.sh', '.zsh', '.bash', '.app', '.workflow', '.action')   # macOS runs these when opened
@@ -632,6 +638,8 @@ def risky(cmd):
         if launches_program(part): return 'Run a program?'
         if re.search(r'(?:^|[\s/])osascript(?:\s|$)', part) and not re.search(r'\s-e\s', part) and '<<' not in cmd:
             return 'Run a script?'   # from a file or a pipe: the gate cannot read what it does
+        if re.search(REDIRECT, re.sub(r'"[^"$`]*"|\'[^\']*\'', '""', part)):   # before the quiet helpers: `pbpaste > file` writes one
+            return 'Change a file?'
         if part.startswith(QUIET) and '$(' not in part and '`' not in part:
             continue
         for q, rx in RISKY:
@@ -645,7 +653,58 @@ def risky(cmd):
             return 'Click this?'   # what --hands asks for too: a blind screen point, or a control that sends, buys, deletes or confirms
         if 'osascript' in part and re.search(r'(keystroke\s+(return|enter|"[qwd]")|key code\s+(36|76|51|117|12|13|2|53))\s+using\s+(\{[^}]*)?command down', part, re.I):
             return 'Press this key?'   # ⌘Return sends, ⌘Delete deletes, ⌘Q/⌘W close without asking
+    argvs = simple_commands(cmd)
+    if argvs is None: return 'Run a script?'   # quoting the gate cannot read cannot be vouched for
+    for argv in argvs:
+        name, args = os.path.basename(argv[0]), argv[1:]
+        if SCRIPT_RUNNERS.fullmatch(name) and not runs_helper(args):
+            return 'Run a script?'   # inline or file code (python3 -c, sh -c, node x.js) can do anything; only this helper is known
+        if name in FILE_CHANGERS or name == 'sed' and any(a.startswith(('-i', '--in-place')) for a in args) or \
+                name == 'plutil' and any(a in ('-convert', '-insert', '-replace', '-remove', '-o') for a in args):
+            return 'Change a file?'
+        if name == 'git' and GIT_DESTROYS.match(' '.join(args)):
+            return 'Delete something?'
+        if name in SYSTEM_CHANGERS:
+            return 'Run a system command?'
     return ''
+
+
+def runs_helper(args):
+    """An interpreter's arguments run this helper file (python3 rabik.py --place …, sh rabik.py …), not code of its own."""
+    script = next((a for a in args if not a.startswith('-')), '')
+    return bool(script) and not any(a.startswith('-') for a in args[:args.index(script)]) and \
+        os.path.realpath(os.path.expanduser(script)) == os.path.realpath(ME)
+
+
+def simple_commands(cmd):
+    """Each simple command's words in a shell line, inside $(…), `…`, ( … ) and find -exec too, past VAR=value prefixes,
+    wrappers (env, nohup, xargs…) and $VAR aliases set earlier in the line. None when its quoting cannot be read."""
+    try: tokens = shell_tokens(cmd.replace('`', ' ; '))   # a backquote opens or closes a command: either way a boundary
+    except ValueError: return None
+    commands, current, nested = [], [], []
+    for token in tokens + [';']:
+        if '$(' in token or ' ; ' in token: nested.append(token.split('$(', 1)[-1])   # a substitution kept inside "…" still runs
+        if token in (';', '&&', '||', '|', '|&', '&', '(', ')', '-exec', '-execdir', '-ok', '-okdir') or token == '$' and not current:
+            if current: commands.append(current)
+            current = []
+        elif token not in ('<', '>', '<<', '>>', '>&', '<&', '&>', '>|') or not current:
+            current.append(token)
+    out, aliases = [], {}
+    for argv in commands:
+        argv = [t for t in argv if t != '$']
+        while argv and re.fullmatch(r'[A-Za-z_]\w*=.*', argv[0]):
+            name, _, value = argv[0].partition('='); aliases[name] = value; argv = argv[1:]
+        argv = [aliases.get(next(filter(None, m.groups())), t) if (m := re.fullmatch(r'\$(\w+)|\$\{(\w+)\}', t)) else t for t in argv]
+        while argv and os.path.basename(argv[0]) in WRAPPERS:
+            takes, argv = WRAPPERS[os.path.basename(argv[0])], argv[1:]
+            while argv and (argv[0].startswith('-') or re.fullmatch(r'[A-Za-z_]\w*=.*|\d+[smhd]?', argv[0])):
+                argv = argv[2:] if argv[0] in takes else argv[1:]
+        if argv: out.append(argv)
+    for text in nested:
+        inner = simple_commands(text)
+        if inner is None: return None
+        out += inner
+    return out
 
 
 def wait_commit():
@@ -3343,29 +3402,6 @@ def watch(what, then, app='', words='', mode='', phrase=''):
             return then and subprocess.run([sys.executable, ME, then])
         time.sleep(5)
     notify('Stopped watching after 3 hours.')
-
-
-def licensed():
-    return not GUMROAD_PRODUCT or os.path.exists(KEY_FILE)
-
-
-def activate(key):
-    req = urllib.request.Request('https://api.gumroad.com/v2/licenses/verify',
-                                 urllib.parse.urlencode({'product_id': GUMROAD_PRODUCT, 'license_key': key}).encode())
-    try:
-        with urllib.request.urlopen(req, timeout=10) as response:
-            r = json.loads(response.read())
-    except urllib.error.HTTPError as e:   # Gumroad answers a bad key with a 404
-        with e:
-            r = json.loads(e.read() or b'{}')
-    except OSError:
-        return 'Could not reach Gumroad. Check the internet and try again.'
-    p = r.get('purchase') or {}
-    if not r.get('success') or p.get('refunded') or p.get('chargebacked'):
-        return 'That key did not work. Copy it from your Gumroad receipt and type: key <your key>'
-    os.makedirs(DIR, exist_ok=True)
-    Path(KEY_FILE).write_text(key)
-    return 'Thanks for buying Rabik! It is unlocked.'
 
 
 def telemetry_enabled():
@@ -7201,7 +7237,7 @@ def main():
         begin_turn(' '.join(args[1:]))
         ping()
         allow_focus(' '.join(args[1:]))
-        r = licensed() and fast(' '.join(args[1:]))
+        r = fast(' '.join(args[1:]))
         if not r:
             checkpoint(status='not_handled')
             sys.exit(1)
@@ -7352,16 +7388,6 @@ def main():
         say('!', 'feedback')
         return say('✓', 'Review your feedback before opening GitHub.')
     ping()
-    key = re.fullmatch(r'\W*(?:my )?(?:license )?key\W+([\w-]{8,})\W*', task, re.I)
-    if key or not licensed():
-        if not wait_commit():
-            return
-        if warm:
-            stop_claude(warm)
-        if key:
-            return say('✓', activate(key[1]))
-        subprocess.run(['open', BUY])
-        return say('✓', f'Rabik is $5, once. Buy a key on the page that just opened, then type: key <your key>')
     os.environ['RABIK_RELAY_OWNER'] = str(os.getpid())
     save_request(os.environ['RABIK_ASK'], task)
     if warm: warm.relaying = True

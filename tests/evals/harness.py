@@ -269,7 +269,6 @@ def run_scenario(scenario, repo, live=False):
         mock.patch.object(subprocess, 'run', run),
         mock.patch.object(subprocess, 'Popen', popen),
         mock.patch.object(att, 'DIR', scratch.name),
-        mock.patch.object(att, 'licensed', return_value=True),
         mock.patch.object(att, 'ping', return_value=None),
         mock.patch.object(att, 'wait_commit', return_value=True),
         mock.patch.object(att, 'front', return_value=(scenario.get('front_app', 'Fixture'), scenario.get('front_window', 'Fixture'))),

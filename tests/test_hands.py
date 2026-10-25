@@ -420,7 +420,7 @@ print("Clicked Export")
         def answer(*args, **_):
             rabik.run.ok = True; rabik.run.ran = rabik.run.cmds = []
             return 'Export opened.',0,[]
-        with patch.multiple(rabik, licensed=lambda:True, ping=lambda:None, look=lambda:[], fast=lambda _:None,
+        with patch.multiple(rabik, ping=lambda:None, look=lambda:[], fast=lambda _:None,
                             window_summary=lambda *_:{'app':'Fixture','window':'Window','text':'Worksheet question and answers. ' * 10}, front=lambda:('Fixture','Window'), osa=lambda *_:'', screens=lambda:[],
                             describe=lambda *_:'Fixture display', me_line=lambda:'', selection_context=lambda:'',
                             relevant_rules=lambda _: '', workflows=lambda *args:'', recent=lambda:[], remember_turn=lambda *_:None,
@@ -449,7 +449,7 @@ print("Clicked Export")
             prompts.append(args[0])
             rabik.run.ok = True; rabik.run.ran = rabik.run.cmds = []
             return 'Done.',0,[]
-        with patch.multiple(rabik, licensed=lambda:True, ping=lambda:None, look=slow_capture, fast=lambda _:None,
+        with patch.multiple(rabik, ping=lambda:None, look=slow_capture, fast=lambda _:None,
                             window_summary=slow_summary, front=lambda:('Fixture','Window'), osa=lambda *_:'', screens=lambda:[],
                             describe=lambda *_:'Fixture display', me_line=lambda:'', selection_context=lambda:'',
                             relevant_rules=lambda _: '', workflows=lambda *args:'', recent=lambda:[], remember_turn=lambda *_:None,
@@ -471,7 +471,7 @@ print("Clicked Export")
             time.sleep(.05)
             finished.set()
             return {'app': 'Fixture', 'window': 'Window', 'text': 'Context'}
-        with patch.multiple(rabik, licensed=lambda:True, ping=lambda:None, look=lambda:[],
+        with patch.multiple(rabik, ping=lambda:None, look=lambda:[],
                             fast=lambda _:'Done.', window_summary=summary, selection_context=lambda:'',
                             remember_turn=lambda *_:None, log_turn=lambda *_, **__:None), \
              patch.object(rabik, 'say'), patch('sys.argv', ['rabik.py', 'instant fixture command']), \
@@ -506,7 +506,7 @@ print("Clicked Export")
             if str(text).startswith('? '):
                 cards.append(text)
                 Path(text.split('\t')[2]).write_text('y')
-        with patch.multiple(rabik,licensed=lambda:True,ping=lambda:None,hands_map=lambda _: {'nodes':[{'label':'Name'}]},
+        with patch.multiple(rabik,ping=lambda:None,hands_map=lambda _: {'nodes':[{'label':'Name'}]},
                             look=lambda:[],remember_turn=lambda *_:None,log_turn=lambda *_, **__:None), \
              patch('builtins.print',side_effect=display), patch.object(rabik,'say'), patch.object(rabik,'hands_action',side_effect=self.session((resolved,acted))), \
              patch.object(rabik,'start_claude') as model, patch.object(rabik,'ask_user',wraps=rabik.ask_user), \

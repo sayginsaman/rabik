@@ -879,8 +879,8 @@ class AgentTests(unittest.TestCase):
     def test_always_allow_for_this_task_is_scoped_to_the_kind_of_action(self):
         kind=rabik.action_kind
         self.assertEqual(kind('Bash',{'command':'curl -s https://example.test | jq .x'}),'Bash: curl + jq')
-        self.assertEqual(kind('Bash',{'command':'python3 report.py --fast'}),'Bash: report.py')
-        self.assertEqual(kind('Bash',{'command':'python3 report.py','dangerouslyDisableSandbox':True}),'Bash: report.py (outside the sandbox)')
+        self.assertEqual(kind('Bash',{'command':'python3 report.py --fast'}),'Bash: report.py (Run a script?)')   # the gate asks before any script; the kind still names this one
+        self.assertEqual(kind('Bash',{'command':'python3 report.py','dangerouslyDisableSandbox':True}),'Bash: report.py (Run a script?, outside the sandbox)')
         self.assertEqual(kind('Bash',{'command':'python3 -c "import os; os.remove(1)"'}),'')
         self.assertEqual(kind('Bash',{'command':'echo "unclosed'}),'')
         self.assertEqual(kind('Write',{'file_path':'/tmp/out/x.md'}),'Write: /tmp/out')

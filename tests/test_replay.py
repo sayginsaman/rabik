@@ -130,7 +130,7 @@ class ReplayTests(unittest.TestCase):
             def start(self): pass
             def join(self,*a): pass
         missing=self.root/'fresh';brain=unittest.mock.Mock(return_value=('Found them. [unlearn]',0,[]));brain.ok=True;brain.cmds=[];brain.ran=[];brain.observed=[]
-        with patch.object(rabik,'DIR',str(missing)),patch.object(rabik,'RECENT',str(missing/'recent.jsonl')),patch.object(rabik,'MEMORY',str(missing/'memory.md')),patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Find fixture notes']),patch.multiple(rabik,licensed=lambda:True,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),osa=lambda *a:'',screens=lambda:[],describe=lambda *a:'Scratch display',selection_context=lambda:'',screen_for=lambda *a:None,run=brain,wait_commit=lambda:True,restore_focus=lambda *a:None,say=lambda *a:None,tip=lambda *a:None,look=lambda:[],hands_map=lambda *a:None):
+        with patch.object(rabik,'DIR',str(missing)),patch.object(rabik,'RECENT',str(missing/'recent.jsonl')),patch.object(rabik,'MEMORY',str(missing/'memory.md')),patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Find fixture notes']),patch.multiple(rabik,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),osa=lambda *a:'',screens=lambda:[],describe=lambda *a:'Scratch display',selection_context=lambda:'',screen_for=lambda *a:None,run=brain,wait_commit=lambda:True,restore_focus=lambda *a:None,say=lambda *a:None,tip=lambda *a:None,look=lambda:[],hands_map=lambda *a:None):
             rabik.main();self.assertEqual(rabik.recent()[0]['a'],'Found them.');self.assertTrue((missing/'log.jsonl').exists())
         brain.assert_called_once()
 
@@ -148,7 +148,7 @@ class ReplayTests(unittest.TestCase):
         def ask(task,reply,cmds):
             brain=unittest.mock.Mock(return_value=(reply,0,[]));brain.ok=True;brain.cmds=cmds;brain.ran=cmds;brain.observed=[]
             tip=unittest.mock.Mock()
-            with patch.object(rabik,'DIR',str(self.root)),patch.object(rabik,'RECENT',str(self.root/'recent.jsonl')),patch.object(rabik,'MEMORY',str(self.root/'memory.md')),patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py',task]),patch.multiple(rabik,licensed=lambda:True,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),osa=lambda *a:'',screens=lambda:[],describe=lambda *a:'Scratch display',selection_context=lambda:'',screen_for=lambda *a:None,run=brain,wait_commit=lambda:True,restore_focus=lambda *a:None,say=lambda *a:None,tip=tip,look=lambda:[],hands_map=lambda *a:None,cached_hands=lambda:None):
+            with patch.object(rabik,'DIR',str(self.root)),patch.object(rabik,'RECENT',str(self.root/'recent.jsonl')),patch.object(rabik,'MEMORY',str(self.root/'memory.md')),patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py',task]),patch.multiple(rabik,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),osa=lambda *a:'',screens=lambda:[],describe=lambda *a:'Scratch display',selection_context=lambda:'',screen_for=lambda *a:None,run=brain,wait_commit=lambda:True,restore_focus=lambda *a:None,say=lambda *a:None,tip=tip,look=lambda:[],hands_map=lambda *a:None,cached_hands=lambda:None):
                 with patch.object(rabik,'app_id',return_value='com.example.fixture'),patch.object(rabik,'app_running',return_value=False): rabik.main()
             return tip.call_args.args[1]
         self.assertEqual(ask('Close fixture','Fixture is closed.',[quit,check]),'Learned: Say “Close fixture” any time.')
@@ -198,7 +198,7 @@ class ReplayTests(unittest.TestCase):
         brain.ok=True;brain.cmds=brain.ran=[command];brain.observed=[{'action':command,'error':False,'result':'verified hidden'}]
         say=unittest.mock.Mock()
         with patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py','It is still visible']), \
-             patch.multiple(rabik,licensed=lambda:True,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),
+             patch.multiple(rabik,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),
                             osa=lambda *a:'',screens=lambda:[],describe=lambda *a:'Scratch display',selection_context=lambda:'',
                             screen_for=lambda *a:None,tool_help=lambda *a,**k:'',run=brain,wait_commit=lambda:True,
                             restore_focus=lambda *a:None,say=say,tip=lambda *a:None,look=lambda:[],hands_map=lambda *a:None):
@@ -227,7 +227,7 @@ class ReplayTests(unittest.TestCase):
         brain=unittest.mock.Mock(return_value=('The unrelated answer.',0,[]))
         brain.ok=True;brain.cmds=brain.ran=[];brain.observed=[]
         with patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Explain an unrelated topic']), \
-             patch.multiple(rabik,licensed=lambda:True,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),
+             patch.multiple(rabik,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),
                             osa=lambda *a:'',screens=lambda:[],describe=lambda *a:'Scratch display',selection_context=lambda:'',
                             screen_for=lambda *a:None,tool_help=lambda *a,**k:'',run=brain,wait_commit=lambda:True,
                             restore_focus=lambda *a:None,say=lambda *a:None,tip=lambda *a:None,look=lambda:[],hands_map=lambda *a:None):
@@ -244,7 +244,7 @@ class ReplayTests(unittest.TestCase):
         brain.ok=True;brain.cmds=brain.ran=[];brain.observed=[]
         say=unittest.mock.Mock()
         with patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Do the fixture task']), \
-             patch.multiple(rabik,licensed=lambda:True,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),
+             patch.multiple(rabik,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),
                             osa=lambda *a:'',screens=lambda:[],describe=lambda *a:'Scratch display',selection_context=lambda:'',
                             screen_for=lambda *a:None,tool_help=lambda *a,**k:'',run=brain,wait_commit=lambda:True,
                             restore_focus=lambda *a:None,say=say,tip=lambda *a:None,look=lambda:[],hands_map=lambda *a:None):
@@ -276,7 +276,7 @@ class ReplayTests(unittest.TestCase):
         brain.observed=[{'action':replacement,'error':False,'result':'Fixture closed'}]
         say,tip=unittest.mock.Mock(),unittest.mock.Mock()
         with patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py','bye fixture']),patch.object(rabik,'app_running',return_value=True),patch.object(rabik.time,'sleep'), \
-             patch.multiple(rabik,**stubs,licensed=lambda:True,ping=lambda:None,front=lambda:('Fixture','Scratch'),screens=lambda:[],describe=lambda *a:'Scratch display',
+             patch.multiple(rabik,**stubs,ping=lambda:None,front=lambda:('Fixture','Scratch'),screens=lambda:[],describe=lambda *a:'Scratch display',
                             selection_context=lambda:'',screen_for=lambda *a:None,tool_help=lambda *a,**k:'',run=brain,wait_commit=lambda:True,
                             restore_focus=lambda *a:None,say=say,tip=tip,look=lambda:[],hands_map=lambda *a:None,report=lambda *a:None,cached_hands=lambda:None):
             rabik.main()
@@ -310,7 +310,7 @@ class ReplayTests(unittest.TestCase):
         brain=unittest.mock.Mock(return_value=('Opened the earlier post.',0,[]));brain.ok=True;brain.cmds=[];brain.ran=[];brain.observed=[]
         with patch.object(rabik,'RECENT',str(self.root/'recent.jsonl')),patch.object(rabik,'MEMORY',str(self.root/'memory.md')):
             rabik.remember_turn('Find a useful post','Opened '+url)
-            with patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Open that post you opened']),patch.multiple(rabik,licensed=lambda:True,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),osa=lambda *a:'',screens=lambda:[],describe=lambda *a:'Scratch display',selection_context=lambda:'',screen_for=lambda *a:None,run=brain,wait_commit=lambda:True,restore_focus=lambda *a:None,say=lambda *a:None,tip=lambda *a:None,look=lambda:[],hands_map=lambda *a:None):
+            with patch.object(rabik.threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Open that post you opened']),patch.multiple(rabik,ping=lambda:None,fast=lambda _:None,front=lambda:('Fixture','Scratch'),osa=lambda *a:'',screens=lambda:[],describe=lambda *a:'Scratch display',selection_context=lambda:'',screen_for=lambda *a:None,run=brain,wait_commit=lambda:True,restore_focus=lambda *a:None,say=lambda *a:None,tip=lambda *a:None,look=lambda:[],hands_map=lambda *a:None):
                 rabik.main()
         prompt=brain.call_args.args[0]
         self.assertIn('Earlier:\nQ: Find a useful post\nA: Opened '+url,prompt)

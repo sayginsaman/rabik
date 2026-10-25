@@ -17,6 +17,23 @@ class SwiftReviewFixTests(unittest.TestCase):
         self.overlay = (ROOT / "ui/ui.html").read_text()
         self.settings = (ROOT / "ui/settings.html").read_text()
 
+    def test_helper_output_is_read_to_the_end_before_waiting(self):
+        # A child blocked writing to a full pipe never exits: waiting first hung Settings once --state outgrew the pipe.
+        lines = self.swift.splitlines()
+        late = [i + 1 for i, line in enumerate(lines) if 'waitUntilExit()' in line
+                and 'readDataToEndOfFile()' not in line.split('waitUntilExit()')[0]
+                and any('readDataToEndOfFile()' in later for later in lines[i + 1:i + 3])]
+        self.assertEqual(late, [], 'read the pipe before waitUntilExit() at these Rabik.swift lines')
+
+    def test_settings_dictionary_is_locked_across_queues(self):
+        # Settings and setup read prefs on a global queue every 1.5 s while main writes them: an unlocked Swift
+        # dictionary read mid-write is undefined behaviour and crashes now and then.
+        prefs = self.swift[self.swift.index('enum Prefs {'):self.swift.index('\nfunc applySharing')]
+        self.assertIn('private static let lock = NSLock()', prefs)
+        self.assertIn('get { lock.lock(); defer { lock.unlock() }; return values }', prefs)
+        self.assertIn('set { lock.lock(); values = newValue; lock.unlock() }', prefs)
+        self.assertNotRegex(prefs, r'static var d: \[String: Any\] = ')
+
     def test_fn_key_match_is_exact_and_modifier_prefixes_conflict(self):
         helpers = self.swift[self.swift.index("let rabikFnKey"):self.swift.index("func configuredHotkey")]
         matcher = self.swift[self.swift.index("func specialHotkey"):self.swift.index("func handleSpecialHotkeys")]

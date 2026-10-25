@@ -40,7 +40,7 @@ class Ask(unittest.TestCase):
                   patch.multiple(rabik, show=self.show, place_many=self.place, place=lambda *a: 'placed', installed_apps=lambda: set(APPS), proc_of=lambda a: a,
                                  app_id=lambda a: 'com.example.' + str(a).lower().replace(' ', ''), app_running=lambda bid: True,
                                  free_focus=lambda *a, **k: None, preview_commands=lambda *a, **k: None, preview_app=lambda *a, **k: None,
-                                 licensed=lambda: True, ping=lambda: None, front=lambda: ('Other Fixture', 'Scratch'), osa=lambda *a, **k: '',
+                                 ping=lambda: None, front=lambda: ('Other Fixture', 'Scratch'), osa=lambda *a, **k: '',
                                  screens=lambda: [], describe=lambda *a: 'Scratch display', selection_context=lambda: '', screen_for=lambda *a: None,
                                  tool_help=lambda *a, **k: '', wait_commit=lambda: True, restore_focus=lambda *a: None, look=lambda *a, **k: [],
                                  hands_map=lambda *a, **k: None, report=lambda *a: None, cached_hands=lambda: None, ask_user=lambda *a: '')]:

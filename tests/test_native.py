@@ -21,7 +21,6 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import rabik
 if os.environ.get('BENCH') == '1':
-    rabik.licensed = lambda: True
     rabik.ping = lambda: None
     rabik.start_claude = lambda: None
     rabik.look = lambda: []

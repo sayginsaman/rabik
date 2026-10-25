@@ -473,3 +473,14 @@ Her fazın sonunda şunlar çalıştırılır: unit testler (boşluksuz bir yold
 | **7 — Performans** | Log rotation; Python tarafında `screens`/`pref` önbelleği ve `place()`'in Swift'e taşınması; polling yerine kqueue/stdin; Swift tarafında AX ve süreç işlerinin ana thread'den alınması | M |
 
 Faz 2–5 Python, Faz 6 Swift üzerinde. Aynı dosyalara dokunmadıkları için paralel yürüyebilirler. Faz 0 ve 1 ikisinden önce gelmeli.
+
+---
+
+## 9. Durum
+
+| Faz | Durum | Ne yapıldı |
+|---|---|---|
+| 0 — Güvenlik ağı | ✅ | Testler gerçek `claude`/`devin`/`pi`'yi başlatırsa yüksek sesle başarısız oluyor (`RealClientLaunched` + son çalışan `test_zz_host_guard`); `screencapture` host guard'da. Her test modülü `tests`'i `rabik`'ten önce import ediyor (tek dosya koşusunda da izole) ve bunu bir test denetliyor. Prompt bütçeleri sabit bir kurulum yoluyla ölçülüyor; testler ve `--selftest` boşluklu yolda (bu klasör) da geçiyor; bytecode testi geliştiricinin `PYTHONDONTWRITEBYTECODE`'unu yok sayıyor. CI: Ubuntu Python 3.9 + 3.13 ve macOS-26 (Swift derleme dahil), action'lar SHA'ya sabit. |
+| 1 — Acil düzeltmeler | ✅ (SW-SEC1 hariç) | **P1:** yönlendirme kontrolü sessiz helper'lardan önce; yorumlayıcılar (python/perl/node/sh -c/eval…), dosya değiştiren programlar (cp, truncate, sed -i, wget…), yıkıcı git ve sistem komutları program konumunda yakalanıyor — `$(…)`, backtick, `find -exec`, `xargs`, `env` içinde de; `tests/test_gate.py` 23 atlatma + 12 normal komut. **P2:** Gumroad kodu silindi. **SW-S1:** dört çağrı önce okuyup sonra bekliyor; kaynak testi eski dört satırı yakalıyor. **SW-S2:** `Prefs.d` `NSLock` arkasında; ThreadSanitizer altında eski kod çöktü (SEGV), yeni kod temiz. |
+
+Açık kalanlar: SW-SEC1 (WebView CSP/navigasyon politikası) ve ana istekleri sandbox'ta çalıştırma kararı (P1'in kalıcı çözümü); ortak `runJSON` yardımcısı Faz 6'da.

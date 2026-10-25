@@ -199,7 +199,14 @@ enum Prefs {
     static let retiredKeys = ["quietAudio", "quietLevel", "autoCopy", "askMe", "corner", "linger", "soundStart", "soundRelease", "soundDone", "soundStop",
         "instant", "live", "ahead", "aheadDelay", "learn", "selection", "guideSteps", "workIn", "openOn", "miniScreen", "draftInsert",
         "meetingNudge", "meetingDetect", "meetingAuto", "fixSetup", "dictateLearn"]
-    static var d: [String: Any] = {
+    // Read from any queue (permission probes in Settings and setup, the speech queue), written on main: every access takes the lock,
+    // so a reader gets a whole copy and never sees the dictionary mid-write.
+    private static let lock = NSLock()
+    static var d: [String: Any] {
+        get { lock.lock(); defer { lock.unlock() }; return values }
+        set { lock.lock(); values = newValue; lock.unlock() }
+    }
+    private static var values: [String: Any] = {
         let saved = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path)))) as? [String: Any] ?? [:]
         var values = defaults.merging(saved) { $1 }
         if !["cheapest", "balanced", "capable"].contains(values["routing"] as? String ?? "") {
@@ -3904,8 +3911,8 @@ final class Onboarding: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     static func plan(_ done: @escaping ([String: Any]) -> Void) {
         DispatchQueue.global().async {
             let p = py(["--check"]), out = Pipe(); p.standardOutput = out
-            try? p.run(); p.waitUntilExit()
-            let j = (try? JSONSerialization.jsonObject(with: out.fileHandleForReading.readDataToEndOfFile())) as? [String: Any]
+            try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()   // read first: a full pipe never lets the helper exit
+            let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             DispatchQueue.main.async { done(j ?? ["ok": false, "need": "install", "text": "Could not run Rabik’s helper (python3 missing?)."]) }
         }
     }
@@ -4020,8 +4027,8 @@ final class Onboarding: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     static func connectors(_ done: @escaping ([String: Any]) -> Void) {
         DispatchQueue.global().async {
             let p = py(["--connectors"]), out = Pipe(); p.standardOutput = out
-            try? p.run(); p.waitUntilExit()
-            let j = (try? JSONSerialization.jsonObject(with: out.fileHandleForReading.readDataToEndOfFile())) as? [String: Any]
+            try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()   // read first: a full pipe never lets the helper exit
+            let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             DispatchQueue.main.async { done(j ?? ["connected": [], "signin": []]) }
         }
     }
@@ -4280,8 +4287,8 @@ enum Updater {
         p.executableURL = URL(fileURLWithPath: "/bin/zsh"); p.arguments = ["-c", script, src]; p.standardOutput = o; p.standardError = o
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"; env["RABIK_NO_RESTART"] = "1"; p.environment = env
-        try? p.run(); p.waitUntilExit()
-        return (p.terminationStatus, String(data: o.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "")
+        try? p.run(); let data = o.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()   // read first: a full pipe never lets the script exit
+        return (p.terminationStatus, String(data: data, encoding: .utf8) ?? "")
     }
     static let version: String = {
         if managedByNix { return (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown") + " · Nix" }
@@ -4584,8 +4591,10 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
     func refresh() {   // usage, saved rules, Claude plan: rabik.py --state (it runs Claude Code, so off the main thread)
         DispatchQueue.global().async { [weak self] in
             let p = py(["--state"]), out = Pipe(); p.standardOutput = out
-            try? p.run(); p.waitUntilExit()
-            let s = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            // Read before waiting: the state (50 recent answers, rules, shortcuts) outgrows the pipe, and a helper blocked
+            // on a full pipe never exits, so waiting first hung Settings and left the helper running.
+            try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+            let s = String(data: data, encoding: .utf8) ?? ""
             guard s.hasPrefix("{") else { return }
             DispatchQueue.main.async { self?.web?.evaluateJavaScript("st.state(\(s))") }
         }
