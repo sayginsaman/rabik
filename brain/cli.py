@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from brain import (
     activity, agents, apps, ask, calendar, clients, dictation, drawing, environ, hands, instant, interaction, macos, meeting, memory,
-    paths, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, sources, spotify, storage, support, telemetry, tips,
+    paths, people, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, sources, spotify, storage, support, telemetry, tips,
     toolhelp, turn, watcher, web, windows, wording)
 
 __all__ = ['INNER', 'BUDGET', 'main']
@@ -59,6 +59,9 @@ def main():
         return agents.agents_service()
     if args == ['--feedback']:
         return print(json.dumps(support.feedback(json.load(sys.stdin))))
+    if args[:1] == ['--people'] and len(args) > 1:
+        found = people.people_command(args[1:])
+        return print(json.dumps(found, ensure_ascii=False) if isinstance(found, dict) else found)
     if args[:1] == ['--activity']:
         return print(activity.activity_search(' '.join(args[1:])))
     if args[:1] == ['--meeting-history']:

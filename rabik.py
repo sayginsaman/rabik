@@ -49,7 +49,7 @@ _MODULES = [import_module('brain.' + name) for name in (   # dependencies first
     'environ', 'paths', 'wording', 'protocol', 'labels', 'storage', 'sources', 'toolhelp', 'prefs', 'memory', 'situation', 'telemetry',
     'prompts', 'routine', 'support', 'turn', 'messages', 'macos', 'apps', 'watcher', 'interaction', 'windows', 'policy',
     'calendar', 'clients', 'hands', 'meeting', 'web', 'drawing', 'dictation', 'spotify', 'skills', 'handoffs', 'screen',
-    'agents', 'activity', 'recap', 'ask', 'tips', 'instant', 'cli')]
+    'agents', 'activity', 'people', 'recap', 'ask', 'tips', 'instant', 'cli')]
 _OWNERS = {name: module for module in _MODULES for name in module.__all__}
 globals().update((name, getattr(module, name)) for name, module in _OWNERS.items())
 

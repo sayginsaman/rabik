@@ -20,7 +20,7 @@ final class MeetingArchive {
     let handle: FileHandle
     private let queue = DispatchQueue(label: "rabik.meeting.archive")
     static let writes = DispatchGroup()
-    init(title: String, app: String, started: Date) throws {
+    init(title: String, app: String, started: Date, people: [[String: String]] = []) throws {
         id = UUID().uuidString
         let root = (Prefs.path as NSString).deletingLastPathComponent + "/meetings"
         folder = root + "/" + id
@@ -29,7 +29,8 @@ final class MeetingArchive {
         try fm.createDirectory(atPath: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root)
         try fm.createDirectory(atPath: folder, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
-        let metadata: [String: Any] = ["title": title, "app": app, "started": started.timeIntervalSince1970, "version": 1]
+        var metadata: [String: Any] = ["title": title, "app": app, "started": started.timeIntervalSince1970, "version": 1]
+        if !people.isEmpty { metadata["people"] = people }   // the calendar's attendees (Settings → People)
         let data = try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys])
         guard fm.createFile(atPath: folder + "/metadata.json", contents: data, attributes: [.posixPermissions: 0o600]), fm.createFile(atPath: folder + "/events.jsonl", contents: nil, attributes: [.posixPermissions: 0o600]) else { throw CocoaError(.fileWriteUnknown) }
         let fd = Darwin.open(folder + "/events.jsonl", O_WRONLY | O_APPEND | O_NOFOLLOW)
@@ -149,7 +150,7 @@ final class MeetingWebView: WKWebView {
 final class MeetingCopilot: NSObject, WKScriptMessageHandler {
     var panel: KeyPanel?, web: WKWebView?, audio: MeetingAudio?, analyzer: SpeechAnalyzer?, reading: Task<Void, Never>?, starting: Task<Void, Never>?
     var translator: TranslationSession?, translationFailed = false, translating: Task<Void, Never>?   // Translate the call (MeetingSpeech), one line at a time
-    var people: [String] = [], named: [String: String] = [:], sinceGuess = 0, lastGuess = Date.distantPast, guessing: Process?   // speaker names: callPeople, guessSpeakers
+    var attendees: [[String: String]] = [], people: [String] = [], named: [String: String] = [:], sinceGuess = 0, lastGuess = Date.distantPast, guessing: Process?   // speaker names: callPeople, guessSpeakers
     var other: String? { room || people.count != 1 ? nil : people[0] }   // a 1:1 on the calendar: who "Them" is
     var micAnalyzer: SpeechAnalyzer?, micReading: Task<Void, Never>?, analyzing: Task<Void, Never>?, micAnalyzing: Task<Void, Never>?, stopping: Task<Void, Never>?
     var micPending = "", micPartial = "", micSettle: DispatchWorkItem?, elapsed: TimeInterval = 0
@@ -314,7 +315,7 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
         guard Prefs.bool("meetingSave"), archive == nil else { js("saving", archive != nil); return }
         do {
             let date = DateFormatter(); date.dateStyle = .medium; date.timeStyle = .short
-            archive = try MeetingArchive(title: meetingTitle.isEmpty ? callApp + " · " + date.string(from: began) : meetingTitle, app: callApp, started: began)
+            archive = try MeetingArchive(title: meetingTitle.isEmpty ? callApp + " · " + date.string(from: began) : meetingTitle, app: callApp, started: began, people: attendees)
             archiveEnded = false; saveEvent(["kind": "notes", "text": brief]); js("saving", true)
         } catch { js("saving", false); js("error", "Could not save this transcript. Check available disk space.") }
     }
@@ -349,7 +350,7 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
         guard loaded, !running, Prefs.bool("meeting"), !Prefs.bool("paused") else { return }
         cancelWork(); brief = String(context.prefix(meetingBriefLimit)); briefEdited = false; running = true; began = Date().addingTimeInterval(-elapsed); nudge = nil; app.close(clear: false); app.shortcutDown = false
         if callApp == "Call" { callApp = demo ? "Demo" : callAppsOnMic().sorted().first ?? "Call" }
-        people = demo ? [] : callPeople()
+        attendees = demo ? [] : callPeople(); people = attendees.compactMap { $0["name"] }.filter { !$0.isEmpty && !$0.contains("@") }
         beginArchive()
         if archiveEnded { saveEvent(["kind": "resumed", "duration": elapsed]); archiveEnded = false }
         js("listen"); bar.paint()
@@ -639,15 +640,18 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
             }
         }
     }
-    // The other people on the calendar event happening now: one is a 1:1's name, more are the names a group guess picks from.
-    func callPeople() -> [String] {
+    // The other people on the calendar event happening now, {name, email}: one is a 1:1's name, more are the names a group guess
+    // picks from, and the saved meeting keeps them for Settings → People.
+    func callPeople() -> [[String: String]] {
         guard !room, EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
         let now = Date()
         let event = calendar.events(matching: calendar.predicateForEvents(withStart: now.addingTimeInterval(-4 * 3600), end: now.addingTimeInterval(15 * 60), calendars: nil))
             .filter { !$0.isAllDay && $0.status != .canceled && $0.startDate <= now.addingTimeInterval(10 * 60) && $0.endDate > now }
             .max { $0.startDate < $1.startDate }
-        return (event?.attendees ?? []).filter { !$0.isCurrentUser && $0.participantType == .person && $0.participantStatus != .declined }
-            .compactMap { $0.name?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && !$0.contains("@") }
+        return (event?.attendees ?? []).filter { !$0.isCurrentUser && $0.participantType == .person && $0.participantStatus != .declined }.map { person in
+            ["name": person.name?.trimmingCharacters(in: .whitespaces) ?? "",
+             "email": person.url.absoluteString.removingPercentEncoding?.replacingOccurrences(of: "mailto:", with: "") ?? ""] }
+            .filter { !($0["name"] ?? "").isEmpty || ($0["email"] ?? "").contains("@") }
     }
     // Group calls: their lines share one channel, so every 8 lines (a minute apart at most once) Haiku names the ones the
     // conversation makes clear (a name said, a reply to a name). The rest stay "Them". Off with AI meeting summaries (the brain checks).

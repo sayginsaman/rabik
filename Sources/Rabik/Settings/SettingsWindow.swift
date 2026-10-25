@@ -280,6 +280,12 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         case "set":
             guard let k = b["k"] as? String, let v = b["v"] else { return }
             apply(k, v)
+        case "people":   // Settings → People: everyone met in saved meetings or told about, built fresh by brain/people.py
+            DispatchQueue.global().async { [weak self] in
+                let p = py(["--people", "list"]), out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
+                let value = (try? JSONSerialization.jsonObject(with: runToEnd(p, out))) as? [String: Any] ?? ["error": "Could not read people. Try again."]
+                self?.send("people", value)
+            }
         case "activityClear":
             guard confirm("Clear activity history?", "Every page, file and window Rabik noted on this Mac is deleted.", "Clear") else { return }
             activity.clear(); send("notice", ["text": "Activity history cleared."])

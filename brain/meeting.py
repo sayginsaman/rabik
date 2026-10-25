@@ -294,6 +294,7 @@ def meeting_read(identifier):
     folder = meeting_path(identifier)
     with meeting_file(folder, 'metadata.json') as f:
         m = json.load(f)
+    m.setdefault('people', [])   # the calendar's attendees, saved by newer Rabik
     m.update(id=identifier, transcript=[], answers=[], notes='', summary='', action_items=[], summary_revision=None, ended=None, duration=0, reminded={})
     partials, guessed = {}, {}
     with meeting_file(folder, 'events.jsonl') as f:

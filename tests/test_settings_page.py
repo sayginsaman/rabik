@@ -124,6 +124,24 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual(out['result']['on'], [False, ['Automatic (Siri)', 'Zoe (Premium) · English (US)'], 'Other languages use their best voice.'])
         self.assertIn({'do': 'set', 'k': 'voice', 'v': 'com.apple.voice.premium.en-US.Zoe'}, out['posts'])
 
+    def test_people_list_detail_and_hide(self):
+        out = self.page("""st.tab('people'); await tick(20);
+            st.people({people: [{id: 'sam@acme.com', name: 'Sam Lee', email: 'sam@acme.com', last: 1793016000, meetings: [{id: 'm2', title: 'Hiring sync', started: 1793016000}], facts: ['Sam Lee: works at Acme']},
+                                {id: 'deniz', name: 'Deniz', email: '', last: 0, meetings: [], facts: ['my sister']}]});
+            const rows = [...document.querySelectorAll('#peoplelist .meetingrow b')].map(b => b.textContent), count = $('peoplecount').textContent;
+            $('peopleq').value = 'sister'; $('peopleq').dispatchEvent(new Event('input')); const found = [...document.querySelectorAll('#peoplelist .meetingrow b')].map(b => b.textContent);
+            $('peopleq').value = ''; $('peopleq').dispatchEvent(new Event('input'));
+            document.querySelector('#peoplelist .meetingrow').click();
+            const detail = [$('persondetail').hidden, $('personname').textContent, [...document.querySelectorAll('#personmeetings b')].map(b => b.textContent), $('personfacts').textContent];
+            $('personhide').click();
+            return {rows, count, found, detail, after: [...document.querySelectorAll('#peoplelist .meetingrow b')].map(b => b.textContent)};""")
+        r = out['result']
+        self.assertEqual((r['rows'], r['count'], r['found']), (['Sam Lee', 'Deniz'], '2 people', ['Deniz']))
+        self.assertEqual(r['detail'], [False, 'Sam Lee', ['Hiring sync'], 'Sam Lee: works at Acme'])
+        self.assertEqual(r['after'], ['Deniz'])
+        self.assertIn({'do': 'people'}, out['posts'])
+        self.assertIn({'do': 'set', 'k': 'peopleHidden', 'v': ['sam@acme.com']}, out['posts'])
+
     def test_notice_shows_and_its_action_runs_once(self):
         out = self.page('''st.notice({text: 'Couldn’t save that change, so the old setting is back.'});
             const shown = !$('notice').hidden && $('noticebtn').hidden;
@@ -200,7 +218,7 @@ class SettingsPageTests(unittest.TestCase):
                 self.assertNotIn(f'data-k="{key}"', page)
                 self.assertNotIn(key, brain.interaction.switches())
                 self.assertNotIn(key, brain.interaction.picks())
-        self.assertEqual(len(page.split('<nav>')[1].split('</nav>')[0].split('data-s=')) - 1, 9)   # 8 pages and Report feedback
+        self.assertEqual(len(page.split('<nav>')[1].split('</nav>')[0].split('data-s=')) - 1, 10)   # 9 pages and Report feedback
 
     def test_pages_wear_their_sidebar_color_and_row_actions_show_on_focus(self):
         out = self.page("""document.body.classList.add('reduce');
@@ -211,7 +229,7 @@ class SettingsPageTests(unittest.TestCase):
             return [new Set(nav).size===nav.length,titled,getComputedStyle(x).opacity,reveal.includes('.row:focus-within > .x'),!!$('general').querySelector('[data-do=quit]'),!!$('account').querySelector('[data-do=quit]')];""")
         distinct, titled, hidden, keyboard, quit_general, quit_account = out['result']
         self.assertTrue(distinct)
-        self.assertEqual(titled, [True] * 7 + [False])   # About has its own big icon
+        self.assertEqual(titled, [True] * 8 + [False])   # About has its own big icon
         self.assertEqual((hidden, keyboard), ('0', True))
         self.assertEqual((quit_general, quit_account), (True, False))
 

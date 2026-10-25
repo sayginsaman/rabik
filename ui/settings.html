@@ -17,9 +17,10 @@
     font: 13px -apple-system, system-ui, sans-serif; color: var(--fg); -webkit-font-smoothing: antialiased; }
   body { display: flex; }
 
-  #meetingq,#askq,#dictationsearch { width:100%;height:32px;box-sizing:border-box;background:var(--ctl);color:var(--fg);border:0;border-radius:8px;padding:0 12px;font:13px system-ui;box-shadow:inset 0 0 0 .5px var(--line),0 1px 1px rgba(0,0,0,.04);outline:none;-webkit-user-select:text; }
-  #meetingq:focus,#askq:focus,#dictationsearch:focus { box-shadow:inset 0 0 0 .5px var(--line),0 0 0 3px rgba(10,132,255,.35); }
-  #meetingcount { margin:12px 2px 8px;font-size:11px;color:var(--fg3); }
+  #meetingq,#askq,#dictationsearch,#peopleq { width:100%;height:32px;box-sizing:border-box;background:var(--ctl);color:var(--fg);border:0;border-radius:8px;padding:0 12px;font:13px system-ui;box-shadow:inset 0 0 0 .5px var(--line),0 1px 1px rgba(0,0,0,.04);outline:none;-webkit-user-select:text; }
+  #meetingq:focus,#askq:focus,#dictationsearch:focus,#peopleq:focus { box-shadow:inset 0 0 0 .5px var(--line),0 0 0 3px rgba(10,132,255,.35); }
+  #meetingcount,#peoplecount { margin:12px 2px 8px;font-size:11px;color:var(--fg3); }
+  #persondetail { animation:rise .24s var(--out); } #persondetail h1 { margin-top:14px; }
   #meetinglist { overflow:hidden; }
   .meetingrow { all:unset;display:block;box-sizing:border-box;width:100%;padding:13px 14px;cursor:pointer;transition:background .15s; }
   .meetingrow + .meetingrow { box-shadow:inset 0 .5px 0 var(--line); }
@@ -303,6 +304,7 @@
   <button data-s="brain"><i class="ni" style="background:#d97757;color:#d97757"><svg viewBox="0 0 24 24"><path d="M10.5 4.5 Q12.03 11.47 19.0 13 Q12.03 14.53 10.5 21.5 Q8.97 14.53 2.0 13 Q8.97 11.47 10.5 4.5Z"/><path d="M18.5 2.0 Q19.13 4.87 22.0 5.5 Q19.13 6.13 18.5 9.0 Q17.87 6.13 15.0 5.5 Q17.87 4.87 18.5 2.0Z"/></svg></i>Intelligence</button>
   <button data-s="memory"><i class="ni" style="background:#ff9f0a;color:#ff9f0a"><svg viewBox="0 0 24 24"><path class="j" d="M7 3.5h10a1.5 1.5 0 0 1 1.5 1.5v15.5l-6.5-4.3-6.5 4.3V5A1.5 1.5 0 0 1 7 3.5z"/></svg></i>Memory</button>
   <button data-s="meetings"><i class="ni" style="background:#5e5ce6;color:#5e5ce6"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="13" height="12" rx="3"/><path class="j" d="M17 10.3l3.6-2.4c.6-.4 1.4 0 1.4.8v6.6c0 .8-.8 1.2-1.4.8L17 13.7z"/></svg></i>Meetings</button>
+  <button data-s="people"><i class="ni" style="background:#64d2ff;color:#64d2ff"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.6"/><path d="M2.5 19.5c.4-3.6 3.1-5.8 6.5-5.8s6.1 2.2 6.5 5.8z"/><circle class="j" cx="17" cy="9" r="2.8"/><path class="j" d="M16.8 13.8c2.8.2 4.5 2.1 4.8 5"/></svg></i>People</button>
   <button data-s="usage"><i class="ni" style="background:#30d158;color:#30d158"><svg viewBox="0 0 24 24"><rect x="3.5" y="12" width="4.6" height="8.5" rx="1.6"/><rect x="9.7" y="4" width="4.6" height="16.5" rx="1.6"/><rect x="15.9" y="8.5" width="4.6" height="12" rx="1.6"/></svg></i>Usage</button>
   <button data-s="account"><i class="ni" style="background:#0a84ff;color:#0a84ff"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.2"/><path d="M3.8 20.6c.4-4.3 3.9-6.9 8.2-6.9s7.8 2.6 8.2 6.9z"/></svg></i>Account &amp; Access</button>
   <button data-s="about"><i class="ni" style="background:#bf5af2;color:#bf5af2"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path class="c" d="M12 7v9M8.3 12.4 12 16.1l3.7-3.7"/></svg></i>About &amp; Updates</button>
@@ -431,6 +433,21 @@
     </div>
     <h3>Saved commands and procedures</h3>
     <div class="group" id="skills"></div>
+  </section>
+
+  <section id="people">
+    <div id="peoplebrowse">
+      <h1>People</h1><p class="lede">Who you met and what Rabik knows, from your meetings and About you.</p>
+      <input type="search" id="peopleq" placeholder="Search people" aria-label="Search people" autocomplete="off">
+      <div id="peoplecount" role="status"></div>
+      <div class="group" id="peoplelist" role="list"></div>
+    </div>
+    <div id="persondetail" hidden>
+      <button id="personback" class="btn">← All people</button><h1 id="personname" tabindex="-1"></h1><p id="personmeta"></p>
+      <h3>Meetings</h3><div id="personmeetings" class="group"></div>
+      <h3>Known</h3><div id="personfacts" class="group"></div>
+      <div class="tools"><button id="personhide" class="btn">Hide from People</button></div>
+    </div>
   </section>
 
   <section id="usage">
@@ -615,7 +632,7 @@
   $('agentsnav').onclick = () => post({ do: 'agents' });   // its own window, beside Settings
   document.querySelectorAll('nav button[data-s] .ni').forEach(i => {
     const icon = i.cloneNode(true); icon.setAttribute('aria-hidden', 'true');
-    $(i.parentNode.dataset.s).querySelector(':scope > h1, #meetingbrowse > h1')?.prepend(icon);
+    $(i.parentNode.dataset.s).querySelector(':scope > h1, #meetingbrowse > h1, #peoplebrowse > h1')?.prepend(icon);
   });
   function openSection(s) {
     cancelRecord();
@@ -625,6 +642,7 @@
     document.querySelectorAll('nav button[data-s]').forEach(b => b.toggleAttribute('aria-current', b === nav));
     $(s).classList.add('on'); document.querySelector('main').scrollTop = 0;
     if (s === 'meetings') { meetingBack(false); requestMeetings(); }
+    if (s === 'people') { personBack(false); post({ do: 'people' }); }
     if (s === 'feedback') { $('feedbackinclude').checked=false; feedbackPreview(); }
     if (s === 'apps') post({ do: 'apps' });   // fresh list and statuses each visit
     if (s === 'brain') probe();
@@ -940,6 +958,29 @@
       b.append(title,meta,summary);b.onclick=()=>{expectedMeeting=m.id;selectMeeting(i);detailScroll=document.querySelector('main').scrollTop;post({do:'meetingOpen',id:m.id});};b.onfocus=()=>selectMeeting(i);$('meetinglist').append(b);
     });selectMeeting(selectedMeeting);
   }
+  // People (brain/people.py): search, a person's meetings (each opens in Meetings) and what About you knows; Hide keeps them out.
+  let savedPeople = [], currentPerson = null, wantedPerson = null;
+  function paintPeople(){
+    const q=$('peopleq').value.trim().toLowerCase(), list=savedPeople.filter(p=>!q||(p.name+' '+p.email+' '+p.facts.join(' ')).toLowerCase().includes(q));
+    $('peoplecount').textContent=`${list.length} ${list.length===1?'person':'people'}${q?' found':''}`; $('peoplelist').replaceChildren();
+    if(!list.length){const e=document.createElement('div');e.className='empty';e.textContent=q?'Nobody matches.':'People from your meetings and About you appear here.';$('peoplelist').append(e);return;}
+    for(const p of list){const b=document.createElement('button');b.className='meetingrow';b.setAttribute('role','listitem');b.dataset.id=p.id;
+      const name=document.createElement('b'),meta=document.createElement('small'),known=document.createElement('span');name.textContent=p.name;
+      meta.textContent=[p.email,p.last?'Last met '+meetingDate(p.last):'',p.meetings.length?`${p.meetings.length} meeting${p.meetings.length===1?'':'s'}`:''].filter(Boolean).join(' · ');
+      known.textContent=p.facts[0]||'';b.append(name,meta,known);b.onclick=()=>openPerson(p);$('peoplelist').append(b);}
+  }
+  function openPerson(p){
+    currentPerson=p;$('peoplebrowse').hidden=true;$('persondetail').hidden=false;$('personname').textContent=p.name;
+    $('personmeta').textContent=[p.email,p.last?'Last met '+meetingDate(p.last):''].filter(Boolean).join(' · ');
+    $('personmeetings').replaceChildren(...(p.meetings.length?p.meetings.map(m=>{const b=document.createElement('button');b.className='meetingrow';
+      const t=document.createElement('b'),d=document.createElement('small');t.textContent=m.title;d.textContent=meetingDate(m.started);b.append(t,d);
+      b.onclick=()=>{openSection('meetings');expectedMeeting=m.id;post({do:'meetingOpen',id:m.id});};return b;}):[Object.assign(document.createElement('div'),{className:'empty',textContent:'No saved meetings.'})]));
+    $('personfacts').replaceChildren(...(p.facts.length?p.facts.map(f=>Object.assign(document.createElement('div'),{className:'row',textContent:f})):[Object.assign(document.createElement('div'),{className:'empty',textContent:'Nothing saved. Say “remember Sam works at Acme”.'})]));
+    $('personname').focus();
+  }
+  function personBack(focus=true){currentPerson=null;$('peoplebrowse').hidden=false;$('persondetail').hidden=true;if(focus)$('peopleq').focus();}
+  $('peopleq').oninput=paintPeople; $('personback').onclick=()=>personBack();
+  $('personhide').onclick=()=>{if(!currentPerson)return;set('peopleHidden',[...(P.peopleHidden||[]),currentPerson.id]);savedPeople=savedPeople.filter(p=>p.id!==currentPerson.id);personBack();paintPeople();};
   // A meeting's action items: tick the ones that are yours and add them to Reminders; added ones stay ticked and greyed.
   function meetingRemindCount(){const n=document.querySelectorAll('#meetingactions input:checked:not(:disabled)').length,b=$('meetingremind');
     b.disabled=!n;b.textContent=n?'Add '+n+' to Reminders':'Add to Reminders';b.hidden=!document.querySelector('#meetingactions input:not(:disabled)');}
@@ -1037,6 +1078,9 @@
     tab(name) { openSection(name); },
     reveal(item) { want = item; reveal(); },
     showMeeting(id) { expectedMeeting = id; post({do: 'meetingOpen', id}); },   // a source chip under an answer
+    showPerson(id) { wantedPerson = id; post({ do: 'people' }); },
+    people(r) { if (r.error) { $('peoplecount').textContent = r.error; return; } savedPeople = r.people || []; paintPeople();
+      if (wantedPerson) { const p = savedPeople.find(x => x.id === wantedPerson); wantedPerson = null; if (p) openPerson(p); } },
     apps(list) {
       if (asking) return;
       if (!pick) pick = new Set(list.filter(a => a.suggested && a.status === 'new').map(a => a.id));
