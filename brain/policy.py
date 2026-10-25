@@ -321,7 +321,7 @@ def gate():
     if recursive or focus_command(cmd) and not macos.wants_focus() and prefs.pref('workIn', 'back') != 'front':
         decision(False, 'Tools cannot start another ask.' if recursive else 'Work in the background. Use --show --bg or hands; focus only when asked.')
         return
-    if (re.search(r'RABIK_HANDS_RECEIPT|RABIK_\w+\s*=|--hands\s+label\b', cmd) or
+    if (re.search(r'RABIK_HANDS_RECEIPT|RABIK_\w+\s*=|--hands\s+label\b|--recap\s+remind\b', cmd) or   # Reminders get only what the user picks
         '--hands' in cmd and (paths.APP in cmd or 'RABIK_APP' in cmd or re.search(r'(?:^|[/\s\"\'])Rabik(?:-real)?(?:[\s\"\']|$)', cmd)) or
         '--calendar' in tokens and any(t == paths.APP or os.path.basename(t) in ('Rabik', 'Rabik-real') for t in tokens[:tokens.index('--calendar')])):
         decision(False, 'Use rabik.py --hands or --calendar; native actions and safety overrides are not model tools.')

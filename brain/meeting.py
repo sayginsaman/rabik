@@ -294,7 +294,7 @@ def meeting_read(identifier):
     folder = meeting_path(identifier)
     with meeting_file(folder, 'metadata.json') as f:
         m = json.load(f)
-    m.update(id=identifier, transcript=[], answers=[], notes='', summary='', action_items=[], summary_revision=None, ended=None, duration=0)
+    m.update(id=identifier, transcript=[], answers=[], notes='', summary='', action_items=[], summary_revision=None, ended=None, duration=0, reminded={})
     partials = {}
     with meeting_file(folder, 'events.jsonl') as f:
         events = []
@@ -315,6 +315,8 @@ def meeting_read(identifier):
         elif kind == 'summary':
             m['summary'] = str(row.get('text', '')); m['action_items'] = row.get('action_items', []); m['summary_revision'] = row.get('revision')
         elif kind == 'resumed': m['ended'] = None
+        elif kind == 'reminded' and isinstance(row.get('items'), dict):   # action items the user added to Reminders, by recap_key
+            m['reminded'].update({str(k): str(v) for k, v in row['items'].items()})
         if kind in ('checkpoint', 'ended', 'resumed'):
             m['duration'] = max(m['duration'], float(row.get('duration', 0)))
             if kind == 'ended': m['ended'] = row.get('at')

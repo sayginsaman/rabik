@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from brain import (
     agents, apps, ask, calendar, clients, dictation, drawing, environ, hands, instant, interaction, macos, meeting, memory,
-    paths, policy, prefs, prompts, protocol, routine, screen, situation, skills, spotify, storage, support, telemetry, tips,
+    paths, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, spotify, storage, support, telemetry, tips,
     toolhelp, turn, watcher, web, windows, wording)
 
 __all__ = ['INNER', 'BUDGET', 'main']
@@ -48,6 +48,9 @@ def main():
         except (OSError, ValueError, TypeError, KeyError) as e: print(str(e)); return sys.exit(1)
     if len(args) == 2 and args[0] == '--routine-fire':
         return sys.exit(0 if routine.routine_fire(args[1]) else 1)
+    if args[:1] == ['--recap']:
+        try: return print(json.dumps(recap.recap_command(args[1:]), ensure_ascii=False))
+        except (OSError, ValueError, TypeError, KeyError) as e: print(json.dumps({'error': str(e)})); return sys.exit(1)
     if args == ['--routine-pop']:
         return print(json.dumps(routine.routine_pop()))
     if args[:1] == ['--agent-notify']:
