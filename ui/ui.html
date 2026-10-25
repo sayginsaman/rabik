@@ -821,6 +821,16 @@
     },
     agentDone(row){agentCard(row);},
     recap(r){recapCard(r);},
+    connectorOffer(o){   // an app whose Claude connector isn't connected came to the front: offer it once
+      $('thread').querySelectorAll('.connector-card').forEach(e=>e.remove());
+      const d=document.createElement('div');d.className='ok offer agent-card done connector-card';
+      d.innerHTML='<div class="eyebrow"><i></i><span>Connector</span></div><b></b><div class="a"><p></p></div><div class="agent-actions keys"></div>';
+      d.querySelector('b').textContent=`Let Rabik and your agents use ${o.name}?`;d.querySelector('.a p').textContent=`Connect ${o.name} in Claude so Rabik can ${o.reads} when you ask.`;
+      const choose=c=>{d.remove();post({connectorOffer:{choice:c,app:o.app}});fit();};
+      const never=document.createElement('button');never.textContent='Don’t ask again';never.onclick=()=>choose('never');
+      const later=keyButton('Not now','esc');later.dataset.esc='';later.onclick=()=>choose('later');
+      const go=keyButton('Connect','↩',true);go.onclick=()=>choose('connect');
+      d.querySelector('.agent-actions').append(never,later,go);($('thread')).append(d);setState('breathing');status('');fit();},
     recapAdded(res){const d=$('thread').querySelector('.recap-card');if(!d)return;const add=d.querySelector('[data-add]');d.querySelector('.recap-msg')?.remove();
       const msg=document.createElement('p');msg.className='note recap-msg';msg.setAttribute('role','status');
       if(res.need)msg.textContent='Rabik can’t use Reminders yet. Allow it in System Settings → Privacy & Security → Reminders, then press Add again.';

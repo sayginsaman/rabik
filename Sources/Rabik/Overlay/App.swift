@@ -506,6 +506,7 @@ final class App: NSObject, WKScriptMessageHandler {
             if let v = b["improve"] as? Bool { Rabik.settings.apply("improve", v); Rabik.settings.push() }
             if let item = b["memory"] as? [String: Any] { Rabik.settings.reveal(item) }   // a receipt's item: Settings → Memory, at that item
             if let source = b["source"] as? [String: Any] { openSource(source) }
+            if let offer = b["connectorOffer"] as? [String: Any], let choice = offer["choice"] as? String, let bundle = offer["app"] as? String { connectorOffer.answer(choice, bundle) }
             if let ok = b["allow"] as? Bool, !askFile.isEmpty { allow(ok) }
             return
         }
