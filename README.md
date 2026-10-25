@@ -205,7 +205,7 @@ If you say yes to **Help improve Rabik** (asked once, off until you do), a task 
 
 - `Rabik.swift`: the app (hotkey, speech, overlay, onboarding window)
 - `rabik.py`: the brain's entry script (fast commands, helpers for windows, web and screen); the AI and Rabik.swift call it
-- `brain/`: the brain's modules, split out of `rabik.py` one layer at a time (paths, settings, storage, output protocol, telemetry, prompts)
+- `brain/`: the brain's modules, split out of `rabik.py` one layer at a time (paths, settings, storage, output protocol, telemetry, prompts; the ask in progress; memory, routines, watches, meetings, dictation, feedback)
 - `ui/ui.html`, `ui/onboarding.html`, `ui/settings.html`: the overlay, the welcome flow, and Settings
 - `ui/AppIcon.icns`: the app icon
 - `ui/orbs.js`: the [thinking-orbs](https://github.com/Jakubantalik/thinking-orbs) engine (MIT, Jakub Antalik)

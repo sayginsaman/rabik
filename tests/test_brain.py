@@ -1,7 +1,10 @@
 """brain/'s layering rules, which keep rabik.py's compatibility facade and every test patch working while code moves out."""
 import ast
+import graphlib
+import importlib
 from pathlib import Path
 import sys
+import time
 import unittest
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -10,6 +13,7 @@ import rabik
 import brain.paths
 import brain.prefs
 import brain.prompts
+import brain.turn
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = sorted((ROOT / 'brain').glob('*.py'))
@@ -35,8 +39,17 @@ class BrainTests(unittest.TestCase):
                     with self.subTest(f'{path.name}: from {node.module}'):
                         self.assertEqual((path.name, node.module), ('prompts.py', 'brain.paths'))
 
+    def test_brain_has_no_import_cycle(self):
+        # The layers depend one way (paths, then prefs and storage, ... meeting, then dictation): a cycle would not fail at
+        # import, it would hand one module the other half-built.
+        deps = {path.stem: {a.name for n in imports(path) if isinstance(n, ast.ImportFrom) and n.module == 'brain' for a in n.names}
+                for path in MODULES}
+        list(graphlib.TopologicalSorter(deps).static_order())   # CycleError names the loop
+
     def test_every_moved_name_is_the_same_object_on_the_facade(self):
-        for module in (brain.paths, brain.prefs, brain.prompts, rabik.storage, rabik.protocol, rabik.telemetry):
+        modules = {importlib.import_module('brain.' + path.stem) for path in MODULES if path.stem != '__init__'}
+        self.assertEqual(set(rabik._OWNERS.values()), modules)   # a module left out of _OWNERS would miss every patch
+        for module in modules:
             for name in module.__all__:
                 with self.subTest(f'{module.__name__}.{name}'):
                     self.assertIs(getattr(rabik, name), getattr(module, name))
@@ -48,6 +61,32 @@ class BrainTests(unittest.TestCase):
             self.assertEqual(rabik.client(), 'pi')   # brain.prefs.client reads the patched pref
         self.assertIs(brain.prefs.pref, original)
         self.assertIs(rabik.pref, original)
+
+    def test_rabik_never_rebinds_a_moved_name_at_module_level(self):
+        # `ME_FILE = …` in rabik.py's own code (the --selftest block) stores into rabik's namespace only: the facade sees
+        # attribute writes, not module-level ones, so brain would keep the real file. Rebind through the owner instead.
+        def module_level(nodes):
+            for node in nodes:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)): continue
+                yield node
+                for field in ('body', 'orelse', 'finalbody', 'handlers'): yield from module_level(getattr(node, field, None) or [])
+        stores = [(n.lineno, n.id) for node in module_level(ast.parse((ROOT / 'rabik.py').read_text()).body)
+                  if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.For, ast.With))
+                  for n in ast.walk(node) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store) and n.id in rabik._OWNERS]
+        self.assertEqual(stores, [])
+
+    def test_a_cancel_lives_in_turn_and_reaches_rabik(self):
+        # STOPPING is rebound when an ask is cancelled: a copy on the facade would go stale, so rabik reads turn.STOPPING.
+        self.assertNotIn('STOPPING', vars(rabik))
+        with patch.object(brain.turn, 'STOPPING', True), self.assertRaises(InterruptedError):
+            rabik.hands_call(['state'])
+
+    def test_log_turn_still_falls_back_to_the_last_replay(self):
+        # replay stays in rabik.py for now; turn reads its steps through the hook rabik sets
+        with patch.object(rabik, 'TURN', {}), patch.object(rabik.replay, 'ran', ['open -a Notes'], create=True), \
+                patch.object(rabik, 'append_log') as log:
+            rabik.log_turn('open notes', 'Done.', time.time())
+        self.assertEqual(log.call_args.args[0]['ran'], ['open -a Notes'])
 
     def test_the_helper_path_is_the_entry_script(self):
         self.assertEqual(brain.paths.ME, str(ROOT / 'rabik.py'))

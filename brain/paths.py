@@ -4,12 +4,13 @@ ME is the entry script, rabik.py next to this package (inside Rabik.app once bui
 saved shortcuts all name that path, so it never points into brain/."""
 import os
 import plistlib
+import re
 import shlex
 from pathlib import Path
 
 __all__ = ['HOME', 'DIR', 'ME', 'PLACE', 'LOOK', 'SEARCH', 'READ', 'SHOW', 'REMEMBER', 'FORGET', 'TYPE', 'PLAY', 'QUEUE', 'ABOUT',
            'SHORTCUT', 'FRONT', 'WATCH', 'PICK', 'SET', 'WEB', 'HISTORY', 'HANDS', 'WINDOW', 'ROUTINE', 'DRAW', 'MEMORY', 'RECENT', 'PREFS',
-           'REPOSITORY', 'APP_VERSION', 'SHOT', 'APP']
+           'REPOSITORY', 'APP_VERSION', 'SHOT', 'APP', 'question_path', 'agent_gate_dir', 'request_file']
 
 HOME = os.path.expanduser('~')
 DIR = os.environ.get('RABIK_DIR') or os.path.join(HOME, '.config/rabik')   # RABIK_DIR: tests keep off the user's chat and rules
@@ -27,3 +28,21 @@ except OSError:
     except (OSError, ValueError): APP_VERSION = 'unknown'
 SHOT = '/tmp/rabik-screen'   # + -<n>.jpg, one per display
 APP = os.environ.get('RABIK_APP') or os.path.join(HOME, 'Applications/Rabik.app/Contents/MacOS/Rabik')   # set by Rabik.app
+
+
+def question_path(directory):
+    """This ask's pending card. Cards and answers live in DIR, not the ask folder: a sandboxed command can write
+    there, and must never reword a card or answer its own Allow."""
+    return os.path.join(DIR, 'answers', os.path.basename(os.path.normpath(directory)) + '.q')
+
+
+def agent_gate_dir(directory):
+    identifier = os.path.basename(directory)
+    return os.path.join(DIR, 'agent-gates', identifier) if re.fullmatch(r'[a-f0-9]{32}', identifier) else directory
+
+
+def request_file(directory):
+    """The user's own words for this ask. Memory, password typing and focus trust them, so they live where no sandbox writes:
+    an agent's gate folder, or DIR/answers beside the ask's Allow card (the ask folder itself is in the writable $TMPDIR)."""
+    gate = agent_gate_dir(directory)
+    return os.path.join(gate, 'request') if gate != directory else question_path(directory)[:-2] + '.request'

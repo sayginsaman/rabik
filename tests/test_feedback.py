@@ -2,6 +2,7 @@
 import io
 import json
 import os
+from pathlib import Path
 import subprocess
 import sys
 import unittest
@@ -56,5 +57,6 @@ class FeedbackTests(unittest.TestCase):
         # "That key did not work" back. Rabik has no license check, so nothing but the model sees such a request.
         for name in ('licensed', 'activate', 'GUMROAD_PRODUCT', 'BUY', 'KEY_FILE'):
             self.assertFalse(hasattr(rabik, name), name)
-        with open(rabik.ME, encoding='utf-8') as f:
-            self.assertNotIn('gumroad', f.read().lower())
+        brain = Path(rabik.ME).parent / 'brain'
+        for path in [Path(rabik.ME), *sorted(brain.glob('*.py'))]:   # the brain's code is rabik.py and brain/
+            self.assertNotIn('gumroad', path.read_text(encoding='utf-8').lower(), path.name)
