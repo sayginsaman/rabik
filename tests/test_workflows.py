@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import tests  # first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 from tests import scratch_dir
 
@@ -221,9 +222,7 @@ class WorkflowTests(unittest.TestCase):
         with patch.dict(os.environ, {'RABIK_LIVE': '1'}):
             self.assertIsNone(rabik.fast('remember how to create calendar event'))
         full = rabik.SYSTEM + rabik.ASK_ME + rabik.POINTER + rabik.LEARN_ME + rabik.TEACH + rabik.ASK_FIRST + rabik.WORKFLOW
-        self.assertLessEqual(len(full), 10000)
-        installed = os.path.expanduser("~/Applications/Rabik.app/Contents/Resources/rabik.py")
-        self.assertLessEqual(len(full.replace(rabik.ME, installed)), 10000)
+        self.assertLessEqual(tests.prompt_chars(full), 10000)
 
     def test_interrupted_shortcut_save_preserves_private_previous_file(self):
         saved={'original':{'mine':True,'cmds':['echo ok'],'reply':'Done.'}}

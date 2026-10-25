@@ -13,6 +13,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class RepoFixTests(unittest.TestCase):
+    def test_every_test_module_isolates_config_before_importing_rabik(self):
+        """`discover -s tests -p one_file.py` imports that module alone: it must load tests/__init__ (scratch RABIK_DIR,
+        no telemetry, host guard) before rabik reads its config paths."""
+        import ast
+        late = []
+        for path in sorted((ROOT / 'tests').rglob('test_*.py')):
+            nodes = sorted((n for n in ast.walk(ast.parse(path.read_text())) if isinstance(n, (ast.Import, ast.ImportFrom))),
+                           key=lambda n: (n.lineno, n.col_offset))
+            for node in nodes:   # the first statement that names tests or rabik decides
+                roots = [a.name.split('.')[0] for a in node.names] if isinstance(node, ast.Import) else [(node.module or '').split('.')[0]]
+                if 'rabik' in roots:
+                    if 'tests' not in roots[:roots.index('rabik')]: late.append(f'{path.relative_to(ROOT)}:{node.lineno}')
+                    break
+                if 'tests' in roots: break
+        self.assertEqual(late, [], 'import tests before rabik in these modules')
+
     def test_long_dry_eval_is_opt_in(self):
         source = (ROOT / 'tests/evals/test_dry.py').read_text()
         self.assertIn("RABIK_RUN_DRY_EVALS') == '1'", source)

@@ -16,6 +16,7 @@ import unittest
 from unittest.mock import patch
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+import tests  # first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 
 WORKER = '''import json,sys,time,os
@@ -140,11 +141,10 @@ class AgentTests(unittest.TestCase):
         self.assertIsNone(rabik.parse_handoff('[agent-profile {"action":"invent","name":"Scout"}]'))
 
     def test_full_installed_prompt_including_handoff_stays_under_budget(self):
-        installed='/Users/exampleuser/Applications/Rabik.app/Contents/Resources/rabik.py'
         for draw in (False,True):   # Drawings off swaps DRAWING for POINTER: both must fit
             self.prefs.update(draw=draw,pointer=True,askMe=True,learnMe=True,tips=True,learn=True)
             prompt=rabik.system_prompt(rabik.ASK_FIRST)
-            self.assertLessEqual(len(prompt.replace(rabik.ME,installed)),10050)   # same 1.3.2 cap as test_screen_draw
+            self.assertLessEqual(tests.prompt_chars(prompt),10050)   # same 1.3.2 cap as test_screen_draw
         self.assertIn('(--look if none)',rabik.POINTER)
         self.assertLess(prompt.index(rabik.AGENT_HANDOFF),250);self.assertEqual(prompt.count(rabik.AGENT_HANDOFF),1)
 
@@ -902,9 +902,9 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(decision['permissionDecision'],'deny');ask.assert_not_called();self.assertIn('--web read',decision['permissionDecisionReason'])
 
     def test_trusted_read_helpers_pass_and_shell_mutations_still_ask(self):
-        read='python3 '+rabik.ME+' --window'
+        read='python3 '+shlex.quote(rabik.ME)+' --window'
         self.assertTrue(rabik.agent_read_command(read));self.assertFalse(rabik.agent_read_command(read+'; echo x > result'))
-        self.assertFalse(rabik.agent_read_command('python3 '+rabik.ME+' --hands type Answer value'))
+        self.assertFalse(rabik.agent_read_command('python3 '+shlex.quote(rabik.ME)+' --hands type Answer value'))
         with patch.object(rabik,'preview_commands'):
             decision,ask=self.gate('Bash',{'command':read},RABIK_AGENT='fixture')
         ask.assert_not_called();self.assertNotEqual(decision.get('permissionDecision'),'deny')
@@ -1209,7 +1209,7 @@ class AgentTests(unittest.TestCase):
         row['_learningContext']=rabik.handoff_context('Known context',[
             {'tool':'Bash','input':json.dumps({'command':f'{rabik.PLACE} Editor fullscreen monitor'}),'status':'completed','result':'Placed.'}])
         self.receipt(row,'Read',{'file_path':'scratch.png'})
-        self.receipt(row,'Bash',{'command':f'python3 {rabik.ME} --window Browser'})
+        self.receipt(row,'Bash',{'command':f'python3 {shlex.quote(rabik.ME)} --window Browser'})
         self.receipt(row,'Bash',{'command':f'./rabik.py --place Browser fullscreen laptop'})
         with patch.object(rabik,'SKILLS',str(Path(self.root.name)/'skills.json')),patch.object(rabik,'cached_hands',return_value=None):
             self.manager.finish(row,'done','Both arranged.')

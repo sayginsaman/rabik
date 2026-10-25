@@ -10,6 +10,7 @@ import threading
 import unittest
 from unittest.mock import Mock, patch
 
+import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 from tests import test_agents
 

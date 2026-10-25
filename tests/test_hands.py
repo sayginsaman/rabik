@@ -1,4 +1,5 @@
 """Native helper integration uses fake APP workers and scratch state only."""
+import shlex
 import io
 import json
 import os
@@ -14,6 +15,7 @@ import unittest
 import unittest.mock
 from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 
 
@@ -196,7 +198,7 @@ precondition(try! String(contentsOfFile:path, encoding:.utf8) == "y")
                      patch('sys.stdout',new_callable=io.StringIO) as out:
                     rabik.gate()
                 self.assertEqual(out.getvalue(),'')
-        with patch('sys.stdin',io.StringIO(json.dumps({'tool_input':{'command':'open '+rabik.ME+' --window'}}))), \
+        with patch('sys.stdin',io.StringIO(json.dumps({'tool_input':{'command':'open '+shlex.quote(rabik.ME)+' --window'}}))), \
              patch('sys.stdout',new_callable=io.StringIO) as out:
             rabik.gate()
         denied = json.loads(out.getvalue())['hookSpecificOutput']

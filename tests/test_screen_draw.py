@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tests import scratch_dir
+from tests import prompt_chars, scratch_dir
 import rabik
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -147,10 +147,9 @@ class DrawingTests(unittest.TestCase):
             self.assertNotIn('--draw',rabik.system_prompt(rabik.ASK_FIRST))
             with self.assertRaisesRegex(ValueError,'off'): rabik.draw({'steps':[]})
         prompt = rabik.system_prompt(rabik.ASK_FIRST)
-        installed = str(Path.home()/'Applications/Rabik.app/Contents/Resources/rabik.py')
         self.assertIn('--draw',prompt)
         self.assertIn('use ' + rabik.DRAW + ' once on Request screen unless user names another',prompt)
-        self.assertLessEqual(len(prompt.replace(rabik.ME,installed)),10050)   # +50 for the send-to-running-input rule (1.3.2)
+        self.assertLessEqual(prompt_chars(prompt),10050)   # +50 for the send-to-running-input rule (1.3.2)
         self.assertIn('draw',rabik.switches())
         self.assertFalse(rabik.replayable(rabik.DRAW + " '{}'"))
 

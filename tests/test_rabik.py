@@ -1,4 +1,5 @@
 """Offline regressions: no Claude calls, Mac actions, or user settings."""
+import shlex
 import io
 import json
 import os
@@ -13,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import tests  # first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 from tests import scratch_dir
 
@@ -903,7 +905,7 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
     def test_hook_and_helper_launch_runs_from_cached_bytecode_outside_the_app(self):
         home = Path(scratch_dir(self)); app = home / 'Rabik.app'; app.mkdir()
         script = app / 'rabik.py'; script.write_text(Path(rabik.ME).read_text())
-        env = {k: v for k, v in os.environ.items() if not k.startswith('RABIK_')} | {'HOME': str(home), 'RABIK_DIR': str(home), 'RABIK_CLIENT': 'pi'}
+        env = {k: v for k, v in os.environ.items() if not k.startswith(('RABIK_', 'PYTHONDONTWRITEBYTECODE', 'PYTHONPYCACHEPREFIX'))} | {'HOME': str(home), 'RABIK_DIR': str(home), 'RABIK_CLIENT': 'pi'}   # a developer's own bytecode settings would hide the cache
         event = json.dumps({'tool_name': 'exec', 'tool_input': {'command': 'env FIXTURE=1 rm /tmp/file'}})
         run = lambda *a, stdin='': subprocess.run([*a], input=stdin, env=env, capture_output=True, text=True, cwd=home, timeout=20)
         for args, stdin in ((['--gate'], event), (['--no-such-flag'], '')):
@@ -1012,8 +1014,10 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
         self.assertLessEqual(max(naps), .02)
 
     def test_allow_answer_is_picked_up_quickly(self):
-        naps = []
+        naps, real_sleep = [], time.sleep
         def nap(secs):
+            if threading.current_thread() is not threading.main_thread():
+                return real_sleep(secs)   # a relay thread an earlier test left behind naps too; it is not this wait
             naps.append(secs)
             Path(json.loads(Path(rabik.question_path(self.root)).read_text())['_a']).write_text('y')   # the user clicks Allow
         with patch.dict(os.environ, {'RABIK_ASK': str(self.root)}), patch.object(rabik.time, 'sleep', side_effect=nap):
@@ -1192,7 +1196,7 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
     def test_read_only_question_tools_stay_on_haiku_without_a_completion_marker(self):
         events=[]
         for n, name, inp in [('1','WebSearch',{'query':'fixture question'}), ('2','WebFetch',{'url':'https://fixture.invalid'}),
-                             ('3','Bash',{'command':f'{sys.executable} {rabik.ME} --window'})]:
+                             ('3','Bash',{'command':f'{sys.executable} {shlex.quote(rabik.ME)} --window'})]:
             events.extend([{'type':'assistant','message':{'content':[{'type':'tool_use','id':n,'name':name,'input':inp}]}},
                            {'type':'user','message':{'content':[{'type':'tool_result','tool_use_id':n,'content':'Source text'}]}}])
         p=unittest.mock.Mock(); p.stdin=io.StringIO(); p.ask=''; p.returncode=0
@@ -1771,8 +1775,7 @@ class WatchAndBudgetTests(unittest.TestCase):
         self.assertIn('Stable facts: answer only if sure.', full)
         self.assertIn('Use relevant window text', full)
         self.assertLessEqual(len(rabik.MODEL_OFFER), 211)
-        self.assertLessEqual(len(full), 10000)
-        self.assertLessEqual(len(full.replace(rabik.ME, os.path.expanduser('~/Applications/Rabik.app/Contents/Resources/rabik.py'))), 10000)
+        self.assertLessEqual(tests.prompt_chars(full), 10000)
 
 
 class BoxLookTests(unittest.TestCase):

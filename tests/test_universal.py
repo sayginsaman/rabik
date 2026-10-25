@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
+import tests  # first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 
 
@@ -341,5 +342,5 @@ class UniversalTests(unittest.TestCase):
         self.assertIn('do not search for another copy', rabik.SYSTEM)
         self.assertNotIn('on Amazon', rabik.SYSTEM)
         full = rabik.SYSTEM + rabik.ASK_ME + rabik.POINTER + rabik.LEARN_ME + rabik.TEACH + rabik.ASK_FIRST + rabik.WORKFLOW
-        self.assertLessEqual(len(full), 10000)
-        print(f'UNIVERSAL PROMPT CHARS: {len(full)}; INSTALLED: {len(full.replace(rabik.ME, os.path.expanduser("~/Applications/Rabik.app/Contents/Resources/rabik.py")))}; TEXT PAGE CHARS: {rabik.TEXT_PAGE}', flush=True)
+        self.assertLessEqual(tests.prompt_chars(full), 10000)
+        print(f'UNIVERSAL PROMPT CHARS (installed): {tests.prompt_chars(full)}; TEXT PAGE CHARS: {rabik.TEXT_PAGE}', flush=True)

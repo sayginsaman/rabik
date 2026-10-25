@@ -1,4 +1,5 @@
 """Replay actions use scratch storage and fake app workers, never paid calls or personal apps."""
+import shlex
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 from tests import scratch_dir
 
@@ -92,8 +94,8 @@ class ReplayTests(unittest.TestCase):
         rabik.save_skills({'do fixture':{'cmds':['peekaboo click --id 12'],'reply':'Done.','mine':True}})
         with patch.object(rabik.subprocess,'run') as run:self.assertIsNone(rabik.replay('do fixture'));run.assert_not_called()
         self.assertIsNone(rabik.shortcut_commands('do fixture',[self.commands[-1]+' && open -a Fixture']))
-        self.assertIsNone(rabik.shortcut_commands('do fixture',[rabik.ME+' ask again']))
-        reply,saved=rabik.remember_workflow('nested fixture',f'Done. [workflow nested fixture | Use the native app.] [replay python3 {rabik.ME} ask again]',True,['open Fixture'])
+        self.assertIsNone(rabik.shortcut_commands('do fixture',[shlex.quote(rabik.ME)+' ask again']))
+        reply,saved=rabik.remember_workflow('nested fixture',f'Done. [workflow nested fixture | Use the native app.] [replay python3 {shlex.quote(rabik.ME)} ask again]',True,['open Fixture'])
         self.assertTrue(saved);self.assertNotIn('nested fixture',rabik.skills())
 
     def test_native_menu_bypasses_map_capture_but_waits_for_confirmation(self):

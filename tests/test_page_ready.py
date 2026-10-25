@@ -1,4 +1,5 @@
 """Page readiness uses fake browser calls and a controlled clock; no real apps or paid calls."""
+import shlex
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import unittest
 from unittest.mock import Mock,patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 
 
@@ -115,8 +117,8 @@ class PageReadyTests(unittest.TestCase):
             self.assertEqual(rabik.label('Bash',{'command':rabik.SHOW+' --bg "https://www.amazon.com/s?k=epsom+salt"'+tail}),'Opening amazon.com')
         self.assertEqual(rabik.label('Bash',{'command':rabik.SHOW+' --bg "/tmp/Fixture Notes.md" && echo ok'}),'Opening Fixture Notes.md')
         # real log chains: the label names this command's target, never a later helper or its quoted words
-        self.assertEqual(rabik.label('Bash',{'command':f'A={rabik.ME}; $A --front Orca && $A --hands click "rabik"'}),'Bringing Orca forward')
-        self.assertEqual(rabik.label('Bash',{'command':'open -g -a Spotify && '+rabik.ME+' --queue "violet"'}),'Opening Spotify')
+        self.assertEqual(rabik.label('Bash',{'command':f'A={shlex.quote(rabik.ME)}; $A --front Orca && $A --hands click "rabik"'}),'Bringing Orca forward')
+        self.assertEqual(rabik.label('Bash',{'command':'open -g -a Spotify && '+shlex.quote(rabik.ME)+' --queue "violet"'}),'Opening Spotify')
         self.assertEqual(rabik.label('Bash',{'command':'open "x-apple.systempreferences:sound" && '+rabik.HANDS+' see "System Settings"'}),'Opening x-apple.systempreferences:sound')
 
     def test_poll_waits_for_ready_and_stable_dom_with_a_five_second_cap(self):

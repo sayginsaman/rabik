@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 
 

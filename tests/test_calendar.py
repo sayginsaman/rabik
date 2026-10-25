@@ -1,4 +1,5 @@
 """Calendar tools use fake events, cards and native stores, never personal calendars."""
+import shlex
 import io
 import json
 import os
@@ -136,7 +137,7 @@ class CalendarTests(unittest.TestCase):
             self.assertEqual(rabik.calendar_backend({'action': 'list'}), {'events': []})
         self.assertEqual(run.call_args.args[0], [rabik.APP, '--calendar'])
         self.assertEqual(json.loads(run.call_args.kwargs['input']), {'action': 'list'})
-        self.assertFalse(rabik.risky(rabik.ME + ' --calendar \'{"action":"delete"}\''))
+        self.assertFalse(rabik.risky(shlex.quote(rabik.ME) + ' --calendar \'{"action":"delete"}\''))
 
     def test_model_cannot_call_native_calendar_directly(self):
         event = {'tool_name': 'Bash', 'tool_input': {}}

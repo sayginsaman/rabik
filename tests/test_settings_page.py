@@ -138,7 +138,7 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual(out['result'], [True, True, 'Updates are managed by Nix', 'Run nix profile upgrade or nix run again.', 'Version 1.3.3 · Nix'])
 
     def test_retired_settings_are_hidden_and_keep_saved_values(self):
-        sys.path.insert(0, str(ROOT)); import rabik
+        sys.path.insert(0, str(ROOT)); import tests, rabik
         source, page = (ROOT / 'Rabik.swift').read_text(), (ROOT / 'ui/settings.html').read_text()
         retired = re.findall(r'"(\w+)"', source[source.index('static let retiredKeys'):source.index(']', source.index('static let retiredKeys'))])
         self.assertIn('workIn', retired)

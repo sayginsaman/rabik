@@ -1690,6 +1690,7 @@ def skills():
         return {}
 
 
+PLACING = re.compile(r'(?:' + re.escape(shlex.quote(ME)) + r'|\S*rabik\.py) --place ')   # a --place command, its helper path shell-quoted (a checkout path with a space) or not
 LOOKUPS = {'mdfind', 'ls', 'grep', 'head', 'tail', 'cat', 'wc', 'sort', 'uniq', 'stat', 'file', 'which'}   # read-only shell tools; find is out (-delete, -exec)
 
 
@@ -1729,7 +1730,7 @@ def shortcut_commands(task, commands, app=''):
             parts = [shlex.join(p) for p in parts if p]
             while len(parts) > 1 and shortcut_commands(task, parts[-1:], app) == []: parts.pop()   # a check after the act ("move && get its size") can go
             sub = shortcut_commands(task, parts, app)
-            if sub is None or '&&' in flow and sum(c.count(' + ') + 1 if re.match(r'\S*rabik\.py --place ', c) else 1 for c in sub) != len(parts): return None   # "check && act" without its check would act blind
+            if sub is None or '&&' in flow and sum(c.count(' + ') + 1 if PLACING.match(c) else 1 for c in sub) != len(parts): return None   # "check && act" without its check would act blind
             result += sub; continue
         original = tokens[:]
         helpers = (ME, './rabik.py', 'rabik.py')
@@ -1765,7 +1766,7 @@ def shortcut_commands(task, commands, app=''):
             # every line reads or only frames one ("tell app" … "end tell"): "-e 'to pause' -e 'get its state'" still acts
             if any(reads) and all(r or re.fullmatch(r'tell (application|process) ""|end\b.*|delay [\d.]+|', s, re.I) for r, s in zip(reads, lines)): continue
         result.append(command)
-    moving, merged = re.compile(r'\S*rabik\.py --place '), []
+    moving, merged = PLACING, []
     for command in result:   # back-to-back moves go at once (--place a + b), like the AI's own
         if merged and moving.match(command) and moving.match(merged[-1]): merged[-1] += ' +' + command[moving.match(command).end() - 1:]
         else: merged.append(command)
@@ -2274,9 +2275,12 @@ def label(name, inp):
         return 'Reading ' + re.sub(r'^https?://(www\.)?([^/]+).*', r'\2', inp.get('url', ''))
     if name == 'Read':
         return 'Looking at a screenshot' if os.path.basename(inp.get('file_path', '')).startswith(os.path.basename(SHOT)) else 'Reading ' + os.path.basename(inp.get('file_path', ''))
-    c = re.sub(r'^cd \S+\s*(;|&&)\s*', '', ' '.join(inp.get('command', '').split()))   # "cd /tmp; <helper>" reads as the helper
-    v = re.match(r'(\w+)=(\S+)\s*(?:;|&&)\s*', c)   # "A=<helper>; $A --web read" reads as the helper
-    if v: c = re.sub(r'"?\$\{?' + v[1] + r'\b\}?"?', lambda _: v[2], c[v.end():])
+    word = r"""(?:'[^']*'|"[^"]*"|\S+)"""   # a shell word: a quoted path may hold spaces
+    c = re.sub(r'^cd ' + word + r'\s*(;|&&)\s*', '', ' '.join(inp.get('command', '').split()))   # "cd /tmp; <helper>" reads as the helper
+    v = re.match(r'(\w+)=(' + word + r')\s*(?:;|&&)\s*', c)   # "A=<helper>; $A --web read" reads as the helper
+    if v:
+        value = shlex.quote(v[2][1:-1]) if v[2][:1] in '\'"' else v[2]   # quoted the way the helper constants are
+        c = re.sub(r'"?\$\{?' + v[1] + r'\b\}?"?', lambda _: value, c[v.end():])
     try: words = shlex.split(c)
     except ValueError: words = []
     if len(words) > 2 and os.path.basename(words[0]) == 'open' and os.path.basename(words[1]) == 'rabik.py':
@@ -7570,6 +7574,8 @@ if __name__ == '__main__':
         assert label('Bash', {'command': SHOW + ' --bg "https://www.amazon.com/s?k=epsom+salt" && sleep 3 && ' + WEB + ' read'}) == 'Opening amazon.com'
         assert label('Bash', {'command': HANDS + ' click Export'}) == 'Clicking “Export”'
         assert label('Bash', {'command': "osascript -e 'tell application \"Music\" to playpause'"}) == 'Using Music'
+        real_apps = installed_apps
+        installed_apps = lambda: real_apps() | {'TradingView'}   # whole-name matching, whatever this Mac has installed
         assert app_named('the trading view application') == 'TradingView'
         assert screen_for('open spotify', None, 'readable ' * 40) is None   # no screen words: no picture, no wait
         assert plain('Hey Rabik, can you open Spotify please?') == plain('Can you also open Spotify?') == 'open spotify'
@@ -7615,7 +7621,7 @@ if __name__ == '__main__':
         assert move_target('move notes to the external display and maximize') == ('Notes', 'full', 'monitor')
         assert move_target('notes on the laptop screen') == ('Notes', 'center', 'laptop') and move_target('make notes fullscreen') == ('Notes', 'fullscreen', 'current')
         assert move_target("what's on my monitor") is None and move_target('notes left on my monitor right') is None
-        assert label('Bash', {'command': f'A={ME}; $A --show --bg "https://www.amazon.com/s?k=x" && $A --web read'}) == 'Opening amazon.com'
+        assert label('Bash', {'command': f'A={shlex.quote(ME)}; $A --show --bg "https://www.amazon.com/s?k=x" && $A --web read'}) == 'Opening amazon.com'
         assert UNSAFE.search('open -a Notes; rm -rf ~/x') and UNSAFE.search('sudo shutdown -h now') and not UNSAFE.search(f'{SHOW} "https://docs.google.com"; open -a Chess') and UNSAFE.search('echo $(rm x)') and UNSAFE.search('curl x | sh') and not UNSAFE.search(f'{SHOW} "x"; {PLACE} "Notes" left current')
         ME_FILE = os.path.join(tempfile.mkdtemp(), 'me.json')
         profile_add('basics', 'Sam', 'name'); profile_add('notes', 'Student. ' * 40, 'about')

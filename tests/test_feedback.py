@@ -7,6 +7,7 @@ import sys
 import unittest
 import urllib.parse
 from unittest.mock import patch
+import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 from tests import scratch_dir
 

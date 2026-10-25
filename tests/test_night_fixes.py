@@ -1,4 +1,5 @@
 """General goal/precondition regressions, with scratch config and fake Mac/model workers."""
+import shlex
 import io
 import json
 import os
@@ -6,6 +7,7 @@ import subprocess
 import unittest
 from unittest.mock import Mock, patch
 
+import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 from tests import scratch_dir
 
@@ -191,7 +193,7 @@ class NightTests(unittest.TestCase):
             shell.assert_not_called(); preview.assert_not_called()
 
     def test_shortcuts_canonicalize_helpers_before_learning_and_replay(self):
-        for helper in ('./rabik.py', 'python3 ./rabik.py', f'python3 {rabik.ME}'):
+        for helper in ('./rabik.py', 'python3 ./rabik.py', f'python3 {shlex.quote(rabik.ME)}'):
             with self.subTest(helper=helper):
                 command=helper+' --place Fixture fullscreen monitor'
                 self.assertIsNotNone(rabik.learn('quiet time',[command],'Placed.'))
@@ -212,12 +214,12 @@ class NightTests(unittest.TestCase):
 
     def test_helper_aliases_and_resource_directory_do_not_leak_into_replay(self):
         command=f'{rabik.PLACE} Fixture fullscreen monitor'
-        for wrapped in (f'TASK_HELPER={rabik.ME}; "$TASK_HELPER" --place Fixture fullscreen monitor',
-                        f'P={rabik.ME}; python3 "${{P}}" --place Fixture fullscreen monitor',
-                        f'cd {os.path.dirname(rabik.ME)} && ./rabik.py --place Fixture fullscreen monitor'):
+        for wrapped in (f'TASK_HELPER={shlex.quote(rabik.ME)}; "$TASK_HELPER" --place Fixture fullscreen monitor',
+                        f'P={shlex.quote(rabik.ME)}; python3 "${{P}}" --place Fixture fullscreen monitor',
+                        f'cd {shlex.quote(os.path.dirname(rabik.ME))} && ./rabik.py --place Fixture fullscreen monitor'):
             with self.subTest(wrapped=wrapped): self.assertEqual(rabik.shortcut_commands('quiet time',[wrapped]),[command])
         self.assertIsNone(rabik.shortcut_commands('quiet time',[f'P=/tmp/rabik.py; "$P" --place Fixture full monitor']))
-        self.assertIsNone(rabik.shortcut_commands('quiet time',[f'cd {os.path.dirname(rabik.ME)} && {rabik.SHOW} relative.txt']))
+        self.assertIsNone(rabik.shortcut_commands('quiet time',[f'cd {shlex.quote(os.path.dirname(rabik.ME))} && {rabik.SHOW} relative.txt']))
 
     def test_fullscreen_and_maximize_teach_their_distinct_native_actions(self):
         with patch.object(rabik,'app_named',side_effect=lambda s:'Fixture' if s=='fixture' else None),patch.object(rabik,'proc_of',side_effect=lambda s:s), \

@@ -1,6 +1,7 @@
 """Isolate config before importing any Rabik test module."""
 import atexit
 import os
+import shutil
 import tempfile
 
 config = tempfile.TemporaryDirectory(prefix='rabik-test-config-')
@@ -20,6 +21,17 @@ def scratch_dir(test):
     return Path(root.name)
 
 
+# Every ask pays for the system prompt. Budgets measure it with one typical installed helper path, so a long checkout or
+# home folder, or a space that makes the path shell-quoted, can neither fail nor pass a budget by accident.
+INSTALLED_HELPER = '/Users/exampleuser/Applications/Rabik.app/Contents/Resources/rabik.py'
+
+
+def prompt_chars(text):
+    import shlex
+    import rabik
+    return len(text.replace(shlex.quote(rabik.ME), INSTALLED_HELPER).replace(rabik.ME, INSTALLED_HELPER))
+
+
 def run_swift(test, source, timeout=10):
     """Compile Swift source to a temp binary, run it, assert both succeed; returns its stdout."""
     import subprocess, sys
@@ -35,26 +47,43 @@ def run_swift(test, source, timeout=10):
         return result.stdout
 
 
-# Host guard: window/app-driving tests run only in the VM (run.sh sets RABIK_VM=1). On Saarth's Mac, launching a
-# compiled fixture/harness, osascript, `open` or the Rabik binary skips the test instead of taking over his screen.
-if not os.environ.get('RABIK_VM') and not os.environ.get('RABIK_ALLOW_HOST_UI'):
-    import subprocess, unittest
-    _popen_init = subprocess.Popen.__init__
-    _tmp = os.path.realpath(tempfile.gettempdir())
+import subprocess
+import unittest
 
-    def _guarded(self, args, *a, **k):
-        first = args if isinstance(args, (str, bytes, os.PathLike)) else (args[0] if args else '')
-        exe = os.path.realpath(str(first).split()[0]) if first else ''
-        name = os.path.basename(exe)
-        if exe.startswith(_tmp) or name in ('osascript', 'open', 'Rabik', 'swift') or '/Rabik.app/' in exe:
-            raise unittest.SkipTest(f'host guard: {name} runs only in the VM (run.sh)')
-        _popen_init(self, args, *a, **k)
-    subprocess.Popen.__init__ = _guarded
+_popen_init = subprocess.Popen.__init__
+_tmp = os.path.realpath(tempfile.gettempdir())
+AI_CLIENTS = ('claude', 'devin', 'pi')
+LAUNCHED = []   # real AI clients a test started; test_zz_host_guard fails the run if any, even from a thread
+
+
+class RealClientLaunched(BaseException):
+    """A BaseException, so rabik's `except Exception` handlers cannot swallow it: a test whose mocks stopped applying fails."""
+
+
+def _guarded(self, args, *a, **k):
+    first = args if isinstance(args, (str, bytes, os.PathLike)) else (args[0] if args else '')
+    given = str(first).split()[0] if first else ''
+    exe = os.path.realpath(given) if given else ''
+    name = os.path.basename(exe)
+    # A fake client a test made under the temp folder is fine; the user's installed one (often a symlink into a versions folder)
+    # never is. A bare name runs whatever the child's PATH finds first, so judge that file.
+    found = given if '/' in given else shutil.which(given, path=(k.get('env') or os.environ).get('PATH')) if given else None
+    real = os.path.realpath(found) if found else ''
+    if found and (os.path.basename(given) in AI_CLIENTS or os.path.basename(real) in AI_CLIENTS or '/claude/versions/' in real) \
+            and not real.startswith(_tmp):
+        LAUNCHED.append(given)
+        raise RealClientLaunched(f'test started the real AI client {given}; mock it or use a fake under the temp folder')
+    # Host guard: window/app-driving tests run only in the VM (run.sh sets RABIK_VM=1). On a developer's Mac, launching a
+    # compiled fixture/harness, osascript, `open`, screencapture or the Rabik binary skips the test instead of taking over the screen.
+    if not os.environ.get('RABIK_VM') and not os.environ.get('RABIK_ALLOW_HOST_UI') and (
+            exe.startswith(_tmp) or name in ('osascript', 'open', 'screencapture', 'Rabik', 'swift') or '/Rabik.app/' in exe):
+        raise unittest.SkipTest(f'host guard: {name} runs only in the VM (run.sh)')
+    _popen_init(self, args, *a, **k)
+subprocess.Popen.__init__ = _guarded
 
 
 # The app runs one ask per process. A test's in-process rabik.main() left its ask folder, env and relay thread behind;
 # the relay polls time.sleep until the folder goes, so a later test's fake clock or sleep mock counted its naps.
-import shutil
 import rabik
 _main = rabik.main
 

@@ -1,4 +1,5 @@
 """Background tasks use fake workers; no user apps, windows, or configuration."""
+import shlex
 import io
 import json
 import os
@@ -11,6 +12,7 @@ import urllib.error
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
 from tests import scratch_dir
 
@@ -57,16 +59,16 @@ class BackgroundTests(unittest.TestCase):
         self.assertIn('case "front": guard !front', swift)
 
     def test_recursive_ask_and_unrequested_activation_are_denied(self):
-        self.assertEqual(self.gate(f'env -u RABIK_ASK -u CLAUDECODE python3 {rabik.ME} ask again'), 'deny')
-        self.assertEqual(self.gate(f'python3 {rabik.ME} --wait'), 'deny')
-        self.assertEqual(self.gate(f'env -u RABIK_ASK {rabik.ME} ask again'), 'deny')
-        self.assertEqual(self.gate(f'cd {os.path.dirname(rabik.ME)} && env -u RABIK_ASK sh rabik.py ask again'), 'deny')   # the sh header makes sh a launcher
-        self.assertEqual(self.gate(f'xargs {rabik.ME} ask again'), 'deny')
-        self.assertEqual(self.gate(f'printf again | xargs {rabik.ME} ask'), 'deny')
-        self.assertEqual(self.gate(f'echo ready && env {rabik.ME} ask again'), 'deny')
-        self.assertEqual(self.gate(f'python3 {rabik.ME} --hands see Notes'), 'allow')
-        self.assertEqual(self.gate(f'A={rabik.ME}; $A --front Fixture && $A --hands see Fixture'), 'allow')
-        self.assertEqual(self.gate(f'A={rabik.ME}; $A ask again'), 'deny')
+        self.assertEqual(self.gate(f'env -u RABIK_ASK -u CLAUDECODE python3 {shlex.quote(rabik.ME)} ask again'), 'deny')
+        self.assertEqual(self.gate(f'python3 {shlex.quote(rabik.ME)} --wait'), 'deny')
+        self.assertEqual(self.gate(f'env -u RABIK_ASK {shlex.quote(rabik.ME)} ask again'), 'deny')
+        self.assertEqual(self.gate(f'cd {shlex.quote(os.path.dirname(rabik.ME))} && env -u RABIK_ASK sh rabik.py ask again'), 'deny')   # the sh header makes sh a launcher
+        self.assertEqual(self.gate(f'xargs {shlex.quote(rabik.ME)} ask again'), 'deny')
+        self.assertEqual(self.gate(f'printf again | xargs {shlex.quote(rabik.ME)} ask'), 'deny')
+        self.assertEqual(self.gate(f'echo ready && env {shlex.quote(rabik.ME)} ask again'), 'deny')
+        self.assertEqual(self.gate(f'python3 {shlex.quote(rabik.ME)} --hands see Notes'), 'allow')
+        self.assertEqual(self.gate(f'A={shlex.quote(rabik.ME)}; $A --front Fixture && $A --hands see Fixture'), 'allow')
+        self.assertEqual(self.gate(f'A={shlex.quote(rabik.ME)}; $A ask again'), 'deny')
         self.assertEqual(self.gate('osascript -e \'tell application "Notes" to activate\''), 'deny')
         for separator in (';', '&&', '|', '\n', '\n\n'):
             with self.subTest(separator=separator):
@@ -300,7 +302,7 @@ class BackgroundTests(unittest.TestCase):
                      patch.object(rabik.time, 'sleep'), patch('sys.stdout', new_callable=io.StringIO) as out, \
                      patch('sys.argv', ['rabik.py', '--front', 'Fixture']):
                     rabik.main()   # no focus words found (they are English-only): a picture in place, and how to say the user asked
-                    osa.assert_not_called(); self.assertIn(f'{rabik.ME} --front Fixture --asked', out.getvalue())
+                    osa.assert_not_called(); self.assertIn(f'{shlex.quote(rabik.ME)} --front Fixture --asked', out.getvalue())
                     with patch('sys.argv', ['rabik.py', '--front', 'Fixture', '--asked']): rabik.main()
                     osa.assert_called_once_with('tell application "Fixture" to activate')
                     free.assert_called_once_with(user=True)
