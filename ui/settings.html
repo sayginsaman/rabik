@@ -33,7 +33,7 @@
   #meetingmeta { color:var(--fg3);font-size:12px;margin:8px 0 16px; }
   #meetingdetail .tools { display:flex;gap:8px;align-items:center;flex-wrap:wrap; }
   #meetingdetail .tools .red { margin-left:auto; }
-  #meetingsummary,#meetingactions,#meetingnotes,#meetinganswers { white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere;padding:14px;-webkit-user-select:text; }
+  #meetingsummary,#meetingnotes,#meetinganswers { white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere;padding:14px;-webkit-user-select:text; }
   .savedline { display:flex;gap:14px;padding:10px 14px;line-height:1.55;-webkit-user-select:text; }
   .savedline + .savedline { box-shadow:inset 0 .5px 0 var(--line); }
   .savedline time { color:var(--fg3);font-size:11px;flex:none;font-variant-numeric:tabular-nums;padding-top:2px; }
@@ -86,6 +86,15 @@
   p.lede { color: var(--fg2); margin: 0 0 22px; line-height: 1.45; }
   h3 { font: 700 13px/16px system-ui; color: var(--fg); margin: 26px 2px 8px; }   /* macOS Headline */
 
+  #recapat { font: 13px -apple-system, system-ui; color: var(--fg); background: var(--ctl); border: 0; border-radius: 6px; padding: 3px 6px; box-shadow: inset 0 0 0 .5px var(--line), 0 1px 1px rgba(0,0,0,.04); }
+  .remindbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin: 8px 2px 0; } .remindbar span { color: var(--fg3); font-size: 11.5px; }
+  .row.todo { cursor: pointer; } .row.todo:has(input:disabled) { cursor: default; }
+  .row.todo input { appearance: none; flex: none; width: 16px; height: 16px; margin: 0; border-radius: 4.5px; box-shadow: inset 0 0 0 1.5px var(--fg3); cursor: inherit;
+    background: center / 11px no-repeat; transition: background-color .15s, box-shadow .15s; }   /* drawn here: the native box is hard to see in dark mode */
+  .row.todo input:checked { background-color: var(--accent); box-shadow: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6 9.6 3.6' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+  .row.todo input:checked:disabled { background-color: var(--green); } .row.todo:has(input:disabled) .t { opacity: .6; }
+  .row.todo input:focus-visible { outline: 3px solid rgba(10,132,255,.45); outline-offset: 2px; }
   .group { background: var(--card); border-radius: 11px; box-shadow: inset 0 0 0 .5px var(--line), 0 1px 2px rgba(0,0,0,.04); }
   div.group { overflow: hidden; }   /* a hovered first or last row keeps the card's round corners */
   .group:has(> .empty:only-child) { background: none; box-shadow: none; }   /* an empty list is a quiet line, not a box */
@@ -345,6 +354,12 @@
     <div class="group">
       <div class="row"><div class="t"><b>Box position</b><span>Where the box opens, on the screen with your pointer.</span></div><div class="seg" data-k="boxPosition"><button data-v="top-left">Top left</button><button data-v="top-center">Top center</button><button data-v="top-right">Top right</button><button data-v="bottom-left">Bottom left</button><button data-v="bottom-center">Bottom center</button><button data-v="bottom-right">Bottom right</button></div></div>
     </div>
+    <h3>Daily recap</h3>
+    <div class="group">
+      <div class="row"><div class="t"><b>Daily recap</b><span>Your day in a few lines, with to-dos you can add to Reminders.</span></div><label class="sw"><input type="checkbox" data-k="recap"></label></div>
+      <div class="row"><div class="t"><b>Time</b><span>A notification, once a day. Say “summarize my day” any time.</span></div><input type="time" id="recapat" step="300" aria-label="Recap time"></div>
+      <div class="row"><div class="t"><b>Reminders list</b><span id="remindershint">Where added to-dos go.</span></div><select id="reminderslist" aria-label="Reminders list"></select></div>
+    </div>
     <h3>Voice</h3>
     <div class="group">
       <div class="row"><div class="t"><b>Microphone</b></div><select data-k="microphone"></select></div>
@@ -487,7 +502,7 @@
       <button id="meetingback" class="btn">← All meetings</button><h1 id="meetingtitle" tabindex="-1"></h1><p id="meetingmeta"></p>
       <div class="tools"><button id="meetingcopy" class="btn">Copy</button><button id="meetingexport" class="btn">Export Markdown</button><button id="meetingdelete" class="btn red">Delete</button></div>
       <h3>Summary</h3><div id="meetingsummary" class="group"></div>
-      <div id="meetingactionblock" hidden><h3>Action items</h3><div id="meetingactions" class="group"></div></div>
+      <div id="meetingactionblock" hidden><h3>Action items</h3><div id="meetingactions" class="group"></div><div class="remindbar"><span id="meetingremindnote" role="status"></span><button class="btn blue" id="meetingremind" disabled>Add to Reminders</button></div></div>
       <div id="meetingnoteblock" hidden><h3>Notes</h3><div id="meetingnotes" class="group"></div></div>
       <div id="meetinganswerblock" hidden><h3>Copilot answers</h3><div id="meetinganswers" class="group"></div></div>
       <h3>Transcript</h3><div id="meetingtranscript" class="group"></div>
@@ -644,6 +659,9 @@
   document.querySelectorAll('[data-k=boxPosition] button').forEach(b => b.title = b.textContent);   // its spots show their names on hover
 
   document.querySelector('[data-k="microphone"]').onchange = e => set('microphone', e.target.value);
+  $('recapat').onchange = e => { if (/^([01]\d|2[0-3]):[0-5]\d$/.test(e.target.value)) set('recapAt', e.target.value); else paint(); };
+  $('reminderslist').onchange = e => set('remindersList', e.target.value);
+  let reminderLists = [];   // Rabik.app sends them once it may read Reminders; until then only the default list
   document.querySelectorAll('.seg[data-k]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => set(g.dataset.k, b.dataset.v)));
   document.querySelectorAll('.sw input[data-k]').forEach(i => i.onchange = () => set(i.dataset.k, i.checked));
   document.querySelectorAll('input[type=range]').forEach(r => {
@@ -680,6 +698,13 @@
       s.value = s.dataset.k === 'microphone' && ![...s.options].some(o => o.value === value) ? 'automatic' : value;
     });
     document.querySelectorAll('input[type=range]').forEach(r => r.value = P[r.dataset.k]);
+    $('recapat').value = P.recapAt || '21:00';
+    const lists = $('reminderslist'), chosen = P.remindersList || '';
+    lists.replaceChildren(new Option('Default list', ''), ...reminderLists.map(l => new Option(l.title + (l.isDefault ? ' (default)' : ''), l.id)));
+    if (chosen && !reminderLists.some(l => l.id === chosen)) lists.append(new Option('Your chosen list', chosen));   // not readable now: keep it, never reset
+    lists.value = chosen;
+    $('remindershint').textContent = reminderLists.length ? 'Where added to-dos go.' : 'Other lists show after you first add a to-do.';
+    for (const id of ['recapat', 'reminderslist']) { $(id).disabled = P.recap === false; $(id).closest('.row').classList.toggle('dim', P.recap === false); }
     $('volv').textContent = Math.round(P.volume / .6 * 100) + '%';
     $('routingwhy').textContent = WHY[P.routing] || '';
     SERVER.forEach(k => { if (document.activeElement !== $(k)) $(k).value = P[k] || ''; });
@@ -883,12 +908,22 @@
       b.append(title,meta,summary);b.onclick=()=>{expectedMeeting=m.id;selectMeeting(i);detailScroll=document.querySelector('main').scrollTop;post({do:'meetingOpen',id:m.id});};b.onfocus=()=>selectMeeting(i);$('meetinglist').append(b);
     });selectMeeting(selectedMeeting);
   }
+  // A meeting's action items: tick the ones that are yours and add them to Reminders; added ones stay ticked and greyed.
+  function meetingRemindCount(){const n=document.querySelectorAll('#meetingactions input:checked:not(:disabled)').length,b=$('meetingremind');
+    b.disabled=!n;b.textContent=n?'Add '+n+' to Reminders':'Add to Reminders';b.hidden=!document.querySelector('#meetingactions input:not(:disabled)');}
+  function meetingTodos(todos){const box=$('meetingactions');box.replaceChildren();
+    for(const t of todos){const row=document.createElement('label');row.className='row todo';const box1=document.createElement('input');box1.type='checkbox';box1.dataset.key=t.key;
+      box1.checked=!!t.added;box1.disabled=!!t.added;box1.onchange=meetingRemindCount;const text=document.createElement('div');text.className='t';const b=document.createElement('b');b.textContent=t.text;text.append(b);
+      if(t.added){const s=document.createElement('span');s.textContent='Added to Reminders';text.append(s);}row.append(box1,text);box.append(row);}
+    meetingRemindCount();}
+  $('meetingremind').onclick=()=>{const keys=[...document.querySelectorAll('#meetingactions input:checked:not(:disabled)')].map(i=>i.dataset.key);
+    if(keys.length&&currentMeeting){$('meetingremind').disabled=true;post({do:'meetingRemind',id:currentMeeting.id,keys});}};
   function meetingBack(focus=true){expectedMeeting=null;currentMeeting=null;meetingMarkdown='';$('meetingbrowse').hidden=false;$('meetingdetail').hidden=true;meetingNotice('');document.querySelector('main').scrollTop=detailScroll;if(focus)selectMeeting(selectedMeeting,true);}
   function openMeeting(m,markdown){
     currentMeeting=m;meetingMarkdown=markdown;$('meetingbrowse').hidden=true;$('meetingdetail').hidden=false;meetingNotice('');
     $('meetingtitle').textContent=m.title;$('meetingmeta').textContent=[meetingDate(m.started),meetingDuration(m.duration),m.app,m.status].filter(Boolean).join(' · ');
     $('meetingsummary').textContent=m.summary||'A recap is not available yet. The transcript is below.';
-    $('meetingactionblock').hidden=!m.action_items?.length;$('meetingactions').textContent=(m.action_items||[]).map(t=>'• '+t).join('\n');
+    $('meetingactionblock').hidden=!m.todos?.length;$('meetingremindnote').textContent='';meetingTodos(m.todos||[]);
     $('meetingnoteblock').hidden=!m.notes;$('meetingnotes').textContent=m.notes||'';
     $('meetinganswerblock').hidden=!m.answers?.length;$('meetinganswers').textContent=(m.answers||[]).map(r=>(r.question||'')+'\n'+(r.lines||[]).join('\n')).join('\n\n');
     $('meetingtranscript').replaceChildren();
@@ -948,6 +983,9 @@
       $('localname').textContent = found.name; $('uselocal').textContent = `Use ${found.name}`;
       $('uselocal').onclick = () => { set('client', 'claude'); set('apiBase', found.base); if (found.models[0]) set('apiModel', found.models[0]); row.hidden = true; };
     },
+    meetingReminded(res){if(!currentMeeting)return;
+      $('meetingremindnote').textContent=res.need?'Allow Reminders in System Settings → Privacy & Security → Reminders.':res.error||(res.added?'Added '+res.added+' to '+(res.list||'Reminders')+'.':'Those are in Reminders already.');
+      if(res.items){currentMeeting.todos=res.items;meetingTodos(res.items);}else meetingRemindCount();},
     meetings(result){
       if(result.error){meetingNotice(result.error);$('meetingcount').textContent='Could not load meetings.';return;}
       if(result.notice){meetingNotice(result.notice);return;}
@@ -980,7 +1018,7 @@
     globe(on) { $('globefix').hidden = !on; },   // fn alone also fires macOS's own 🌐 action
     load(d) {
       P = {talkMode: 'hold', dictateMode: 'verbatim', dictateHotkeyLabel: '', microphone: 'automatic', meetingSave: true, meetingSummary: true, client: 'claude', ...d.prefs}; recording = '';
-      P.routines = d.routines || []; paintRoutines();
+      P.routines = d.routines || []; paintRoutines(); reminderLists = d.reminderLists || [];
       $('shortcut').classList.remove('rec'); $('change').textContent = 'Change Shortcut'; $('dictatechange').classList.remove('rec');
       hotkeyTaken = !!d.hotkeyTaken; dictateHotkeyTaken = !!d.dictateHotkeyTaken; if ($('schint').className !== 'warn') $('schint').className = hotkeyTaken ? 'taken' : '';
       if (d.icon) $('icon').src = $('bigicon').src = d.icon;

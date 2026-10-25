@@ -194,6 +194,8 @@ class RecapTests(unittest.TestCase):
         self.assertEqual(result['added'], 1)
         self.assertEqual(self.calls[-1]['items'][0]['notes'], 'Rabik · Weekly sync, Oct 25')
         self.assertEqual(brain.meeting.meeting_read(ident)['reminded'], {'book the room': 'r0'})
+        self.assertEqual([(t['text'], t['added']) for t in brain.meeting.meeting_read(ident)['todos']],
+                         [('Saygin sends the deck by Friday', ''), ('Book the room', 'r0')])   # what the meeting panel and Settings tick
         self.assertEqual([bool(i['added']) for i in brain.recap.recap_items(f'meeting:{ident}')[2]], [False, True])
         for bad in ('meeting:../x', 'recap:yesterday', 'other:1'):
             with self.subTest(bad=bad), self.assertRaises(ValueError): brain.recap.recap_items(bad)
@@ -369,6 +371,66 @@ class RecapCardTests(unittest.TestCase):
         self.assertEqual(out['done'], ['Added 1 to Work.', [True, False, True], True])
         self.assertTrue(out['allAdded'])   # all in Reminders: no Add button
         self.assertEqual(out['plain'], [False, 'The AI recap could not be made, so this is the plain list.', 1])
+
+class RecapMeetingTests(unittest.TestCase):
+    def test_a_meetings_panel_and_settings_page_add_through_the_same_path(self):
+        swift, panel = native_source(), (Path(__file__).resolve().parents[1] / 'ui/meeting.html').read_text()
+        self.assertIn('case "remind": if let id = b["id"] as? String, let keys = b["keys"] as? [String] { dailyRecap.add("meeting:" + id, keys) { [weak self] in self?.js("reminded", $0) } }', swift)
+        self.assertIn('dailyRecap.add("meeting:" + id, keys) { [weak self] in self?.send("meetingReminded", $0) }', swift)
+        self.assertIn('d["reminderLists"] = ((try? CalendarTool.reminders(["action": "reminderLists"], store: calendar))?["lists"] as? [[String: Any]]) ?? []', swift)
+        self.assertIn("post({do:'remind',id:todoMeeting,keys})", panel)
+        self.assertIn("b.setAttribute('role','checkbox')", panel)   # the panel's own tap path ticks a button, like the box
+        self.assertNotIn("Action items\\n'+m.action_items", panel)   # no longer plain text
+
+
+SETTINGS = r"""
+st.load({prefs: {hotkeyLabel: '⌃⌥Space', recap: true, recapAt: '21:00', remindersList: 'work'}, reminderLists: [{id: 'home', title: 'Reminders', isDefault: true}, {id: 'work', title: 'Work', isDefault: false}]});
+const out = {};
+out.lists = [...$('reminderslist').options].map(o => [o.value, o.textContent]); out.list = $('reminderslist').value; out.time = $('recapat').value;
+$('recapat').value = '07:30'; $('recapat').dispatchEvent(new Event('change'));
+$('reminderslist').value = 'home'; $('reminderslist').dispatchEvent(new Event('change'));
+st.load({prefs: {hotkeyLabel: '⌃⌥Space', recap: false, remindersList: 'gone'}}); out.off = [$('recapat').disabled, $('reminderslist').disabled, $('reminderslist').value, $('remindershint').textContent];
+expectedMeeting = 'm1';
+st.meetings({meeting: {id: 'm1', title: 'Weekly sync', started: 1792929600, duration: 60, app: 'Zoom', status: 'Ended', summary: 'Ship Monday.', transcript: [],
+  todos: [{key: 'send the deck', text: 'Send the deck', added: ''}, {key: 'book the room', text: 'Book the room', added: 'r1'}]}, markdown: ''});
+const boxes = [...document.querySelectorAll('#meetingactions input')];
+out.rows = boxes.map(i => [i.checked, i.disabled]); out.before = [$('meetingremind').disabled, $('meetingremind').textContent];
+boxes[0].click(); out.after = [$('meetingremind').disabled, $('meetingremind').textContent]; $('meetingremind').click();
+st.meetingReminded({added: 1, list: 'Work', items: [{key: 'send the deck', text: 'Send the deck', added: 'r2'}, {key: 'book the room', text: 'Book the room', added: 'r1'}]});
+out.done = [$('meetingremindnote').textContent, [...document.querySelectorAll('#meetingactions input')].map(i => i.disabled), $('meetingremind').hidden];
+st.meetingReminded({need: 'reminders'}); out.need = $('meetingremindnote').textContent;
+return out;
+"""
+
+
+@unittest.skipUnless(sys.platform == 'darwin', 'macOS WebKit page check')
+class RecapSettingsTests(unittest.TestCase):
+    def test_the_recap_settings_and_a_meetings_action_items(self):
+        import re
+        root = Path(__file__).resolve().parents[1]
+        src = (root / 'tests/test_settings_page.py').read_text()
+        harness = re.search(r"HARNESS = r'{3}(.*?)'{3}", src, re.S)[1]
+        setup = re.search(r"SETUP = '{3}(.*?)'{3}", src, re.S)[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            source, binary = Path(tmp) / 'page.swift', Path(tmp) / 'page'
+            source.write_text(harness)
+            built = subprocess.run(['swiftc', str(source), '-o', str(binary)], capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            run = subprocess.run([str(binary), str(root / 'ui/settings.html'), setup + SETTINGS], capture_output=True, text=True,
+                                 timeout=30, env={**os.environ, 'RABIK_DIR': tmp})
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        got = json.loads(run.stdout.strip().splitlines()[-1]); out, posts = got['result'], got['posts']
+        self.assertEqual(out['lists'], [['', 'Default list'], ['home', 'Reminders (default)'], ['work', 'Work']])
+        self.assertEqual((out['list'], out['time']), ('work', '21:00'))
+        self.assertIn({'do': 'set', 'k': 'recapAt', 'v': '07:30'}, posts)
+        self.assertIn({'do': 'set', 'k': 'remindersList', 'v': 'home'}, posts)
+        self.assertEqual(out['off'], [True, True, 'gone', 'Other lists show after you first add a to-do.'])   # a list it cannot read now is kept
+        self.assertEqual(out['rows'], [[False, False], [True, True]])
+        self.assertEqual(out['before'], [True, 'Add to Reminders'])
+        self.assertEqual(out['after'], [False, 'Add 1 to Reminders'])
+        self.assertIn({'do': 'meetingRemind', 'id': 'm1', 'keys': ['send the deck']}, posts)
+        self.assertEqual(out['done'], ['Added 1 to Work.', [True, True], True])
+        self.assertIn('Privacy & Security → Reminders', out['need'])
 
 if __name__ == '__main__':
     unittest.main()

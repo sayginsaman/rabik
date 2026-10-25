@@ -39,6 +39,15 @@ canvas{width:30px;height:30px;flex:none;margin-left:-3px}
 #saving,#prepstatus.ok{font-size:10px!important;color:#8cbda1!important;white-space:nowrap}
 #prepstatus.ok{font-size:11.5px!important}
 :is(#saving,#prepstatus.ok)::before{content:"";display:inline-block;width:4px;height:4px;border-radius:50%;background:currentColor;margin-right:4px;vertical-align:2px}
+#todos{margin:-4px 0 12px}#todos h2{margin:0 0 4px;font-size:11px;font-weight:600;color:var(--fg2)}
+#todolist{display:grid;gap:1px;margin:0 -6px 8px}
+#todolist .todo{display:flex;align-items:flex-start;gap:8px;width:100%;padding:5px 6px;border-radius:8px;background:none;box-shadow:none;text-align:left;line-height:1.4}
+#todolist .todo.hover:not(:disabled){background:var(--card)}#todolist .todo:active{transform:none}
+#todolist .todo>i{flex:none;display:grid;place-items:center;width:15px;height:15px;margin-top:1px;border-radius:4.5px;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.45)}
+#todolist .todo svg{width:11px;height:11px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+#todolist .todo[aria-checked=true]>i{background:var(--accent);box-shadow:none}#todolist .todo[aria-checked=true] svg{opacity:1}
+#todolist .todo.added{opacity:.6}#todolist .todo.added>i{background:#30d158}#todolist .todo:disabled{opacity:.6}
+#remindnote{margin:6px 0 0;font-size:11.5px;color:var(--fg2)}
 #recap{white-space:pre-wrap;user-select:text;-webkit-user-select:text;color:var(--fg2);font-size:12px;line-height:1.5;margin:12px 0;overflow-wrap:anywhere}
 body.saved #pillow::after{content:"";position:absolute;right:5px;top:5px;width:4px;height:4px;border-radius:50%;background:#8cbda1}
 #title span{font-size:11.5px;color:var(--fg2);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -215,7 +224,7 @@ body.reduce *{animation:none!important;transition:none!important}
 
 <footer id="askbar" hidden><div class="chips"><button data-ask="What did I miss?">Catch me up</button><button id="screen">Explain the screen</button></div><form id="askform"><input id="ask" placeholder="Ask about the call…" aria-label="Ask about the call" maxlength="1500" autocomplete="off"><button id="send" type="button" aria-label="Ask by voice" title="Ask by voice"><b>↑</b><svg class="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button></form><div id="voicebar" hidden><p id="heard" class="waiting">Listening…</p><button id="voicein" aria-label="Type instead" title="Click to type instead"><span id="askwave" aria-hidden="true"></span></button><button id="voicesend" class="blue" aria-label="Send">↑</button></div></footer>
 
-<section id="ended" hidden><h1 id="endtitle">Your meeting</h1><p class="note" id="endnote">Saved on this Mac.</p><div id="recap" hidden></div><button id="endcopy" class="quiet big">Copy transcript</button><button id="allmeetings" class="quiet big">See all meetings →</button><button id="resume" class="blue big">Resume listening</button><div class="bar" style="margin-top:8px"><button id="save">Done</button><button id="delete">Delete meeting</button></div></section>
+<section id="ended" hidden><h1 id="endtitle">Your meeting</h1><p class="note" id="endnote">Saved on this Mac.</p><div id="recap" hidden></div><div id="todos" hidden><h2>Action items</h2><div id="todolist"></div><button id="remind" class="blue big" disabled>Add to Reminders</button><p id="remindnote" hidden></p></div><button id="endcopy" class="quiet big">Copy transcript</button><button id="allmeetings" class="quiet big">See all meetings →</button><button id="resume" class="blue big">Resume listening</button><div class="bar" style="margin-top:8px"><button id="save">Done</button><button id="delete">Delete meeting</button></div></section>
 
 <p id="notice" hidden>Rabik hears this call and your microphone. Transcripts stay on this Mac.</p>
 <div id="toast" role="status" hidden></div>
@@ -293,6 +302,17 @@ $('save').onclick=()=>{$('save').disabled=true;$('resume').disabled=true;post({d
 $('delete').onclick=()=>post({do:'deleteSaved'});
 $('endcopy').onclick=()=>{post({do:'copy',text:savedTranscript.map(r=>`${time(r.seconds||0)}  ${r.mic?'You':'Them'}: ${r.text}`).join('\n')});toast('Transcript copied')};
 $('allmeetings').onclick=()=>post({do:'meetings'});
+// A meeting's action items: the user ticks the ones that are theirs and adds them to Reminders; added ones stay ticked and greyed.
+let todoMeeting='';
+function remindCount(){const n=document.querySelectorAll('#todolist .todo[aria-checked=true]:not(.added)').length,b=$('remind');
+  b.disabled=!n;b.textContent=n?'Add '+n+' to Reminders':'Add to Reminders';b.hidden=!document.querySelector('#todolist .todo:not(.added)');}
+function todos(m){todoMeeting=m.id||todoMeeting;const list=$('todolist');list.replaceChildren();
+  for(const t of m.todos||[]){const b=document.createElement('button');b.className='todo'+(t.added?' added':'');b.dataset.key=t.key;b.setAttribute('role','checkbox');b.setAttribute('aria-checked',t.added?'true':'false');
+    b.innerHTML='<i aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6 9.6 3.6"/></svg></i><span></span>';b.querySelector('span').textContent=t.text+(t.added?' · Added':'');
+    if(t.added)b.disabled=true;else b.onclick=()=>{b.setAttribute('aria-checked',b.getAttribute('aria-checked')==='true'?'false':'true');remindCount();};list.append(b);}
+  show('todos',!!(m.todos||[]).length);remindCount();}
+$('remind').onclick=()=>{const keys=[...document.querySelectorAll('#todolist .todo[aria-checked=true]:not(.added)')].map(b=>b.dataset.key);
+  if(keys.length){$('remind').disabled=true;post({do:'remind',id:todoMeeting,keys});}};
 $('choose').onclick=$('livechoose').onclick=()=>post({do:'chooseFiles'});
 $('unfile').onclick=()=>{files='';$('prepfiles').replaceChildren();show('filechip',false);savePrep();fit()};
 for(const b of $('tabs').children)b.onclick=()=>tab(b.dataset.tab);
@@ -335,7 +355,10 @@ window.meeting={
   privacy(on){saving=on;this.mode()},
   mode(m){if(m)for(const b of $('mode').children)b.setAttribute('aria-pressed',String(b.dataset.mode===m));document.querySelector('#prep h1').textContent=room()?'Get ready for your meeting':'Get ready for your call';$('notice').textContent=(room()?'Rabik hears the room through your microphone.':'Rabik hears this call and your microphone.')+' Transcripts stay on this Mac.'},
   saving(on){saving=on;document.body.classList.toggle('saved',on);show('saving',running&&!minimized&&on);$('endnote').textContent=on?'Saved on this Mac.':'This transcript isn’t saved. Copy it before closing. Enable saving in Settings for future meetings.';$('delete').disabled=!on;$('restore').title=on?'Restore · Saving transcript':'Restore'},
-  recap(m){$('recap').textContent=m.summary+(m.action_items?.length?'\n\nAction items\n'+m.action_items.map(s=>'• '+s).join('\n'):'');show('recap',!!m.summary);if(!running)fit()},
+  recap(m){$('recap').textContent=m.summary;show('recap',!!m.summary);todos(m);if(!running)fit()},
+  reminded(res){const note=$('remindnote');note.textContent=res.need?'Rabik can’t use Reminders yet. Allow it in System Settings → Privacy & Security → Reminders.'
+    :res.error||(res.added?'Added '+res.added+' to '+(res.list||'Reminders')+'.':'Those are in Reminders already.');show('remindnote',true);
+    if(res.items)todos({id:todoMeeting,todos:res.items});else remindCount();if(!running)fit()},
   settled(id){if(id!==viewTransition)return;document.body.classList.remove('transitioning');document.body.classList.add('revealing')},
   compact(on){if(!running)return;if(on)voice(false);minimized=on;show('notice',false);show('toast',false);document.body.classList.toggle('compact',on);view(on?'pillow':'live');if(!on)$('ask').focus()},
   level(value){if(!running||!(minimized||voicing))return;const bars=[...$(minimized?'wave':'askwave').children],heights=bars.map(b=>b.style.height||'3px');bars.forEach((b,i)=>b.style.height=i===bars.length-1?`${3+Math.min(1,Math.max(0,value)*4)*23}px`:heights[i+1]);if(!document.body.classList.contains('reduce'))$('orb3').style.transform=`scale(${1+Math.min(1,Math.max(0,value)*4)*.18})`},

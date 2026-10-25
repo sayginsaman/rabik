@@ -76,6 +76,8 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
                                 "hotkeyTaken": !hotkeyRegistered, "dictateHotkeyTaken": !Prefs.str("dictateHotkeyLabel").isEmpty && !dictateHotkeyRegistered, "globeTaken": globeKeyTaken()]
         let routines = (Prefs.path as NSString).deletingLastPathComponent + "/routines.json"
         d["routines"] = (try? JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:routines)))) as? [[String:Any]] ?? []
+        // Reminders lists only once Rabik may read them: Settings never asks for access; the first Add to Reminders does
+        d["reminderLists"] = ((try? CalendarTool.reminders(["action": "reminderLists"], store: calendar))?["lists"] as? [[String: Any]]) ?? []
         if let t = NSApp.applicationIconImage?.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) {
             d["icon"] = "data:image/png;base64," + png.base64EncodedString()
         }
@@ -265,6 +267,8 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         case "meetingOpen": if let id = b["id"] as? String { meetings(["action": "get", "id": id]) }
         case "meetingDelete": if let id = b["id"] as? String { meetings(["action": "delete", "id": id]) }
         case "meetingExport": if let id = b["id"] as? String { exportMeeting(id) }
+        case "meetingRemind":
+            if let id = b["id"] as? String, let keys = b["keys"] as? [String] { dailyRecap.add("meeting:" + id, keys) { [weak self] in self?.send("meetingReminded", $0) } }
         case "meetingCopy": if let text = b["text"] as? String { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string); send("meetings", ["notice": "Copied."]) }
         case "meetingPrepPrompt": NSPasteboard.general.clearContents(); NSPasteboard.general.setString(meetingPrepPrompt, forType: .string); send("meetings", ["notice": "Prep prompt copied."])
         case "meetingPrepOpen": if Prefs.bool("meeting") { meeting.open() }

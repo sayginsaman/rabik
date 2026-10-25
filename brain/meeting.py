@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime
-from brain import clients, memory, paths, prefs, prompts, turn
+from brain import clients, memory, paths, prefs, prompts, turn, wording
 
 __all__ = ['MEETING_BRIEF_LIMIT', 'MEETING_STYLE_LIMIT', 'MEETING_PROMPT_LIMIT', 'MEETING_CONNECTOR_TOOLS', 'meeting_parse',
            'meeting_prompt', 'meeting_process', 'meeting_payload', 'meeting_call', 'meeting_live', 'meeting_local_brief',
@@ -315,7 +315,7 @@ def meeting_read(identifier):
         elif kind == 'summary':
             m['summary'] = str(row.get('text', '')); m['action_items'] = row.get('action_items', []); m['summary_revision'] = row.get('revision')
         elif kind == 'resumed': m['ended'] = None
-        elif kind == 'reminded' and isinstance(row.get('items'), dict):   # action items the user added to Reminders, by recap_key
+        elif kind == 'reminded' and isinstance(row.get('items'), dict):   # action items the user added to Reminders, by wording.casekey
             m['reminded'].update({str(k): str(v) for k, v in row['items'].items()})
         if kind in ('checkpoint', 'ended', 'resumed'):
             m['duration'] = max(m['duration'], float(row.get('duration', 0)))
@@ -325,6 +325,7 @@ def meeting_read(identifier):
     if m['summary_revision'] is not None and m['summary_revision'] != [len(m['transcript']), m['ended'], m['duration']]:
         m['summary'] = ''; m['action_items'] = []
     m['status'] = 'Ended' if m['ended'] else 'Interrupted or listening'
+    m['todos'] = [{'key': wording.casekey(t), 'text': str(t), 'added': m['reminded'].get(wording.casekey(t), '')} for t in m['action_items']]   # for Add to Reminders
     return m
 
 

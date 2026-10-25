@@ -5,7 +5,7 @@ import unicodedata
 from functools import lru_cache
 
 __all__ = ['dashes', 'plain', 'STOP', 'FILLER', 'gist', '_words', 'DEICTIC', 'MORE', 'FAILED', 'failed_action_reply', 'NUMS',
-           'norm', 'DICTATE_MERGE', 'dictate_sound']
+           'norm', 'DICTATE_MERGE', 'dictate_sound', 'casekey']
 
 
 def _words(value):
@@ -71,3 +71,8 @@ def dictate_sound(text):
         if k and not out.endswith(k):
             out += k
     return out
+
+
+def casekey(text):
+    """One action item however it is spaced or cased: what its "added to Reminders" mark is kept under."""
+    return ' '.join(str(text).casefold().split())

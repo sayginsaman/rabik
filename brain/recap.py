@@ -8,9 +8,9 @@ import re
 import subprocess
 import time
 from datetime import date, datetime, timedelta
-from brain import agents, calendar, meeting, paths, prefs, routine, storage
+from brain import agents, calendar, meeting, paths, prefs, routine, storage, wording
 
-__all__ = ['RECAP_SYSTEM', 'RECAP_DATE_CUE', 'recap_path', 'recap_key', 'recap_day', 'recap_tomorrow', 'recap_inputs', 'recap_local',
+__all__ = ['RECAP_SYSTEM', 'RECAP_DATE_CUE', 'recap_path', 'recap_day', 'recap_tomorrow', 'recap_inputs', 'recap_local',
            'recap_check', 'recap_read', 'recap_make', 'recap_due', 'recap_items', 'recap_remind', 'recap_command']
 
 
@@ -30,11 +30,6 @@ RECAP_DATE_CUE = re.compile(r'\b(today|tonight|tomorrow|monday|tuesday|wednesday
 
 def recap_path(day):
     return os.path.join(paths.DIR, 'recaps', f'{day}.json')
-
-
-def recap_key(text):
-    """One action item however it is spaced or cased: what an "added" mark is kept under."""
-    return ' '.join(str(text).casefold().split())
 
 
 def recap_day(stamp):
@@ -144,9 +139,9 @@ def recap_make(day=None, force=False, evening=False):
                 note = 'The AI recap could not be made, so this is the plain list.'
         titles = {m['id']: m['title'] for m in inputs['meetings']}
         titles.update({a['id']: a['title'] for a in inputs['agents']})
-        added = {recap_key(a.get('text', '')): a['added'] for a in (old or {}).get('actions', []) if isinstance(a, dict) and a.get('added')}
+        added = {wording.casekey(a.get('text', '')): a['added'] for a in (old or {}).get('actions', []) if isinstance(a, dict) and a.get('added')}
         for action in recap['actions']:
-            action.update(key=recap_key(action['text']), source=titles.get(action['from'], ''), added=added.get(recap_key(action['text']), ''))
+            action.update(key=wording.casekey(action['text']), source=titles.get(action['from'], ''), added=added.get(wording.casekey(action['text']), ''))
         result = {'day': day, 'made': time.time(), 'source': source, 'note': note, 'fingerprint': fingerprint,
                   'evening': evening or bool((old or {}).get('evening')), **recap}
         storage.private_json(recap_path(day), result)
@@ -171,13 +166,11 @@ def recap_items(source):
     kind, _, ident = str(source).partition(':')
     if kind == 'recap' and re.fullmatch(r'\d{4}-\d{2}-\d{2}', ident):
         data = recap_read(ident) or {}
-        return 'Daily recap', ident, [{'key': recap_key(a['text']), 'text': a['text'], 'due': a.get('due', ''), 'added': a.get('added', '')}
+        return 'Daily recap', ident, [{'key': wording.casekey(a['text']), 'text': a['text'], 'due': a.get('due', ''), 'added': a.get('added', '')}
                                       for a in data.get('actions', []) if isinstance(a, dict) and isinstance(a.get('text'), str)]
     if kind == 'meeting':
         m = meeting.meeting_read(ident)   # ValueError for a bad or missing ID
-        marks = m.get('reminded', {})
-        return m.get('title') or 'Meeting', recap_day(m['started']), [{'key': recap_key(t), 'text': str(t), 'due': '', 'added': marks.get(recap_key(t), '')}
-                                                                     for t in m['action_items']]
+        return m.get('title') or 'Meeting', recap_day(m['started']), [{**t, 'due': ''} for t in m['todos']]
     raise ValueError('Unknown source')
 
 
@@ -199,7 +192,7 @@ def recap_remind(source, keys):
             fcntl.flock(lock, fcntl.LOCK_EX)
             data = recap_read(ident) or {}
             for a in data.get('actions', []):
-                if isinstance(a, dict) and recap_key(a.get('text', '')) in marks: a['added'] = marks[recap_key(a['text'])]
+                if isinstance(a, dict) and wording.casekey(a.get('text', '')) in marks: a['added'] = marks[wording.casekey(a['text'])]
             storage.private_json(recap_path(ident), data)
     elif marks:
         meeting.meeting_append(ident, {'kind': 'reminded', 'items': marks, 'at': time.time()})
