@@ -212,5 +212,5 @@ def recap_command(args):
         if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys): raise ValueError('Give the item keys as a JSON list.')
         return recap_remind(args[1], keys)
     day = next((a for a in args if re.fullmatch(r'\d{4}-\d{2}-\d{2}', a)), None)
-    if any(a not in ('--force', day) for a in args): raise ValueError('Use --recap [YYYY-MM-DD] [--force] | catch-up | schedule | items <source> | remind <source> <keys>')
+    if any(a not in ('--force', day) for a in args): raise ValueError('Use --recap [YYYY-MM-DD] [--force] | catch-up | schedule | read <day> | items <source> | remind <source> <keys>')
     return recap_make(day, '--force' in args)
