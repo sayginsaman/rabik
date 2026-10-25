@@ -5,7 +5,7 @@ import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
-from brain import paths, storage
+from brain import environ, paths, storage
 
 __all__ = ['pref', 'save_pref', 'routing_mode', 'work_model', 'main_model', 'server', '_models_at', 'models', 'LOCAL_SERVERS',
            'local_servers', 'client', 'agent_model', 'routine_model']
@@ -67,9 +67,9 @@ def _models_at(url, key='', timeout=4):
 
 def models():
     """The custom server's model names, for Settings' Model box. /v1/models is the same list shape on OpenAI-style and Anthropic-style servers."""
-    probe = os.environ.get('RABIK_PROBE_BASE')   # setup's Change provider asks about a server before it is saved
+    probe = environ.probe_base()   # setup's Change provider asks about a server before it is saved
     base = str(pref('apiBase', '') if probe is None else probe).strip().rstrip('/')
-    key = str(pref('apiKey', '') if probe is None else os.environ.get('RABIK_PROBE_KEY', '')).strip()
+    key = str(pref('apiKey', '') if probe is None else environ.probe_key('')).strip()
     try: u = urllib.parse.urlparse(base)
     except ValueError: return []
     if u.scheme not in ('http', 'https') or not u.hostname: return []

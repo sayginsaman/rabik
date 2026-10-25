@@ -10,18 +10,18 @@ import sys
 import threading
 import time
 from pathlib import Path
-from brain import paths, prefs
+from brain import environ, paths, prefs
 
 __all__ = ['POSTHOG_KEY', 'telemetry_enabled', 'install_id', 'posthog', 'ping', 'clean', 'report', 'report_error', 'exception_error',
            'install_exception_hooks', 'dictation_event', 'tool_kinds', 'ask_done']
 
 
 # Anonymous counts, timings and error locations under a random install ID; never asks or screen content. Off in Settings → Privacy. Empty key = off.
-POSTHOG_KEY = os.environ.get('RABIK_POSTHOG_KEY', '')   # your PostHog project's public capture token; empty = telemetry off
+POSTHOG_KEY = environ.posthog_key('')   # your PostHog project's public capture token; empty = telemetry off
 
 
 def telemetry_enabled():
-    return bool(POSTHOG_KEY and prefs.pref('stats', True) and not os.environ.get('RABIK_DIR'))   # RABIK_DIR is the pure-test sandbox
+    return bool(POSTHOG_KEY and prefs.pref('stats', True) and not environ.sandbox_dir())   # RABIK_DIR is the pure-test sandbox
 
 
 def install_id():
@@ -70,7 +70,7 @@ def clean(text):
 
 def report(task, reply, ran, secs, why):
     """Settings → Help improve Rabik (off until the user says yes): a task that failed goes to the maker, cleaned."""
-    if POSTHOG_KEY and prefs.pref('improve', False) and os.environ.get('RABIK_LIVE') != '1':
+    if POSTHOG_KEY and prefs.pref('improve', False) and not environ.live():
         posthog('task_failed', {'task': clean(task), 'reply': clean(reply), 'steps': [clean(c) for c in list(ran)[:12]], 'why': why,
                                 'secs': round(secs, 1), 'model': prefs.pref('model', 'haiku')})
 

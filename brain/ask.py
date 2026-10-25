@@ -12,8 +12,8 @@ import threading
 import time
 from dataclasses import dataclass, field
 from brain import (
-    agents, clients, handoffs, interaction, labels, macos, messages, paths, policy, prefs, prompts, protocol, situation,
-    storage, telemetry, turn, web)
+    agents, clients, environ, handoffs, interaction, labels, macos, messages, paths, policy, prefs, prompts, protocol,
+    situation, storage, telemetry, turn, web)
 
 __all__ = ['RunResult', 'run', 'run_devin', 'run_pi']
 
@@ -70,7 +70,7 @@ def run(task, p=None, shots=(), auto_work=False, *, request=None, main_only=Fals
         if getattr(p, 'ask', ''): agents.save_request(p.ask, messages.main_ask(task, request)[0])
         p.stdin.write(message); p.stdin.close()
     p.waiting = threading.Event()
-    if getattr(p, 'ask', '') and getattr(p, 'relaying', False) is not True and os.environ.get('RABIK_RELAY_ACTIVE') != str(os.getpid()):
+    if getattr(p, 'ask', '') and getattr(p, 'relaying', False) is not True and not environ.relay_active_here():
         p.relaying = True
         p.relay_thread = threading.Thread(target=interaction.relay, args=(p,), daemon=True)
         p.relay_thread.start()
@@ -101,9 +101,9 @@ def run(task, p=None, shots=(), auto_work=False, *, request=None, main_only=Fals
     reply, managed_reply, cost, steps, cmds, last_failed, completed, result_error, ids, bad = '', '', 0, [], [], False, False, False, {}, set()
     action_indexes, evidence, redirected = [], False, set()
     live, shown, drew = '', '', False   # the answer so far, as the box shows it ("… <text>"); the final reply always replaces it
-    streams = os.environ.get('RABIK_UI') == '1' and prefs.pref('showAnswers', 'stream') != 'once'   # Settings › Show answers: All at once
+    streams = environ.in_box() and prefs.pref('showAnswers', 'stream') != 'once'   # Settings › Show answers: All at once
     # a draft for the caret shows its mode only in the final answer, so a cursor ask never moves mid-way
-    move = handoffs.MainMove(task, p, request) if not main_only and not os.environ.get('RABIK_CARET') and getattr(p, 'ask', '') and os.environ.get('RABIK_UI') == '1' else None
+    move = handoffs.MainMove(task, p, request) if not main_only and not environ.caret() and getattr(p, 'ask', '') and environ.in_box() else None
     if move:
         move.thread = threading.Thread(target=move.watch, daemon=True); move.thread.start()
     try:
@@ -122,7 +122,7 @@ def run(task, p=None, shots=(), auto_work=False, *, request=None, main_only=Fals
                     if shown: protocol.say('…', ''); shown = ''
                 elif delta.get('type') == 'text_delta' and isinstance(delta.get('text'), str) and live is not None:
                     live += delta['text']
-                    commit = os.environ.get('RABIK_COMMIT')
+                    commit = environ.commit()
                     text = handoffs.streamed_answer(live) if streams and not drew and (not commit or os.path.exists(commit)) else ''
                     if text != shown: protocol.say('…', text); shown = text
                 continue
@@ -133,7 +133,7 @@ def run(task, p=None, shots=(), auto_work=False, *, request=None, main_only=Fals
                 blocks = messages.message_blocks(j)
                 directives = handoffs.parse_handoffs(''.join(b.get('text', '') for b in blocks if b.get('type') == 'text' and isinstance(b.get('text'), str)))
                 directive = directives[0] if directives else None
-                if directive and not any(b.get('type') == 'tool_use' for b in blocks) and os.environ.get('RABIK_UI') == '1':
+                if directive and not any(b.get('type') == 'tool_use' for b in blocks) and environ.in_box():
                     if main_only and any(not (d.get('steer') or d.get('namedAction')) for d in directives):
                         clients.stop_claude(p)
                         if not routing_retry:
@@ -158,9 +158,9 @@ def run(task, p=None, shots=(), auto_work=False, *, request=None, main_only=Fals
                     if attempt.observed: context = handoffs.handoff_context(context, attempt.observed)
                     for handoff in directives:
                         brief = str(handoff.get('brief', '')).replace(prompts.MODEL_OFFER, '').replace(prompts.MODEL_OFFER.strip(), '').strip() or confirmed[:1000]
-                        app = web.running_app(handoff['app']) if handoff.get('app') else os.environ.get('RABIK_FRONT', '')   # unnamed: the window the user asked over
+                        app = web.running_app(handoff['app']) if handoff.get('app') else environ.front_app('')   # unnamed: the window the user asked over
                         page = web.work_page(app, handoff.get('page', ''), getattr(p, 'ask', '')) if app else {}
-                        attempt.handoffs.append({**handoff, 'brief': brief, 'context': context, 'request': confirmed, 'app': app or os.environ.get('RABIK_FRONT', ''), 'page': page})
+                        attempt.handoffs.append({**handoff, 'brief': brief, 'context': context, 'request': confirmed, 'app': app or environ.front_app(''), 'page': page})
                         handoffs.persist_handoff(attempt.handoffs[-1], p.pid)
                         if attempt.handoff is None:
                             attempt.handoff = attempt.handoffs[0]

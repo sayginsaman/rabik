@@ -8,7 +8,7 @@ import os
 import sys
 import tempfile
 import time
-from brain import paths
+from brain import environ, paths
 
 __all__ = ['say', 'emit']
 
@@ -36,8 +36,8 @@ def emit(lines, directory=None):
             try:
                 with open(paths.WORKED, 'w') as f: json.dump({k: json.loads(line[2:]).get(k) for k in ('app', 'window')}, f)
             except (OSError, ValueError): pass
-    ask = directory or os.environ.get('RABIK_ASK')
-    if ask and os.environ.get('RABIK_RELAY_OWNER') != str(os.getpid()):
+    ask = directory or environ.ask_dir()
+    if ask and not environ.relay_owner_here():
         # Atomic, ordered events: the relay sees the window before its point, even for a fast chain.
         with tempfile.NamedTemporaryFile(mode='w', dir=ask, prefix='.hands-', delete=False) as f:
             f.write('\n'.join(lines)); name = f.name

@@ -8,7 +8,7 @@ import shlex
 import subprocess
 import sys
 import time
-from brain import interaction, macos, paths, policy, prefs, protocol, turn, wording
+from brain import environ, interaction, macos, paths, policy, prefs, protocol, turn, wording
 
 __all__ = ['HANDS_VERBS', 'HANDS_RISK', 'agent_window', 'handed_page', 'agent_window_id', 'hands_pin', 'hands_env', 'GONE',
            'hands_call', 'hands_action', 'hands_map', 'hands', 'menu_bar_icons', 'with_icons', 'menu_bar_click', 'hands_valid',
@@ -18,7 +18,7 @@ __all__ = ['HANDS_VERBS', 'HANDS_RISK', 'agent_window', 'handed_page', 'agent_wi
 def agent_window(app):
     """The browser window this agent task opened, while it is in the same browser; 0 when there is none."""
     try:
-        with open(os.path.join(paths.agent_gate_dir(os.environ['RABIK_ASK']), 'browser-window.json')) as f: saved = json.load(f)
+        with open(os.path.join(paths.agent_gate_dir(environ.ask_dir(required=True)), 'browser-window.json')) as f: saved = json.load(f)
         return saved['window'] if saved.get('app') == app and type(saved.get('window')) is int else 0
     except (KeyError, OSError, ValueError, AttributeError): return 0
 
@@ -26,7 +26,7 @@ def agent_window(app):
 def handed_page():
     """The user's page this agent task was handed (outside its sandbox): the one page of the user's it may act on."""
     try:
-        with open(os.path.join(paths.agent_gate_dir(os.environ['RABIK_ASK']), 'work-page.json')) as f: page = json.load(f)
+        with open(os.path.join(paths.agent_gate_dir(environ.ask_dir(required=True)), 'work-page.json')) as f: page = json.load(f)
         return page if isinstance(page, dict) else {}
     except (KeyError, OSError, ValueError): return {}
 
@@ -43,7 +43,7 @@ HANDS_RISK = (r'\b(buy|purchase|pay|payment|order|bid|checkout|delete|remove|era
 def agent_window_id(app):
     """The Core Graphics id of the browser window this agent task opened in app, else of the user's window it was handed ('' when
     neither); None when that window is gone."""
-    if not app or not os.environ.get('RABIK_AGENT'): return ''
+    if not app or not environ.agent(): return ''
     handed = handed_page()
     window = agent_window(app) or (handed.get('window') if str(handed.get('app', '')).casefold() == app.casefold() and type(handed.get('window')) is int else 0)
     if not window: return ''
@@ -61,10 +61,10 @@ def hands_pin(args, target=None, state=None):
     """(window id, strict): the window a hands call must stay in. Agents keep their own browser window, else the window they mapped
     last in that app; a main ask follows the front one, never into the user's other windows (native, hands.json.windows). Only a pin from the last map may give way to a fresh look."""
     if isinstance(target, dict): return str(target.get('windowID', '')), True
-    if state is not None or not os.environ.get('RABIK_AGENT'): return '', False
+    if state is not None or not environ.agent(): return '', False
     mapped = macos.cached_hands() or {}
     looks = args[:1] in (['see'], ['identify'], ['read'])
-    app = (args[1] if len(args) > 1 else os.environ.get('RABIK_FRONT', '')) if looks else str(mapped.get('app', ''))
+    app = (args[1] if len(args) > 1 else environ.front_app('')) if looks else str(mapped.get('app', ''))
     own = agent_window_id(app)
     if own != '': return own, True
     same = not looks or app.casefold() in (str(mapped.get('app', '')).casefold(), str(mapped.get('pid', '')))
@@ -163,8 +163,8 @@ def hands(*args):
             if r.returncode and 'Accessibility' in r.stdout: return interaction.need('accessibility', 'To use app menus for this task.'), False
             protocol.emit([line for line in r.stdout.splitlines() if line.startswith('▣ ')])
             return '\n'.join(line for line in r.stdout.strip().splitlines() if not line.startswith('▣ ')), not r.returncode
-        if not os.path.exists(paths.hands_state()) and not hands_map(os.environ.get('RABIK_FRONT', '')):
-            r = hands_call(['see'] + ([os.environ['RABIK_FRONT']] if os.environ.get('RABIK_FRONT') else []), timeout=6)   # a slow app, not a missing permission: say which
+        if not os.path.exists(paths.hands_state()) and not hands_map(environ.front_app('')):
+            r = hands_call(['see'] + ([environ.front_app(required=True)] if environ.front_app() else []), timeout=6)   # a slow app, not a missing permission: say which
             if 'Accessibility' in r.stdout: return interaction.need('accessibility', 'To click and type in apps for this task.'), False
             if r.returncode or 'Accessibility' in r.stdout:
                 return r.stdout.strip() or 'Could not read the front app. Run see "<app>" for the app you mean.', False
@@ -175,8 +175,8 @@ def hands(*args):
                 return False
             labels = check['labels']
             if check.get('secure') and args[0] == 'type':
-                request = os.environ.get('RABIK_REQUEST', '')
-                ask = os.environ.get('RABIK_ASK')
+                request = environ.request('')
+                ask = environ.ask_dir()
                 if ask and os.path.exists(paths.request_file(ask)):
                     with open(paths.request_file(ask)) as f:
                         request = f.read()
@@ -185,7 +185,7 @@ def hands(*args):
                     return False
             if check.get('risky') and prefs.pref('safe', True) and not policy.task_allowed('hands ' + args[0]):
                 what = ' → '.join(labels) or args[0]
-                if not os.environ.get('RABIK_ASK'):
+                if not environ.ask_dir():
                     denied.append(f'Safe mode: {args[0]} "{what}" needs the user’s Allow card.')
                     return False
                 question = f'{args[0].capitalize()} "{what[:120]}"?'
@@ -198,7 +198,7 @@ def hands(*args):
         check, r = hands_action(list(args), authorize)
         if denied:
             return denied[0], False
-        if check is None and args[0] == 'click' and 'No visible control named' in r.stdout and not os.environ.get('RABIK_BAR'):
+        if check is None and args[0] == 'click' and 'No visible control named' in r.stdout and not environ.in_menu_bar_click():
             bar = menu_bar_click(args[1])
             if bar:
                 return bar
@@ -235,11 +235,8 @@ def menu_bar_click(target):
     hits = [n for n, _ in menu_bar_icons() if want in wording.dashes(n).lower()]
     if len(hits) != 1 or not hands_map('MenuBarAgent'):   # only now does the menu bar become the target
         return None
-    os.environ['RABIK_BAR'] = '1'
-    try:
+    with environ.clicking_menu_bar():
         result, ok = hands('click', hits[0])
-    finally:
-        os.environ.pop('RABIK_BAR', None)
     if ok:
         time.sleep(0.3)   # the panel opens in Control Center; its map becomes the next target
         panel = hands_call(['see', 'Control Center'], timeout=2)
@@ -336,7 +333,7 @@ def fast_hands(text):
     command = hands_command(text)
     if not command and not icon: return None
     # Native actions wait for final words; existing safe built-ins can still run live.
-    if os.environ.get('RABIK_LIVE') == '1':
+    if environ.live():
         return None
     if icon:   # a top-right menu bar icon by any name: no AI
         bar = menu_bar_click(icon[1].replace('wifi', 'wi-fi'))
@@ -344,7 +341,7 @@ def fast_hands(text):
             return bar[0].splitlines()[0]
         if not command: return None
     args, target = command
-    m = (macos.cached_hands() if os.environ.get('RABIK_HANDS_STATE') else None) or hands_map(os.environ.get('RABIK_FRONT', ''))
+    m = (macos.cached_hands() if environ.hands_file() else None) or hands_map(environ.front_app(''))
     if not m:
         return None
     if target:

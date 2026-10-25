@@ -46,7 +46,7 @@ import brain
 # Every name a brain module exports is here too, the same object, and a write to one also goes to the module that owns it,
 # so brain code reading that name sees the same patch. Unit tests patch the owner itself (patch.object(brain.prefs, ...)).
 _MODULES = [import_module('brain.' + name) for name in (   # dependencies first
-    'paths', 'wording', 'protocol', 'labels', 'storage', 'toolhelp', 'prefs', 'memory', 'situation', 'telemetry',
+    'environ', 'paths', 'wording', 'protocol', 'labels', 'storage', 'toolhelp', 'prefs', 'memory', 'situation', 'telemetry',
     'prompts', 'routine', 'support', 'turn', 'messages', 'macos', 'apps', 'watcher', 'interaction', 'windows', 'policy',
     'calendar', 'clients', 'hands', 'meeting', 'web', 'drawing', 'dictation', 'spotify', 'skills', 'handoffs', 'screen',
     'agents', 'ask', 'tips', 'instant', 'cli')]

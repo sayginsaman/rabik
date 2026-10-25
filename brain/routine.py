@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 import uuid
-from brain import paths, prefs, storage
+from brain import environ, paths, prefs, storage
 
 __all__ = ['routines', 'routine_label', 'routine_job_path', 'routine_install', 'routine_repair', 'routine_add', 'routine_remove',
            'routine_slot', 'routine_fire', 'routine_pop', 'routine_command']
@@ -47,7 +47,7 @@ def routine_label(row):
 
 
 def routine_job_path(identifier):
-    root = os.path.join(paths.DIR, 'launchagents') if os.environ.get('RABIK_DIR') else os.path.join(paths.HOME, 'Library', 'LaunchAgents')
+    root = os.path.join(paths.DIR, 'launchagents') if environ.sandbox_dir() else os.path.join(paths.HOME, 'Library', 'LaunchAgents')
     return os.path.join(root, f'com.rabik.routine.{identifier}.plist')
 
 
@@ -63,7 +63,7 @@ def routine_install(row):
         job['StartCalendarInterval'] = [{**values, 'Weekday': day} for day in range(1, 6)] if row['days'] == 'weekdays' else values
     with open(path + '.tmp', 'wb') as f: plistlib.dump(job, f)
     os.chmod(path + '.tmp', 0o600); os.replace(path + '.tmp', path)
-    if not os.environ.get('RABIK_DIR'):
+    if not environ.sandbox_dir():
         target = f'gui/{os.getuid()}'
         subprocess.run(['/bin/launchctl', 'bootout', target, path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         loaded = subprocess.run(['/bin/launchctl', 'bootstrap', target, path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -132,7 +132,7 @@ def routine_remove(identifier):
     finally:
         lock.close()
     path = routine_job_path(identifier)
-    if not os.environ.get('RABIK_DIR'):
+    if not environ.sandbox_dir():
         subprocess.run(['/bin/launchctl', 'bootout', f'gui/{os.getuid()}', path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try: os.remove(path)
     except FileNotFoundError: pass
@@ -173,7 +173,7 @@ def routine_fire(identifier, now=None):
             fcntl.flock(f, fcntl.LOCK_EX); f.write(json.dumps({'id': identifier}) + '\n')
     finally:
         lock.close()
-    if not os.environ.get('RABIK_DIR'):
+    if not environ.sandbox_dir():
         wake = subprocess.run(['/bin/launchctl', 'kickstart', f'gui/{os.getuid()}/com.rabik.app'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if wake.returncode and subprocess.run(['/usr/bin/pgrep', '-f', paths.APP], stdout=subprocess.DEVNULL).returncode:
             bundle = paths.APP.partition('/Contents/MacOS/')[0]

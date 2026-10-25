@@ -5,7 +5,7 @@ import re
 import threading
 import time
 import uuid
-from brain import clients, macos, messages, paths, policy, storage, web, wording
+from brain import clients, environ, macos, messages, paths, policy, storage, web, wording
 
 __all__ = ['tag_json', 'HANDOFF_TAG', 'parse_handoff', 'parse_handoffs', 'without_handoff_line', 'streamed_answer',
            'persist_handoff', 'named_agents', 'save_named_agents', 'named_agent_action', 'handoff_context', 'agent_title',
@@ -197,7 +197,7 @@ class MainMove:
                 return
             now = time.monotonic(); waiting = self.p.waiting.is_set()
             if not self.ready:   # movable once the words are confirmed; the clock starts then too
-                commit = os.environ.get('RABIK_COMMIT')
+                commit = environ.commit()
                 if commit and not os.path.exists(commit): self.last = now; return
                 self.ready = True
                 print('⇢ ' + json.dumps({'a': self.answer}), flush=True)
@@ -238,4 +238,4 @@ class MainMove:
         context = handoff_context(task, list(self.trace.values()))
         page = web.work_page(ask=self.p.ask)   # the page this ask was already working in, if any
         return {'title': agent_title(request), 'brief': request[:1000], 'request': request, 'context': context,
-                'app': page.get('app') or os.environ.get('RABIK_FRONT', ''), 'page': page, 'accepted': True, 'focus': macos.wants_focus()}
+                'app': page.get('app') or environ.front_app(''), 'page': page, 'accepted': True, 'focus': macos.wants_focus()}

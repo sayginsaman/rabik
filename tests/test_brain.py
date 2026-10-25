@@ -46,6 +46,8 @@ class BrainTests(unittest.TestCase):
     def test_every_moved_name_is_the_same_object_on_the_facade(self):
         modules = {importlib.import_module('brain.' + path.stem) for path in MODULES if path.stem != '__init__'}
         self.assertEqual(set(rabik._OWNERS.values()), modules)   # a module left out of _OWNERS would miss every patch
+        names = [name for module in modules for name in module.__all__]
+        self.assertEqual(sorted({n for n in names if names.count(n) > 1}), [])   # the facade holds one object per name
         for module in modules:
             for name in module.__all__:
                 with self.subTest(f'{module.__name__}.{name}'):
@@ -117,6 +119,23 @@ class BrainTests(unittest.TestCase):
                 isinstance(n.value, ast.Attribute) and isinstance(n.value.value, ast.Name) and n.value.value.id in modules)]
             with self.subTest(path.name):
                 self.assertEqual(writes, [])
+
+    def test_only_environ_reads_rabik_variables(self):
+        # brain/environ.py names every RABIK_* variable and reads it one way; elsewhere the environment is only passed on
+        # to a child process ({**os.environ, 'RABIK_ASK': ask}).
+        for path in MODULES:
+            if path.name == 'environ.py': continue
+            tree = ast.parse(path.read_text())
+            parents = {c: p for p in ast.walk(tree) for c in ast.iter_child_nodes(p)}
+            reads = []
+            for n in ast.walk(tree):
+                if isinstance(n, ast.Attribute) and n.attr == 'environ' and isinstance(n.value, ast.Name) and n.value.id == 'os':
+                    p = parents[n]
+                    key = parents[p].args[0] if isinstance(p, ast.Attribute) and p.attr in ('get', 'pop') and parents[p].args else \
+                        p.slice if isinstance(p, ast.Subscript) else None
+                    if isinstance(key, ast.Constant) and str(key.value).startswith('RABIK_'): reads.append((n.lineno, key.value))
+            with self.subTest(path.name):
+                self.assertEqual(reads, [])
 
     def test_a_replay_reaches_the_ask_log_through_its_result(self):
         # log_turn logs what it is given; main() passes the replayed shortcut's steps from fast()'s result.

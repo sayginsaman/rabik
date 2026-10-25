@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 import time
-from brain import interaction, memory, paths, prompts, turn, wording
+from brain import environ, interaction, memory, paths, prompts, turn, wording
 
 __all__ = ['contact_matches', 'contacts', 'calendar_backend', 'calendar_tool']
 
@@ -59,7 +59,7 @@ def calendar_tool(args):
             raise ValueError('Calendar fields must be strings.')
         action = data.get('action')
         if action not in ('list', 'add', 'move', 'delete'): return prompts.CALENDAR_HELP
-        if action != 'list' and os.environ.get('RABIK_AGENT_PREP') == '1':
+        if action != 'list' and environ.agent_prep():
             return 'Call preparation is read-only.'
         def date(value):
             from datetime import datetime
@@ -89,7 +89,7 @@ def calendar_tool(args):
         def label(e): return f"{e['title']} · {times(e['start'], e['end'])} · {e['calendar']}" + (' · ' + ', '.join(e['attendees']) if e.get('attendees') else '') + (' · all day' if e.get('allDay') else '')
         if len(matches) > 1:
             if len(matches) > 8: return 'Too many matches. Ask for a narrower title or range.'
-            answer = interaction.ask_user({'pick': 'Which event?', 'options': [label(e) for e in matches]}, max(1, deadline - time.monotonic())) if os.environ.get('RABIK_ASK') else None
+            answer = interaction.ask_user({'pick': 'Which event?', 'options': [label(e) for e in matches]}, max(1, deadline - time.monotonic())) if environ.ask_dir() else None
             if answer is None or not answer.isdigit() or int(answer) >= len(matches): return 'No event selected. Do not guess.'
             matches = [matches[int(answer)]]
         event = matches[0]
@@ -100,7 +100,7 @@ def calendar_tool(args):
             end = date(data['end']) if 'end' in data else start + (date(event['end']) - date(event['start']))
             change.update(start=start.isoformat(), end=end.isoformat())
         destination = times(change['start'], change['end']) if action == 'move' else 'Deleted'
-        if not os.environ.get('RABIK_ASK') or interaction.ask_user({'q': 'Move this event?' if action == 'move' else 'Delete this event?',
+        if not environ.ask_dir() or interaction.ask_user({'q': 'Move this event?' if action == 'move' else 'Delete this event?',
                 'cmd': f"{event['title']} → {destination} · {'from ' if action == 'move' else ''}{label(event).removeprefix(event['title'] + ' · ')} · this occurrence only"},
                 max(1, deadline - time.monotonic())) != 'y': return 'No change made. User approval is required.'
         if turn.STOPPING or not interaction.wait_commit(): return 'Request cancelled.'

@@ -9,7 +9,7 @@ import sys
 import time
 import urllib.parse
 from collections import Counter
-from brain import interaction, labels, macos, paths, prefs, storage
+from brain import environ, interaction, labels, macos, paths, prefs, storage
 
 __all__ = ['DENIED', 'DENY', 'SAFE_OUT', 'RISKY', 'REDIRECT', 'SCRIPT_RUNNERS', 'FILE_CHANGERS', 'SYSTEM_CHANGERS',
            'GIT_DESTROYS', 'WRAPPERS', 'RISKY_LABEL', 'RUNS', 'APP_DIRS', 'QUIET', 'ARRANGE', 'launches_program', 'runs_path',
@@ -224,7 +224,7 @@ def search_first(ask):
 def gate():
     """AI client's PreToolUse hook: native hands cannot bypass their wrapper; in safe mode a risky command waits for the user's Allow (60 s, then no).
     Allowed = it runs for real, outside the sandbox. The AI asking to leave the sandbox by itself asks too."""
-    external = os.environ.get('RABIK_CLIENT') in ('devin', 'pi')
+    external = environ.client_override() in ('devin', 'pi')
     try:
         event = json.load(sys.stdin)
         if not isinstance(event, dict) or not isinstance(event.get('tool_input', {}), dict): raise ValueError('Invalid tool event')
@@ -247,15 +247,15 @@ def gate():
             print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse',
                               'permissionDecision': 'allow' if ok else 'deny',
                               **({'updatedInput': {**inp, **({'command': trusted_read} if trusted_read else {}), 'dangerouslyDisableSandbox': True}} if ok and event.get('tool_name') == 'Bash' and
-                                 (not os.environ.get('RABIK_AGENT') or inp.get('dangerouslyDisableSandbox') or trusted_read) else
+                                 (not environ.agent() or inp.get('dangerouslyDisableSandbox') or trusted_read) else
                                  {'permissionDecisionReason': reason} if not ok else {})}}))
     def record_external():
-        if not external or not os.environ.get('RABIK_ASK'): return
+        if not external or not environ.ask_dir(): return
         step = labels.label('Bash' if external_tool == 'exec' else external_tool, inp)
-        source = os.environ.get('RABIK_CLIENT', 'client')
-        with open(os.path.join(os.environ['RABIK_ASK'], source + '-tools.jsonl'), 'a') as f:
+        source = environ.client_override('client')
+        with open(os.path.join(environ.ask_dir(required=True), source + '-tools.jsonl'), 'a') as f:
             f.write(json.dumps({'tool': external_tool, 'input': inp, 'step': step}) + '\n')
-        tmp = os.path.join(os.environ['RABIK_ASK'], f'.hands-{source}-{time.time_ns()}')
+        tmp = os.path.join(environ.ask_dir(required=True), f'.hands-{source}-{time.time_ns()}')
         with open(tmp, 'w') as f:
             f.write('▸ ' + step)
         os.rename(tmp, tmp.replace('/.hands-', '/hands-'))
@@ -263,25 +263,25 @@ def gate():
     if not interaction.wait_commit():
         decision(False, 'The request was cancelled before the transcript was confirmed.')
         return
-    if os.path.exists(os.path.join(os.environ.get('RABIK_ASK', paths.DIR), 'handed-off')):
+    if os.path.exists(os.path.join(environ.ask_dir(paths.DIR), 'handed-off')):
         decision(False, 'This request was handed off. Its tools belong to the background agent.'); return
     if event.get('tool_name') == 'WebFetch' and not agent_url_allowed(inp.get('url', '')):
         decision(False, agent_url_denial()); return
     # WebSearch takes 4-6 s and is billed per search; the free helper takes ~2 s. The prompt's "on failure" alone was ignored.
-    if event.get('tool_name') == 'WebSearch' and not external and search_first(os.environ.get('RABIK_ASK')):
+    if event.get('tool_name') == 'WebSearch' and not external and search_first(environ.ask_dir()):
         decision(False, f'Run {paths.SEARCH} "<query>" first; WebSearch only if it fails or misses.'); return
-    if os.environ.get('RABIK_AGENT') and event.get('tool_name') == 'Bash' and re.search(r'(?:^|[\s;&|(/])open\s[^;&|]*https?://', inp.get('command', '')):
+    if environ.agent() and event.get('tool_name') == 'Bash' and re.search(r'(?:^|[\s;&|(/])open\s[^;&|]*https?://', inp.get('command', '')):
         decision(False, f'Open web pages with {paths.ME} --web read "<url>": it uses this task\'s own browser window, never the user\'s tabs.'); return
     agent_approved = False
-    if event.get('tool_name', '').startswith('mcp__') and (prefs.pref('safe', True) or os.environ.get('RABIK_AGENT_PREP') == '1'):
-        annotations = connector_annotations(event, os.environ.get('RABIK_ASK', ''))
+    if event.get('tool_name', '').startswith('mcp__') and (prefs.pref('safe', True) or environ.agent_prep()):
+        annotations = connector_annotations(event, environ.ask_dir(''))
         if annotations.get('readOnly', annotations.get('readOnlyHint')) is True and not annotations.get('destructive', annotations.get('destructiveHint', False)):
             decision(True, '')
             return
-        if os.environ.get('RABIK_AGENT_PREP') == '1':
+        if environ.agent_prep():
             decision(False, 'Call preparation is read-only. This tool is not annotated read-only.')
             return
-        directory = os.environ.get('RABIK_ASK')
+        directory = environ.ask_dir()
         if not directory:
             decision(False, 'Safe mode: connector metadata is missing; approval is required.')
             return
@@ -291,7 +291,7 @@ def gate():
         if answer == 'task': allow_for_task(kind)
         decision(answer in ('y', 'task'), 'The user said no. Do not try another way.')
         return
-    if os.environ.get('RABIK_AGENT') and prefs.pref('safe', True) and event.get('tool_name') in ('Bash', 'Write', 'Edit') and not trusted_read:
+    if environ.agent() and prefs.pref('safe', True) and event.get('tool_name') in ('Bash', 'Write', 'Edit') and not trusted_read:
         kind = action_kind(event['tool_name'], inp)
         answer = 'y' if task_allowed(kind) else interaction.ask_user(
             {'q': 'Allow this task action?', 'cmd': (str(inp.get('file_path', '')) + '\n' + json.dumps(inp, ensure_ascii=False)).strip()[:800], 'task': bool(kind)}, 600)
@@ -326,10 +326,10 @@ def gate():
         decision(False, 'Use rabik.py --hands or --calendar; native actions and safety overrides are not model tools.')
         return
     q = '' if agent_approved or trusted_read else risky(cmd) or ('Run outside the safe folder?' if inp.get('dangerouslyDisableSandbox') or external and cmd else '')
-    if not q or not os.environ.get('RABIK_ASK') or not prefs.pref('safe', True):
-        if os.environ.get('RABIK_ASK'): macos.preview_commands(cmd)
+    if not q or not environ.ask_dir() or not prefs.pref('safe', True):
+        if environ.ask_dir(): macos.preview_commands(cmd)
         record_external()
-        if os.environ.get('RABIK_AGENT') or trusted_read or external: decision(True, '')
+        if environ.agent() or trusted_read or external: decision(True, '')
         return
     ok = interaction.ask_user({'q': q, 'cmd': cmd[:800]}, 60) == 'y'
     if ok:
@@ -376,13 +376,13 @@ def action_kind(tool, inp):
 
 def task_allowed(kind):
     try:
-        with open(os.path.join(paths.agent_gate_dir(os.environ['RABIK_ASK']), 'allow-task')) as f: return bool(kind) and kind in json.load(f)
+        with open(os.path.join(paths.agent_gate_dir(environ.ask_dir(required=True)), 'allow-task')) as f: return bool(kind) and kind in json.load(f)
     except (KeyError, OSError, ValueError, TypeError): return False
 
 
 def allow_for_task(kind):
     if not kind or task_allowed(kind): return
-    path = os.path.join(paths.agent_gate_dir(os.environ['RABIK_ASK']), 'allow-task')
+    path = os.path.join(paths.agent_gate_dir(environ.ask_dir(required=True)), 'allow-task')
     try:
         with open(path) as f: kinds = json.load(f)
     except (OSError, ValueError): kinds = []
@@ -390,7 +390,7 @@ def allow_for_task(kind):
 
 
 def managed_agent():
-    return bool(re.fullmatch(r'[a-f0-9]{32}', os.environ.get('RABIK_AGENT', '')) and os.environ.get('RABIK_ASK'))
+    return bool(re.fullmatch(r'[a-f0-9]{32}', environ.agent('')) and environ.ask_dir())
 
 
 def agent_url_parts(url):
@@ -427,7 +427,7 @@ def agent_url_allowed(url, directory=None):
     wanted = agent_url_parts(url)
     if not wanted: return False
     try:
-        with open(os.path.join(paths.agent_gate_dir(directory or os.environ['RABIK_ASK']), 'urls.json')) as f: observed = json.load(f)
+        with open(os.path.join(paths.agent_gate_dir(directory or environ.ask_dir(required=True)), 'urls.json')) as f: observed = json.load(f)
     except (OSError, ValueError): return False
     for value in observed if isinstance(observed, list) else []:
         known = agent_url_parts(value)

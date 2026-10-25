@@ -5,7 +5,7 @@ import re
 import subprocess
 import time
 import uuid
-from brain import hands, interaction, macos, paths, prefs, protocol
+from brain import environ, hands, interaction, macos, paths, prefs, protocol
 
 __all__ = ['draw_target', 'drawing', 'draw', 'guide_reply', 'point']
 
@@ -94,8 +94,8 @@ def drawing(data, mappings=None):
 def draw(data):
     if not prefs.pref('draw', True): raise ValueError('Screen drawings are off')
     if not interaction.wait_commit(): raise ValueError('Request cancelled before confirmation')
-    ask = os.environ.get('RABIK_ASK')
-    if not ask or os.environ.get('RABIK_AGENT'): raise ValueError('Drawing needs the main Rabik request')
+    ask = environ.ask_dir()
+    if not ask or environ.agent(): raise ValueError('Drawing needs the main Rabik request')
     try:
         with open(os.path.join(ask, 'draw-screens.json')) as f: snapshot = json.load(f)
     except (OSError, ValueError): snapshot = {}

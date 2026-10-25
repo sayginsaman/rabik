@@ -8,13 +8,14 @@ import re
 import shlex
 from pathlib import Path
 
+from brain import environ
 __all__ = ['HOME', 'DIR', 'ME', 'PLACE', 'LOOK', 'SEARCH', 'READ', 'SHOW', 'REMEMBER', 'FORGET', 'TYPE', 'PLAY', 'QUEUE', 'ABOUT',
            'SHORTCUT', 'FRONT', 'WATCH', 'PICK', 'SET', 'WEB', 'HISTORY', 'HANDS', 'WINDOW', 'ROUTINE', 'DRAW', 'MEMORY',
            'RECENT', 'PREFS', 'REPOSITORY', 'APP_VERSION', 'SHOT', 'APP', 'question_path', 'agent_gate_dir', 'request_file',
            'LAST', 'WORKED', 'hands_state']
 
 HOME = os.path.expanduser('~')
-DIR = os.environ.get('RABIK_DIR') or os.path.join(HOME, '.config/rabik')   # RABIK_DIR: tests keep off the user's chat and rules
+DIR = environ.sandbox_dir() or os.path.join(HOME, '.config/rabik')   # RABIK_DIR: tests keep off the user's chat and rules
 ME = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'rabik.py')   # inside Rabik.app once built, so the AI's helper commands point here
 PLACE, LOOK, SEARCH, READ, SHOW, REMEMBER, FORGET, TYPE, PLAY, QUEUE, ABOUT, SHORTCUT, FRONT, WATCH, PICK, SET, WEB, HISTORY, HANDS, WINDOW, ROUTINE = (shlex.quote(ME) + f' --{c}' for c in ('place', 'look', 'search', 'read', 'show', 'remember', 'forget', 'type', 'play', 'queue', 'me add', 'shortcut', 'front', 'watch', 'pick', 'set', 'web', 'history', 'hands', 'window', 'routine'))
 DRAW = shlex.quote(ME) + " --draw"
@@ -28,7 +29,7 @@ except OSError:
         with open(Path(ME).parents[1] / 'Info.plist', 'rb') as f: APP_VERSION = plistlib.load(f).get('CFBundleShortVersionString', 'unknown')
     except (OSError, ValueError): APP_VERSION = 'unknown'
 SHOT = '/tmp/rabik-screen'   # + -<n>.jpg, one per display
-APP = os.environ.get('RABIK_APP') or os.path.join(HOME, 'Applications/Rabik.app/Contents/MacOS/Rabik')   # set by Rabik.app
+APP = environ.app() or os.path.join(HOME, 'Applications/Rabik.app/Contents/MacOS/Rabik')   # set by Rabik.app
 
 
 def question_path(directory):
@@ -56,4 +57,4 @@ WORKED = os.path.join(DIR, 'worked.json')   # the window the last task worked in
 
 
 def hands_state():
-    return os.environ.get('RABIK_HANDS_STATE', os.path.join(DIR, 'hands.json'))
+    return environ.hands_file(os.path.join(DIR, 'hands.json'))

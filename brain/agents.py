@@ -15,8 +15,8 @@ from datetime import datetime
 from pathlib import Path
 import brain.routine   # Agents: a local named routine hides the module there
 from brain import (
-    clients, handoffs, interaction, labels, macos, meeting, messages, paths, policy, prefs, prompts, skills, storage,
-    web, wording)
+    clients, environ, handoffs, interaction, labels, macos, meeting, messages, paths, policy, prefs, prompts, skills,
+    storage, web, wording)
 
 __all__ = ['save_request', 'agent_show', 'agent_history', 'agent_context', 'agent_ping_ready', 'agent_visible_text', 'agent_made',
            'agent_results', 'agent_commands', 'agent_routing_result', 'Agents', 'agents_service', 'agent_usage_rows']
@@ -26,7 +26,7 @@ def agent_show(identifier):
     """A background task's work, read-only: once this ask answers, the box shows a done task's card; one not done opens in the Agent view."""
     row = next((r for r in agent_history(full=False) if r.get('id') == identifier), None)
     if not row: return 'No such task. Use an ID from the background tasks list.'
-    if not os.environ.get('RABIK_ASK'): return 'Only an ask in the box can show a task.'
+    if not environ.ask_dir(): return 'Only an ask in the box can show a task.'
     interaction.ask_user({'agentShow': identifier}, 5)
     return ('Its card shows under your reply.' if row.get('status') == 'done' else 'Its live work opens in the Agent view.') + ' Reply in one line; do not repeat its findings.'
 

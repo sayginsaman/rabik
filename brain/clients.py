@@ -11,7 +11,7 @@ import sys
 import tempfile
 import time
 import urllib.parse
-from brain import paths, policy, prefs, prompts, storage, turn
+from brain import environ, paths, policy, prefs, prompts, storage, turn
 
 __all__ = ['stop_claude', 'plan', 'claude_plan', 'devin_plan', 'pi_plan', 'devin_config', 'delete_devin_session', 'stop_devin',
            'PI_GATE', 'stop_workers', 'user_agent_tools', 'copy_agent_skills', 'start_ai', 'start_claude']
@@ -225,7 +225,7 @@ def start_ai(model=None):
 
 def start_claude(model=None, agent=None):
     """`claude -p` started ahead, waiting for the request on stdin: its ~1 s startup happens while the user is still talking."""
-    claude = os.environ.get('RABIK_CLAUDE') or shutil.which('claude')
+    claude = environ.claude() or shutil.which('claude')
     if not claude:
         return None
     system = prompts.system_prompt(prompts.ASK_FIRST if prefs.pref('safe', True) else prompts.NEVER)
@@ -233,7 +233,7 @@ def start_claude(model=None, agent=None):
         for main_only in (prompts.AGENT_HANDOFF, prompts.DRAWING, prompts.POINTER, prompts.TEACH, prompts.WORKFLOW): system = system.replace(main_only, '')   # [tip]/[workflow]/[point] are read only from main replies
         system += prompts.AGENT_SYSTEM + ('\nPersonal tools are enabled.' if prefs.pref('agentUserTools', True) else '\nPersonal tools are disabled; do not request them.')
     settings = {}
-    ask = agent['directory'] if agent else os.environ.get('RABIK_ASK') or tempfile.mkdtemp(prefix='rabik-ask-')   # keep helpers and focus restoration on the same ask
+    ask = agent['directory'] if agent else environ.ask_dir() or tempfile.mkdtemp(prefix='rabik-ask-')   # keep helpers and focus restoration on the same ask
     if not agent: atexit.register(shutil.rmtree, ask, True)
     if agent and prefs.pref('safe', True):
         settings['sandbox'] = {'enabled': True, 'autoAllowBashIfSandboxed': True, 'allowUnsandboxedCommands': True, 'excludedCommands': policy.SAFE_OUT}

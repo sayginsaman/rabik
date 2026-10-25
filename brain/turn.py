@@ -6,7 +6,7 @@ import os
 import threading
 import time
 from functools import wraps
-from brain import prefs, storage, telemetry
+from brain import environ, prefs, storage, telemetry
 
 __all__ = ['TURN', 'checkpoint', 'begin_turn', 'end_turn', 'log_turn']
 
@@ -44,8 +44,8 @@ def begin_turn(task):
     started = time.time()
     TURN.update(id=f'{os.getpid()}-{time.time_ns()}', pid=os.getpid(), _started=started,
                 at=time.strftime('%Y-%m-%d %H:%M:%S'), task=task, reply='', usd=0,
-                steps=[], step_times=[], ran=[], status='running', live=os.environ.get('RABIK_LIVE') == '1',
-                confirmed=not bool(os.environ.get('RABIK_COMMIT')), pics=0, cursor=os.environ.get('RABIK_CARET') == '1',
+                steps=[], step_times=[], ran=[], status='running', live=environ.live(),
+                confirmed=not bool(environ.commit()), pics=0, cursor=environ.caret() == '1',
                 model=prefs.main_model(), path='model', escalated=False, escalate_why=None, attempt_usd=[], attempt_usage=[])
     checkpoint()
 
@@ -74,13 +74,13 @@ def log_turn(task, reply, started, cost=0, steps=0, ran=(), pics=0, *, model=Non
     attempt_usd = list(attempt_usd) if attempt_usd is not None else ([] if model == 'instant' else [cost])
     row = {'at': time.strftime('%Y-%m-%d %H:%M:%S'), 'task': task, 'reply': reply,
            'usd': round(cost, 5) if cost is not None else None, 'secs': round(time.time() - started, 1), 'steps': steps,
-           'ran': list(ran), 'live': os.environ.get('RABIK_LIVE') == '1',
-           'pics': pics, 'cursor': os.environ.get('RABIK_CARET') == '1', 'model': model, 'path': path, 'escalated': bool(escalated),
+           'ran': list(ran), 'live': environ.live(),
+           'pics': pics, 'cursor': environ.caret() == '1', 'model': model, 'path': path, 'escalated': bool(escalated),
            'escalate_why': escalate_why if escalated else None, 'attempt_usd': attempt_usd,
            'attempt_usage': list(attempt_usage) if attempt_usage is not None else list(TURN.get('attempt_usage', []))}
     if TURN and TURN.get('task') == task:
         TURN.update(row, status='completed' if status == 'running' else status,
-                    confirmed=not os.environ.get('RABIK_COMMIT') or os.path.exists(os.environ['RABIK_COMMIT']))
+                    confirmed=not environ.commit() or os.path.exists(environ.commit(required=True)))
         storage.append_log({k: v for k, v in TURN.items() if not k.startswith('_')})
         telemetry.ask_done(TURN)
     else:

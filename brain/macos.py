@@ -5,7 +5,7 @@ import os
 import re
 import shlex
 import subprocess
-from brain import paths, prefs, protocol, turn
+from brain import environ, paths, prefs, protocol, turn
 
 __all__ = ['osa', 'osa_quote', 'wants_focus', 'asks_front', 'screens', 'describe', 'front', 'free_focus', 'allow_focus',
            'restore_focus', 'request_screen', 'window_target', 'cached_hands', 'preview_app', 'preview_commands']
@@ -22,12 +22,12 @@ def osa_quote(text):
 
 
 def wants_focus(task=None, sites=False):
-    ask = os.environ.get('RABIK_ASK')
-    if os.environ.get('RABIK_AGENT') and not sites:   # agents stay behind unless the user's own words asked for front work
+    ask = environ.ask_dir()
+    if environ.agent() and not sites:   # agents stay behind unless the user's own words asked for front work
         return bool(ask) and os.path.exists(os.path.join(paths.agent_gate_dir(ask), 'focus-requested'))
     if ask and os.path.exists(os.path.join(ask, 'focus-requested')): return True
     if task is None:
-        task = os.environ.get('RABIK_REQUEST', '')
+        task = environ.request('')
         if ask:
             try:
                 with open(paths.request_file(ask)) as f: task = f.read()
@@ -44,9 +44,9 @@ def asks_front(task):
 
 
 def preview_app(app, action='work', title='', directory=None, frame=None):
-    if not app or os.environ.get('RABIK_LIVE') == '1' and prefs.pref('workIn', 'back') != 'front' and not wants_focus(): return
+    if not app or environ.live() and prefs.pref('workIn', 'back') != 'front' and not wants_focus(): return
     try:
-        mapped = cached_hands() if frame is None and not title and os.environ.get('RABIK_HANDS_STATE') else None
+        mapped = cached_hands() if frame is None and not title and environ.hands_file() else None
         if isinstance(mapped, dict) and str(mapped.get('app', '')).casefold() == str(app).casefold():
             pinned = mapped.get('windowFrame')
             if isinstance(pinned, list) and len(pinned) == 4: frame = pinned
@@ -118,7 +118,7 @@ def describe(scr, fx=None, fy=None):
 
 def front():
     # Rabik.app passes the app the user was in when the user pressed the keys (its own windows can take focus, e.g. onboarding)
-    app = os.environ.get('RABIK_FRONT') or osa('tell application "System Events" to get name of first process whose frontmost is true')
+    app = environ.front_app() or osa('tell application "System Events" to get name of first process whose frontmost is true')
     return app, osa(f'tell application "System Events" to tell process "{app}" to get name of front window') if app else ''   # no front app: nothing to ask
 
 
@@ -150,8 +150,8 @@ def restore_focus(app, task, cmds):
 
 
 def request_screen():
-    if os.environ.get('RABIK_SCREEN'): return os.environ['RABIK_SCREEN']
-    app = os.environ.get('RABIK_FRONT') or front()[0]
+    if environ.screen(): return environ.screen(required=True)
+    app = environ.front_app() or front()[0]
     try:
         x, y = map(int, osa(f'tell application "System Events" to tell process "{app}" to get position of window 1').split(', '))
         return next((n for n, sx, sy, w, h, _ in screens() if sx <= x + 50 < sx + w and sy <= y + 50 < sy + h), 'current')

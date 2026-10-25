@@ -10,7 +10,7 @@ import tempfile
 import time
 import urllib.parse
 import urllib.request
-from brain import apps, hands, interaction, macos, paths, policy, prefs, protocol, storage, windows
+from brain import apps, environ, hands, interaction, macos, paths, policy, prefs, protocol, storage, windows
 
 __all__ = ['get', 'text_of', 'search', 'WEB_JS', 'RISKY_CLICK', 'browser_terms', 'browser_adapter', 'close_agent_window',
            'work_page', 'running_app', 'page_ready', 'web', 'connectors', 'show', 'background_tab', 'remember_background_tab']
@@ -18,7 +18,7 @@ __all__ = ['get', 'text_of', 'search', 'WEB_JS', 'RISKY_CLICK', 'browser_terms',
 
 def background_tab(url, app):
     """Navigate Rabik's last background page in place; making a new browser tab can activate its app."""
-    saved_path = os.path.join(os.environ.get('RABIK_ASK', paths.DIR) if os.environ.get('RABIK_AGENT') else paths.DIR, 'background-page.json')
+    saved_path = os.path.join(environ.ask_dir(paths.DIR) if environ.agent() else paths.DIR, 'background-page.json')
     try:
         with open(saved_path) as f: saved = json.load(f)
         adapter = browser_adapter(app)
@@ -35,7 +35,7 @@ def background_tab(url, app):
         r = subprocess.run(['osascript', '-e', script, saved['url'], url], capture_output=True, text=True, timeout=1)
         if r.returncode: return False
         page = {'app': app, 'adapter': adapter, 'window': window, 'tab': tab, 'target': None}
-        path = os.path.join(os.environ.get('RABIK_ASK', paths.DIR), 'web.json')
+        path = os.path.join(environ.ask_dir(paths.DIR), 'web.json')
         os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
         storage.private_json(path, page)
         return True
@@ -45,7 +45,7 @@ def background_tab(url, app):
 
 def remember_background_tab(app):
     """Remember only a tab Rabik just opened or reused, including its final URL after redirects."""
-    page_path = os.path.join(os.environ.get('RABIK_ASK', paths.DIR), 'web.json')
+    page_path = os.path.join(environ.ask_dir(paths.DIR), 'web.json')
     try:
         with open(page_path) as f: page = json.load(f)
         adapter, window, tab = page['adapter'], page['window'], page['tab']
@@ -57,7 +57,7 @@ def remember_background_tab(app):
         if r.returncode or not url: return
         saved = {'app': app, 'adapter': adapter, 'window': window, 'tab': tab, 'url': url}
         os.makedirs(paths.DIR, mode=0o700, exist_ok=True)
-        path = os.path.join(os.environ.get('RABIK_ASK', paths.DIR) if os.environ.get('RABIK_AGENT') else paths.DIR, 'background-page.json')
+        path = os.path.join(environ.ask_dir(paths.DIR) if environ.agent() else paths.DIR, 'background-page.json')
         with open(path + '.tmp', 'w') as f: json.dump(saved, f)
         os.chmod(path + '.tmp', 0o600); os.replace(path + '.tmp', path)
     except (OSError, ValueError, KeyError, subprocess.TimeoutExpired):
@@ -69,9 +69,9 @@ def show(target, bg=False):
     bg: a page Rabik works in by itself opens behind, so the user keeps working (the mini screen shows it)."""
     t = os.path.expanduser(target)
     if re.match(r'^https?://', t) and not policy.agent_url_allowed(t): return policy.agent_url_denial()
-    if os.environ.get('RABIK_AGENT') and re.match(r'^https?://', t) and not (macos.wants_focus() or prefs.pref('workIn', 'back') == 'front' and macos.wants_focus(None, True)):
+    if environ.agent() and re.match(r'^https?://', t) and not (macos.wants_focus() or prefs.pref('workIn', 'back') == 'front' and macos.wants_focus(None, True)):
         return web('read', t)
-    mine = '' if bg and os.environ.get('RABIK_FOCUS_GUARD') == '1' else macos.osa('tell application "System Events" to get name of first process whose frontmost is true') if bg else macos.front()[0]
+    mine = '' if bg and environ.focus_guard() else macos.osa('tell application "System Events" to get name of first process whose frontmost is true') if bg else macos.front()[0]
     ahead = bg and prefs.pref('workIn', 'back') == 'front'
     if bg:
         is_url = bool(re.match(r'^[a-z]+:', t))
@@ -137,7 +137,7 @@ def get(url, timeout=10):
         body, final = response.read().decode('utf-8', 'replace'), response.geturl()
     if policy.managed_agent():
         links = [urllib.parse.urljoin(final, html.unescape(link)) for link in re.findall(r'''(?i)\bhref\s*=\s*["']([^"'#]+)''', body[:1000000])]
-        policy.agent_url_observe(os.environ['RABIK_ASK'], [final, *links])
+        policy.agent_url_observe(environ.ask_dir(required=True), [final, *links])
     return body
 
 
@@ -335,8 +335,8 @@ def web(cmd, n='', text='', app=None, fresh=False, want='', page=None):
             quoted = app.replace('\\', '\\\\').replace('"', '\\"')
             tab_id = 'id of t' if adapter == 'chromium' else 'index of t'
             selection = 'active tab index' if adapter == 'chromium' else 'current tab'
-            own = hands.agent_window(app) if os.environ.get('RABIK_AGENT') else 0
-            if os.environ.get('RABIK_AGENT'):   # the task's own window, reused for every page; the user's windows and tabs stay as they are
+            own = hands.agent_window(app) if environ.agent() else 0
+            if environ.agent():   # the task's own window, reused for every page; the user's windows and tabs stay as they are
                 opened = ('set w to make new window\nset URL of active tab of w to item 1 of argv\nset t to active tab of w' if adapter == 'chromium' else
                           'make new document with properties {URL:item 1 of argv}\nset w to window 1\nset t to current tab of w')
                 selected = 'set active tab index of w to (count tabs of w)' if adapter == 'chromium' else 'set current tab of w to t'
@@ -359,21 +359,21 @@ def web(cmd, n='', text='', app=None, fresh=False, want='', page=None):
             if r.returncode or len(ids) != 3 or not all(i.isdigit() and int(i) > 0 for i in ids[:2]):
                 return 'Could not create a background page in an existing window. Requested page was not read.'
             if ids[2] == 'new':
-                storage.private_json(os.path.join(paths.agent_gate_dir(os.environ['RABIK_ASK']), 'browser-window.json'), {'app': app, 'window': int(ids[0])})
+                storage.private_json(os.path.join(paths.agent_gate_dir(environ.ask_dir(required=True)), 'browser-window.json'), {'app': app, 'window': int(ids[0])})
                 windows.keep_behind(mine, app, wait=.5)
             page = dict(app=app, adapter=adapter, window=int(ids[0]), tab=int(ids[1]), target=None)
             status = web('wait', text=n, app=app, page=page)
             if status != 'Page ready.': return status + '\nRequested page not ready; do not substitute another source.'
             result = web('read', app=app, want=n, page=page)
-            directory = os.environ.get('RABIK_ASK', paths.DIR)
+            directory = environ.ask_dir(paths.DIR)
             os.makedirs(directory, mode=0o700, exist_ok=True)
             storage.private_json(os.path.join(directory, 'web.json'), page)
             return result
         except (OSError, ValueError, subprocess.TimeoutExpired) as e:
             return f'Could not read the background page: {e}'
-    explicit = app; app = app or os.environ.get('RABIK_FRONT', '')
-    path = os.path.join(os.environ.get('RABIK_ASK', paths.DIR), 'web.json')
-    if page is None and not explicit and not fresh and (cmd != 'read' or os.environ.get('RABIK_ASK')):
+    explicit = app; app = app or environ.front_app('')
+    path = os.path.join(environ.ask_dir(paths.DIR), 'web.json')
+    if page is None and not explicit and not fresh and (cmd != 'read' or environ.ask_dir()):
         try:
             with open(path) as f: prior = json.load(f)
             if isinstance(prior.get('app'), str): app = prior['app']
@@ -385,7 +385,7 @@ def web(cmd, n='', text='', app=None, fresh=False, want='', page=None):
         return f'{app} does not expose a scriptable web page. Read it with {paths.WINDOW} or {paths.HANDS} see.'
     try:
         saved = page
-        if saved is None and not fresh and os.path.exists(path) and (cmd != 'read' or os.environ.get('RABIK_ASK')):
+        if saved is None and not fresh and os.path.exists(path) and (cmd != 'read' or environ.ask_dir()):
             with open(path) as f: saved = json.load(f)
         if not saved or saved.get('app') != app or saved.get('adapter') != adapter:
             query, _ = browser_terms(app, adapter)
@@ -398,7 +398,7 @@ def web(cmd, n='', text='', app=None, fresh=False, want='', page=None):
             storage.private_json(path, saved)
         if not all(isinstance(saved.get(k), int) and saved[k] > 0 for k in ('window', 'tab')):
             raise ValueError('Invalid page target')
-        if os.environ.get('RABIK_AGENT') and cmd in ('click', 'fill', 'type-after') and saved['window'] != hands.agent_window(app):
+        if environ.agent() and cmd in ('click', 'fill', 'type-after') and saved['window'] != hands.agent_window(app):
             handed = hands.handed_page()
             if any(handed.get(k) != saved.get(k) for k in ('app', 'window', 'tab')):
                 return f"That page is in the user's own window; agents only read it. To act on it, open its URL in this task's window: {paths.WEB} read <url>"
@@ -442,7 +442,7 @@ def web(cmd, n='', text='', app=None, fresh=False, want='', page=None):
             except ValueError:
                 return 'No such control. Read the page again.'
             if c.get('submit') or re.search(RISKY_CLICK, c['what'], re.I) and prefs.pref('safe', True):
-                if not os.environ.get('RABIK_ASK'):   # a saved shortcut has no Allow card: never click these blind
+                if not environ.ask_dir():   # a saved shortcut has no Allow card: never click these blind
                     return 'This click needs the user\'s confirmation. Ask through Rabik, not a shortcut.'
                 if not policy.task_allowed('web click'):
                     answer = interaction.ask_user({'q': f'Click "{c["short"][:40]}"?', 'cmd': f'{app}: click "{c["what"][:300]}"', 'task': policy.managed_agent()}, 60)
@@ -479,7 +479,7 @@ def web(cmd, n='', text='', app=None, fresh=False, want='', page=None):
 
 def connectors():
     """The user's claude.ai connectors: names connected, and names that need a sign-in."""
-    claude = os.environ.get('RABIK_CLAUDE') or shutil.which('claude') or os.path.expanduser('~/.local/bin/claude')
+    claude = environ.claude() or shutil.which('claude') or os.path.expanduser('~/.local/bin/claude')
     try: out = subprocess.run([claude, 'mcp', 'list'], capture_output=True, text=True, timeout=20, cwd=tempfile.gettempdir(),
                               env={k: v for k, v in os.environ.items() if k != 'ANTHROPIC_API_KEY'}).stdout
     except (OSError, subprocess.TimeoutExpired): out = ''

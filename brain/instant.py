@@ -8,7 +8,7 @@ import time
 import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
-from brain import apps, hands, macos, paths, prefs, protocol, skills, spotify, telemetry, tips, web, windows, wording
+from brain import apps, environ, hands, macos, paths, prefs, protocol, skills, spotify, telemetry, tips, web, windows, wording
 
 __all__ = ['FastResult', 'fast']
 
@@ -39,7 +39,7 @@ def _fast(text, result):
     text = text.strip()
     named = skills.named_shortcut(text)
     if named and prefs.pref('learn', True):
-        if os.environ.get('RABIK_LIVE') == '1': return None
+        if environ.live(): return None
         name, action = (named[1] or named[2]).strip(), text[named.end():].strip(' ,:;')
         if hands.hands_command(wording.plain(action)) or skills.named_shortcut(action): return None
         reply = action and _fast(action, result)
@@ -51,7 +51,7 @@ def _fast(text, result):
         return None
     t = wording.plain(text)
     if t in ('report feedback', 'report a bug'):
-        if os.environ.get('RABIK_LIVE') == '1': return None
+        if environ.live(): return None
         protocol.say('!', 'feedback')
         return 'Review your feedback before opening GitHub.'
     quick = hands.fast_hands(t)
@@ -59,12 +59,12 @@ def _fast(text, result):
         return quick
     m = re.fullmatch(r'remember how to (.+?)(?: for (?:the )?future)?', t)
     if m and prefs.pref('learn', True):
-        if os.environ.get('RABIK_LIVE') == '1':
+        if environ.live():
             return None
         return ('I have saved the procedure for next time.' if skills.workflows(m[1]) or any(wording.gist(k) == wording.gist(m[1]) for k in skills.skills()) else
                 'I do not have a verified procedure for that yet. Complete the task successfully first so I can save it.')
     if t in ('no', 'yes', 'ok', 'okay', 'nevermind', 'never mind', 'cancel', 'nothing', 'thanks', 'thank you'):
-        return None if os.environ.get('RABIK_LIVE') == '1' else 'Okay.'   # stray word after a turn: no AI call; mid-sentence it starts the next words ("No, when I say …")
+        return None if environ.live() else 'Okay.'   # stray word after a turn: no AI call; mid-sentence it starts the next words ("No, when I say …")
     m = re.fullmatch(r'(?:close|quit) (.+)', t)
     app = apps.app_named(m[1]) if m and not wording.DEICTIC.search(m[1]) else None
     if app:
@@ -78,7 +78,7 @@ def _fast(text, result):
     sk, g = (skills.skills() if prefs.pref('learn', True) else {}), wording.gist(t)
     k, swap = (t, None) if t in sk else (None, None) if wording.DEICTIC.search(t) or not g else skills.like(g, sk)   # same words that matter, any order or filler, or another app
     if k:
-        if os.environ.get('RABIK_LIVE') == '1':
+        if environ.live():
             return None   # even a shortcut named "open Spotify" waits for confirmed words
         replayed = skills.replay(k, swap)
         result.ran = replayed.ran

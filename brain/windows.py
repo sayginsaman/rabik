@@ -5,7 +5,7 @@ import re
 import subprocess
 import time
 from pathlib import Path
-from brain import apps, macos, paths, prefs
+from brain import apps, environ, macos, paths, prefs
 
 __all__ = ['place', 'place_many', 'model_note', 'place_failed', 'keep_behind', 'MOVE_WORDS', 'move_target']
 
@@ -147,7 +147,7 @@ def place_failed(output):
 def keep_behind(mine, app, wait=1.5):
     """Give focus back to the user's app if `app` jumped forward by itself (a launch, Spotify starting to play);
     never undo a switch to some other app the user made."""
-    if not mine or not app or macos.wants_focus() or prefs.pref('workIn', 'back') == 'front' or os.environ.get('RABIK_FOCUS_GUARD') == '1': return   # the native app watches late activations; don't hold every background open for 1.5 s
+    if not mine or not app or macos.wants_focus() or prefs.pref('workIn', 'back') == 'front' or environ.focus_guard(): return   # the native app watches late activations; don't hold every background open for 1.5 s
     names = {app.lower(), apps.proc_of(app).lower()}
     for _ in range(int(wait * 10)):   # some apps come forward late (Spotify, Chrome on a monitor)
         time.sleep(0.1)

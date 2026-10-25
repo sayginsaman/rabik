@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 import brain.paths   # choices: a local named paths hides the module there
-from brain import apps, macos, paths, prefs, protocol, storage
+from brain import apps, environ, macos, paths, prefs, protocol, storage
 
 __all__ = ['wait_commit', 'ask_user', 'pick', 'switches', 'picks', 'set_switch', 'thumb', 'choices', 'question_answer_path',
            'ask', 'NEEDS', 'need', 'allow_page_js', 'relay']
@@ -21,7 +21,7 @@ __all__ = ['wait_commit', 'ask_user', 'pick', 'switches', 'picks', 'set_switch',
 
 def wait_commit():
     """Early reasoning is allowed; tools and the final answer wait for the confirmed transcript."""
-    path = os.environ.get('RABIK_COMMIT')
+    path = environ.commit()
     if not path:
         return True
     parent = os.getppid()
@@ -36,7 +36,7 @@ def wait_commit():
 
 def ask_user(j, secs):
     """Hands a question to relay() (the box, or a dialog) and waits for the answer. None: no answer in time, or cancelled."""
-    d, parent = os.environ['RABIK_ASK'], os.getppid()
+    d, parent = environ.ask_dir(required=True), os.getppid()
     deadline = time.monotonic() + secs
     fd = os.open(os.path.join(d, 'permission.lock'), os.O_RDWR | os.O_CREAT, 0o600)
     with os.fdopen(fd, 'r+') as lock:
@@ -63,7 +63,7 @@ def pick(question, options):
     """{PICK}: the AI isn't sure which one the user means, so the user picks in the box. Prints the one picked."""
     if not options:
         return print('No options given.')
-    s = ask_user({'pick': question, 'options': options[:8]}, 110) if os.environ.get('RABIK_ASK') else None   # 110 s: under the AI's 2-minute tool limit
+    s = ask_user({'pick': question, 'options': options[:8]}, 110) if environ.ask_dir() else None   # 110 s: under the AI's 2-minute tool limit
     if s is None:
         return print('The user did not pick. Do not guess; say you need them to pick one.')
     if s.startswith('='):
@@ -100,7 +100,7 @@ def set_switch(words, on):
             return print('No such setting. Choices: ' + '; '.join(f'{n}: {", ".join(o)}' for n, o in rows.values()) + '. Switches (on|off): ' + ', '.join(switches().values()))
         if k == 'client':
             return print('Only the user can change the AI client in Settings.')
-        if os.environ.get('RABIK_ASK'):
+        if environ.ask_dir():
             ask_user({'set': k, 'value': options[o]}, 5)
         else:
             prefs.save_pref(k, options[o])
@@ -111,7 +111,7 @@ def set_switch(words, on):
         return print('No such switch. Switches: ' + ', '.join(rows.values()) + '. Choices: ' + '; '.join(f'{n}: {", ".join(o)}' for n, o in picks().values()))
     if k == 'safe' and on == 'off':   # the AI may make Rabik safer, never less safe: a web page could ask it to
         return print('Only the user can turn Safe mode off: Settings > Account & Access > Safety. It is still on.')
-    if os.environ.get('RABIK_ASK'):
+    if environ.ask_dir():
         ask_user({'set': k, 'value': on == 'on'}, 5)
     else:
         prefs.save_pref(k, on == 'on')
@@ -145,10 +145,10 @@ def choices(options):
 def allow_page_js(app, ask=False):
     """Chromium browsers: View > Developer > Allow JavaScript from Apple Events, clicked by its menu. Asks the user once (Settings: pageJS), then keeps it on."""
     if ask and not prefs.pref('pageJS', False) and not prefs.pref('fixSetup', False):
-        if not os.environ.get('RABIK_ASK') or ask_user({'need': 'page-js', 'app': app, 'q': f'I can turn on page reading in {app} for you',
+        if not environ.ask_dir() or ask_user({'need': 'page-js', 'app': app, 'q': f'I can turn on page reading in {app} for you',
                                                           'cmd': 'View > Developer > Allow JavaScript from Apple Events, kept on.'}, 60) != 'y':
             return False
-        if not os.environ.get('RABIK_AGENT'): ask_user({'set': 'pageJS', 'value': True}, 5)   # an agent's chip sets it on Allow
+        if not environ.agent(): ask_user({'set': 'pageJS', 'value': True}, 5)   # an agent's chip sets it on Allow
     # shortcut: English menu names only; a translated Chrome needs the item found by position
     return macos.osa('on run argv\ntell application "System Events" to tell process (item 1 of argv)\n'
                'set m to menu item "Allow JavaScript from Apple Events" of menu 1 of menu item "Developer" of menu 1 of menu bar item "View" of menu bar 1\n'
@@ -165,8 +165,8 @@ def need(kind, why='', app='', do=False):
     if kind not in NEEDS: return 'Use one of: ' + ', '.join(NEEDS) + '.'
     name = NEEDS[kind] + (f' for {app}' if app else '')
     skip = f'Not now: continue without {name} by the next-best route, and say in the result what you skipped.'
-    if not os.environ.get('RABIK_ASK'): return f'{name} is off. Tell the user it would help, in one line.'
-    wait = 900 if os.environ.get('RABIK_AGENT') else 110   # main asks: under the AI's 2-minute tool limit, as pick()
+    if not environ.ask_dir(): return f'{name} is off. Tell the user it would help, in one line.'
+    wait = 900 if environ.agent() else 110   # main asks: under the AI's 2-minute tool limit, as pick()
     if kind == 'page-js':
         app = app or 'Google Chrome'
         if do or prefs.pref('fixSetup', False): protocol.emit([f'▸ Turning on page reading in {app}'])
@@ -182,7 +182,7 @@ def question_answer_path(directory, question):
 
 def relay(p=None, directory=None):
     """Passes the gate's question to the box ("? <question>\t<command>\t<answer file>"), or a dialog when there is no box."""
-    directory = directory or (p.ask if p is not None else os.environ['RABIK_ASK'])
+    directory = directory or (p.ask if p is not None else environ.ask_dir(required=True))
     q, pointer = paths.question_path(directory), os.path.join(directory, 'point')
     while (p is None and os.path.isdir(directory)) or (p is not None and p.poll() is None) or os.path.exists(pointer) or (os.path.isdir(directory) and any(n.startswith('hands-') for n in os.listdir(directory))):
         for name in sorted(n for n in os.listdir(directory) if n.startswith('hands-')) if os.path.isdir(directory) else []:
@@ -207,23 +207,23 @@ def relay(p=None, directory=None):
                 k, v, rows = j['set'], j.get('value'), picks()
                 if not (k in switches() and isinstance(v, bool) and (k != 'safe' or v) or k in rows and k != 'client' and v in rows[k][1].values()):
                     pass   # only what --set can ask for: never a server address, key, the AI client, or Safe mode off
-                elif os.environ.get('RABIK_UI') == '1':
+                elif environ.in_box():
                     print(f"⚙ {j['set']} {j['value'] if isinstance(j['value'], str) else 'true' if j['value'] else 'false'}", flush=True)
                 else:   # no app running: it reads the file when it starts
                     prefs.save_pref(j['set'], j['value'])
                 Path(a + '.tmp').write_text('ok')
                 os.rename(a + '.tmp', a)
             elif 'agentShow' in j:   # "▤ <task ID>": the app shows that task's work once this ask ends
-                if os.environ.get('RABIK_UI') == '1' and re.fullmatch(r'[a-f0-9]{32}', str(j['agentShow'])): print('▤ ' + j['agentShow'], flush=True)
+                if environ.in_box() and re.fullmatch(r'[a-f0-9]{32}', str(j['agentShow'])): print('▤ ' + j['agentShow'], flush=True)
                 Path(a + '.tmp').write_text('ok')
                 os.rename(a + '.tmp', a)
-            elif 'pick' in j and os.environ.get('RABIK_UI') == '1':   # "◇ {json}": the choices card
+            elif 'pick' in j and environ.in_box():   # "◇ {json}": the choices card
                 print('◇ ' + json.dumps({'q': j['pick'], 'options': choices(j['options']), 'a': a}), flush=True)
             elif 'pick' in j:
                 r = macos.osa('on run argv\nset r to choose from list (rest of argv) with prompt (item 1 of argv)\nif r is false then return ""\nreturn item 1 of r\nend run', j['pick'], *j['options'])
                 Path(a + '.tmp').write_text(str(j['options'].index(r)) if r in j['options'] else '')
                 os.rename(a + '.tmp', a)   # whole, or the waiting side reads it half-written
-            elif os.environ.get('RABIK_UI') == '1':
+            elif environ.in_box():
                 print(f"? {j['q']}\t{' '.join(j['cmd'].split())}\t{a}" + (f"\t\t\t{json.dumps({'need': j['need'], 'app': j.get('app', '')})}" if j.get('need') else
                       f"\t\tretry\t{' '.join(j.get('details', '').split())}" if j.get('retry') else ''), flush=True)   # not say(): it would squash the tabs
             else:

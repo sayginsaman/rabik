@@ -5,7 +5,7 @@ import os
 import re
 import subprocess
 import tempfile
-from brain import drawing, hands, macos, paths, prefs, storage, turn, web
+from brain import drawing, environ, hands, macos, paths, prefs, storage, turn, web
 
 __all__ = ['look', 'screen_for', 'TEXT_PAGE', 'text_page', 'window_identity', 'window_summary', 'window_text']
 
@@ -19,7 +19,7 @@ def look(cleanup=True, window=None):
     x, y, w, h = (window or {}).get('windowFrame') or (0, 0, 0, 0)
     home = next((i for i, s in enumerate(scr, 1) if s[1] <= x + w / 2 < s[1] + s[3] and s[2] <= y + h / 2 < s[2] + s[4]), None) if window else None
     def one(i):
-        ask = os.environ.get('RABIK_ASK')   # AI helper images belong to the request owner, not this short-lived process.
+        ask = environ.ask_dir()   # AI helper images belong to the request owner, not this short-lived process.
         fd, path = tempfile.mkstemp(prefix=f'rabik-screen-{i}-', suffix='.jpg', dir=ask)
         os.close(fd)
         os.remove(path)
@@ -42,7 +42,7 @@ def look(cleanup=True, window=None):
             dims = re.findall(r'pixel(?:Width|Height): (\d+)', size)
             if len(dims) == 2:
                 mappings[str(n)] = {'frame': list(scr[n-1][1:5]), 'pixels': list(map(int, dims))}
-        snapshot = os.path.join(os.environ.get('RABIK_ASK', paths.DIR), 'draw-screens.json')
+        snapshot = os.path.join(environ.ask_dir(paths.DIR), 'draw-screens.json')
         try:
             if not mappings: raise ValueError('No captured displays')
             storage.private_json(snapshot, {'screens': mappings, 'target': target.result()})
@@ -76,7 +76,7 @@ def window_identity(app):
 
 def window_summary(app=''):
     """Cheap key-down context: bounded AX head only; never OCR, permission cards, or full document text."""
-    app = app or os.environ.get('RABIK_FRONT') or macos.front()[0]
+    app = app or environ.front_app() or macos.front()[0]
     try:
         r = hands.hands_call(['read', app] if app else ['read'], timeout=.4, head=True)
         state = json.loads(r.stdout) if not r.returncode else {}
@@ -85,7 +85,7 @@ def window_summary(app=''):
     summary = {k: state[k] for k in ('app', 'window', 'page', 'web', 'identity', 'incomplete') if k in state}
     summary['app'] = summary.get('app') or app
     summary['text'] = str(state.get('text', ''))[:1500]
-    directory = os.environ.get('RABIK_ASK', paths.DIR)
+    directory = environ.ask_dir(paths.DIR)
     try:
         os.makedirs(directory, mode=0o700, exist_ok=True)
         with open(os.path.join(directory, 'window-summary.json.tmp'), 'w') as f: json.dump(summary, f)
@@ -99,8 +99,8 @@ def window_summary(app=''):
 def window_text(app='', offset=0, ocr=False):
     """One reader: DOM when supported, document AX otherwise, then existing window OCR."""
     if offset < 0: return 'Use a nonnegative offset.'
-    app = app or os.environ.get('RABIK_FRONT') or macos.front()[0]
-    directory = os.environ.get('RABIK_ASK', paths.DIR)
+    app = app or environ.front_app() or macos.front()[0]
+    directory = environ.ask_dir(paths.DIR)
     path = os.path.join(directory, 'window-text.json')
     if offset:
         try:
@@ -138,7 +138,7 @@ def window_text(app='', offset=0, ocr=False):
         except (OSError, ValueError, AttributeError):
             pass
     if not ocr and web_hint is True:
-        page = web.web('read', app=app, fresh=not bool(os.environ.get('RABIK_AGENT')))
+        page = web.web('read', app=app, fresh=not bool(environ.agent()))
         if re.search(r'\[Read 0-\d+ of \d+ chars', page) or '\nControls:' in page or page.startswith('Controls:'):
             text, source = page, 'dom'
     if turn.STOPPING: return ''
@@ -150,7 +150,7 @@ def window_text(app='', offset=0, ocr=False):
         except (OSError, ValueError, KeyError, subprocess.TimeoutExpired): pass
         # No fresh key-down head for this app (a later step, another app): the full AX read says if it holds a web page.
         if web_hint is None and state.get('web') and not turn.STOPPING:
-            page = web.web('read', app=app, fresh=not bool(os.environ.get('RABIK_AGENT')))
+            page = web.web('read', app=app, fresh=not bool(environ.agent()))
             if re.search(r'\[Read 0-\d+ of \d+ chars', page) or '\nControls:' in page or page.startswith('Controls:'):
                 text, source = page, 'dom'
     if turn.STOPPING: return ''

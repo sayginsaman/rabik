@@ -10,7 +10,7 @@ import tempfile
 import threading
 import time
 from functools import wraps
-from brain import paths, storage, wording
+from brain import environ, paths, storage, wording
 
 __all__ = ['ME_FILE', 'CATEGORIES', 'SOURCES', 'SENSITIVE', 'category', '_profile_date', '_mask', '_fact', '_PROFILE_MUTEX',
            '_PROFILE_STATE', '_profile_locked', '_save_profile', '_normalize_profile', 'me', 'profile_name',
@@ -189,7 +189,7 @@ def profile_category(name):
 
 def _request_contains(evidence):
     """The user said these words: in this ask, or in a question of this chat ("remember that" points back). Never the AI's answers."""
-    root = os.environ.get('RABIK_ASK')
+    root = environ.ask_dir()
     if not root:
         return True
     try:
@@ -210,7 +210,7 @@ def _split_fact(text, fallback):
 @_profile_locked
 def profile_add(category_, text, kind='', source=None):
     profile, category_ = me(), category(category_)
-    source = source or ('learned' if os.environ.get('RABIK_ASK') else 'you')
+    source = source or ('learned' if environ.ask_dir() else 'you')
     if source == 'learned' and not _request_contains(text):
         return 'not saved: only the user’s own words can change About you'
     kind, value = (kind, text.strip()) if kind else _split_fact(text, CATEGORIES[category_].rstrip('s').lower())
@@ -228,14 +228,14 @@ def profile_add(category_, text, kind='', source=None):
 
 @_profile_locked
 def profile_set(identifier, text, evidence=None):
-    if os.environ.get('RABIK_ASK') and not _request_contains(evidence if evidence is not None else text):
+    if environ.ask_dir() and not _request_contains(evidence if evidence is not None else text):
         return 'not saved: only the user’s own words can change About you'
     profile = me()
     fact = next((f for f in profile['facts'] if f['id'] == identifier), None)
     if not fact:
         return 'not found'
     kind, value = _split_fact(text, fact['kind'])
-    changed = _fact(fact['category'], kind, value, 'learned' if os.environ.get('RABIK_ASK') else 'you',
+    changed = _fact(fact['category'], kind, value, 'learned' if environ.ask_dir() else 'you',
                     identifier=identifier, sensitive=bool(SENSITIVE.search(kind + ' ' + value)))
     if not changed:
         return 'not saved: empty fact'
@@ -245,7 +245,7 @@ def profile_set(identifier, text, evidence=None):
 
 @_profile_locked
 def profile_drop(identifier, evidence=''):
-    if os.environ.get('RABIK_ASK') and not _request_contains(evidence):
+    if environ.ask_dir() and not _request_contains(evidence):
         return 'not forgotten: only the user’s own words can change About you'
     profile = me()
     kept = [f for f in profile['facts'] if f['id'] != identifier]
@@ -257,7 +257,7 @@ def profile_drop(identifier, evidence=''):
 
 @_profile_locked
 def profile_forget_source(source, evidence=''):
-    if os.environ.get('RABIK_ASK') and not _request_contains(evidence):
+    if environ.ask_dir() and not _request_contains(evidence):
         return 'not forgotten: only the user’s own words can change About you'
     if source not in SOURCES:
         return 'not found'

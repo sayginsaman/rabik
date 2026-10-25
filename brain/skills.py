@@ -8,7 +8,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass, field
-from brain import apps, hands, macos, memory, paths, policy, prefs, web, windows, wording
+from brain import apps, environ, hands, macos, memory, paths, policy, prefs, web, windows, wording
 
 __all__ = ['SKILLS', 'INTERNAL_TASK_MARKERS', 'UNSAFE', 'NAMED', 'named_shortcut', 'TRIGGER', 'shortcut_name', 'skills',
            'PLACING', 'LOOKUPS', 'shortcut_commands', 'save_skills', 'learn', 'unlearn', 'app_in', 'like', 'swapped',
@@ -282,8 +282,7 @@ def _replay(k, swap, result):
         result.failed_at = index
         try:
             tokens = shlex.split(c)
-            with_request = os.environ.get('RABIK_REQUEST'); os.environ['RABIK_REQUEST'] = asked
-            try:
+            with environ.requested(asked):   # each step trusts the words that taught it, then the ask's own again
                 if tokens[:2] == [paths.ME, '--show'] and (len(tokens) == 3 or len(tokens) == 4 and tokens[2] == '--bg'):
                     reply = web.show(tokens[-1], '--bg' in tokens)   # as the verified run did: the model chose front or --bg from the words in any language
                     result.ran.append(f'{c[:200]}  => {reply[:200]}')
@@ -312,9 +311,6 @@ def _replay(k, swap, result):
                     if tokens[0] == 'open' and len(tokens) in (3, 4) and tokens[1:-1] in (['-a'], ['-g', '-a']) and (bid := apps.app_id(apps.app_named(tokens[-1]) or tokens[-1])) and not apps.app_up(bid):
                         result.ran.append(f'{tokens[-1]} => not running'); return None   # exit 0 is not proof: check by bundle id, as quit does
                     macos.preview_commands(c)
-            finally:
-                if with_request is None: os.environ.pop('RABIK_REQUEST', None)
-                else: os.environ['RABIK_REQUEST'] = with_request
         except (OSError, ValueError, subprocess.TimeoutExpired) as e:
             result.ran.append(f'{c[:200]}  => {type(e).__name__}')
             return None

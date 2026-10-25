@@ -13,14 +13,14 @@ import threading
 import time
 from pathlib import Path
 from brain import (
-    agents, apps, ask, calendar, clients, dictation, drawing, hands, instant, interaction, macos, meeting, memory,
+    agents, apps, ask, calendar, clients, dictation, drawing, environ, hands, instant, interaction, macos, meeting, memory,
     paths, policy, prefs, prompts, protocol, routine, screen, situation, skills, spotify, storage, support, telemetry, tips,
     toolhelp, turn, watcher, web, windows, wording)
 
 __all__ = ['INNER', 'BUDGET', 'main']
 
 
-INNER = bool(os.environ.get('RABIK_ASK'))   # started by the AI's own tool call, not by the user
+INNER = bool(environ.ask_dir())   # started by the AI's own tool call, not by the user
 
 
 BUDGET = {'usd': 0.002, 'secs': 6}   # median of the last 50 AI asks must stay under this (Oct 10, 2026: $0.0009, 4.7 s)
@@ -155,7 +155,7 @@ def main():
     if args == ['--look']:
         return print('\n'.join(f'{label}: {path}' for path, label in screen.look(cleanup=False)) or 'no screenshot: ' + interaction.need('screen', 'To see your screen for this task.'))
     if args[:1] == ['--front'] and len(args) > 1:   # "show me where" on an app or tab the user isn't looking at
-        agent, asked = os.environ.get('RABIK_AGENT'), args[-1] == '--asked' and len(args) > 2
+        agent, asked = environ.agent(), args[-1] == '--asked' and len(args) > 2
         app, words = args[1], ' '.join(args[2:-1] if asked else args[2:])
         if not (asked and not agent) and not macos.wants_focus() and prefs.pref('workIn', 'back') != 'front':
             # Work needs no focus: the window is pictured where it sits (not key, covered, other display) and its picture spots click it.
@@ -170,8 +170,8 @@ def main():
                 return print('\n'.join(filter(None, [m['description'] if m else 'No accessible window. Work in the background with hands see.' if agent else
                                                      f'Not brought forward: work needs no focus. Only if the user asked to see, open or switch to it: {again}',
                                                      shots or 'no screenshot: ' + interaction.need('screen', 'To see your screen for this task.')])))
-        if os.environ.get('RABIK_ASK') and not os.environ.get('RABIK_AGENT'):
-            storage.private_json(os.path.join(os.environ['RABIK_ASK'], 'focus-requested'), True)
+        if environ.ask_dir() and not environ.agent():
+            storage.private_json(os.path.join(environ.ask_dir(required=True), 'focus-requested'), True)
         macos.free_focus(user=True)
         macos.osa(f'tell application "{macos.osa_quote(app)}" to activate')
         if words:   # any app: the window whose title has the words; browsers: also that tab (fails quietly elsewhere). `contains` ignores case.
@@ -223,10 +223,10 @@ def main():
         return print(memory.edit_rule(args[1], args[2]))
     if args[:1] == ['--forget']:
         return print(f"forgot {memory.forget_rules(' '.join(args[1:]))} line(s)")
-    if args[:1] == ['--fast'] and os.environ.get('RABIK_LIVE') != '1' and hands.hands_command(wording.plain(' '.join(args[1:]))):
+    if args[:1] == ['--fast'] and not environ.live() and hands.hands_command(wording.plain(' '.join(args[1:]))):
         state_dir = tempfile.mkdtemp(prefix='rabik-hands-fast-')
         atexit.register(shutil.rmtree, state_dir, True)
-        os.environ['RABIK_HANDS_STATE'] = os.path.join(state_dir, 'hands.json')
+        environ.set_hands_file(os.path.join(state_dir, 'hands.json'))
     if args[:1] == ['--fast']:   # explicit CLI action; exit 1 = not a simple command
         os.makedirs(paths.DIR, exist_ok=True)
         started = time.time()
@@ -292,7 +292,7 @@ def main():
     if args[:1] == ['--shortcut']:   # the user asked for it, so it skips learn()'s checks, not the safety one
         if len(args) != 3:
             return print('usage: --shortcut "<words>" "<shell command>"')
-        if os.environ.get('RABIK_ASK'):
+        if environ.ask_dir():
             return print('Finish and verify the requested actions. Rabik saves shortcuts automatically from their successful tool results; do not write skills.json.')
         if skills.UNSAFE.search(args[2]) or not hands.hands_replayable(args[2]):   # replays run with no AI and no deny list: never anything that deletes or needs admin
             return print('not saved: shortcuts cannot delete files or use sudo')
@@ -305,7 +305,7 @@ def main():
     if args == ['--check']:   # the setup window asks this
         return print(json.dumps(clients.plan()))
     if args[:1] == ['--search']:
-        try: open(os.path.join(os.environ['RABIK_ASK'], 'searched'), 'a').close()   # the gate's WebSearch fallback opens
+        try: open(os.path.join(environ.ask_dir(required=True), 'searched'), 'a').close()   # the gate's WebSearch fallback opens
         except (KeyError, OSError): pass
         try: return print(web.search(' '.join(args[1:])))
         except (OSError, ValueError) as e: return print(f'search failed ({e}); use WebSearch')
@@ -326,9 +326,9 @@ def main():
         sys.exit(print('unknown command: ' + ' '.join(args)[:80], file=sys.stderr) or 2)
     state_dir = tempfile.mkdtemp(prefix='rabik-hands-')
     atexit.register(shutil.rmtree, state_dir, True)
-    os.environ['RABIK_HANDS_STATE'] = os.path.join(state_dir, 'hands.json')
+    environ.set_hands_file(os.path.join(state_dir, 'hands.json'))
     warm = clients.start_ai() if args == ['--wait'] else None   # Rabik.app: started at key-down, request comes on stdin at release
-    os.environ['RABIK_ASK'] = warm.ask if warm else state_dir
+    environ.set_ask_dir(warm.ask if warm else state_dir)
     shots = []
     snap = threading.Thread(target=lambda: shots.extend(screen.look()), daemon=True)   # only started when readable context is thin
     snap.shots = shots
@@ -344,7 +344,7 @@ def main():
     def read_front():
         started = time.monotonic()
         try:
-            summary = screen.window_summary(os.environ.get('RABIK_FRONT', ''))
+            summary = screen.window_summary(environ.front_app(''))
             summaries.append(summary)
             if not summary.get('text'):
                 start_snap()   # likely visual: overlap capture with the remaining speech/model warmup
@@ -367,7 +367,7 @@ def main():
             remaining, done, marks, drawn = request.get('remaining'), request.get('done', []), request.get('point'), request.get('drawing')
             card = str(request.get('agentCard') or '')
         else: front_now, _, task = line.rpartition('\t')
-        os.environ['RABIK_FRONT'] = front_now or os.environ.get('RABIK_FRONT', '')
+        environ.set_front_app(front_now or environ.front_app(''))
     task = task if args == ['--wait'] else ' '.join(a for a in args if a != '--plan') or interaction.ask()
     if not task:
         return warm and clients.stop_claude(warm)
@@ -385,16 +385,16 @@ def main():
         protocol.say('!', 'feedback')
         return protocol.say('✓', 'Review your feedback before opening GitHub.')
     telemetry.ping()
-    os.environ['RABIK_RELAY_OWNER'] = str(os.getpid())
-    agents.save_request(os.environ['RABIK_ASK'], task)
+    environ.set_relay_owner()
+    agents.save_request(environ.ask_dir(required=True), task)
     if warm: warm.relaying = True
-    thread = threading.Thread(target=interaction.relay, args=(warm, os.environ['RABIK_ASK']), daemon=True)
+    thread = threading.Thread(target=interaction.relay, args=(warm, environ.ask_dir(required=True)), daemon=True)
     if warm: warm.relay_thread = thread
-    else: os.environ['RABIK_RELAY_ACTIVE'] = str(os.getpid())
+    else: environ.set_relay_active()
     thread.start()
     t = time.time()
     remembered = memory.memory_items()   # the receipt under the answer shows what this ask changed
-    commit = os.environ.get('RABIK_COMMIT')
+    commit = environ.commit()
     macos.allow_focus(task)
     if prefs.pref('instant', True) and hands.hands_command(wording.plain(task)):
         if not interaction.wait_commit(): return
@@ -419,12 +419,12 @@ def main():
     if failed_replay: protocol.say('▸', 'The shortcut did not work. Redoing it')
     if done: task += skills.INTERNAL_TASK_MARKERS[0] + ' ' + ' '.join(done) + skills.INTERNAL_TASK_MARKERS[1] + ' ' + (remaining or '') + '\nDo only the remaining goal; check before repeating completed actions.'
     if reading_started: atexit.register(reading.join, .3)
-    app = os.environ.get('RABIK_FRONT') or macos.front()[0]   # before anything else takes focus, so "this window" still means the user's window
+    app = environ.front_app() or macos.front()[0]   # before anything else takes focus, so "this window" still means the user's window
     m = re.fullmatch(r'(.*), (-?\d+), (-?\d+)', macos.osa(f'tell application "System Events" to tell process "{app}" to get {{name, position}} of front window'), re.S) if app else None
     win, fx, fy = (m[1], int(m[2]) + 50, int(m[3]) + 50) if m else ('', None, None)
     displays.join()
     scr = macos.describe(displays.screens, fx, fy)
-    if os.environ.get('RABIK_SCREEN'): scr += '; Request screen (default for unnamed moves and drawings): ' + os.environ['RABIK_SCREEN']
+    if environ.screen(): scr += '; Request screen (default for unnamed moves and drawings): ' + environ.screen(required=True)
     ctx = f'Front app: {app}. Front window: {win or "?"}.' + f' Screens: {scr}. Now: {time.strftime("%a %b %d %Y %I:%M %p")}.'
     try:
         with open(paths.WORKED) as f: w = json.load(f) if time.time() - os.path.getmtime(paths.WORKED) < 600 else None
@@ -432,7 +432,7 @@ def main():
         w = None
     if w and w.get('app') and w.get('app') != app:
         ctx += f' Last task worked in: {w["app"]} "{w.get("window") or "?"}".'
-    if os.environ.get('RABIK_CARET') and prefs.pref('selection', True):
+    if environ.caret() and prefs.pref('selection', True):
         ctx += ' The user\'s text cursor is in the front app. If the request asks for new text for that cursor, return [draft] + the text.'   # an earlier draft goes in with [insert] (system prompt)
     help_ = toolhelp.tool_help(task, cached_only=True)
     threading.Thread(target=toolhelp.tool_help, args=(task,), daemon=True).start()   # cold help is ready for the next turn
@@ -507,10 +507,10 @@ def main():
         attempt.ran = previous + attempt.ran
         reply, cost, steps = again or reply, None if cost is None or more is None else cost + more, steps + extra
         if handed_off(): return
-    elif not attempt.ok and os.environ.get('RABIK_ASK'):
+    elif not attempt.ok and environ.ask_dir():
         if warm:
-            os.environ['RABIK_RELAY_ACTIVE'] = str(os.getpid())
-            threading.Thread(target=interaction.relay, args=(None, os.environ['RABIK_ASK']), daemon=True).start()
+            environ.set_relay_active()
+            threading.Thread(target=interaction.relay, args=(None, environ.ask_dir(required=True)), daemon=True).start()
         answer = wording.plain(interaction.ask_user({'q': 'Couldn’t finish this', 'cmd': 'Try again with the same model.',
                                  'retry': True, 'details': attempt.error}, 60) or '')
         if answer in ('r', 'retry', 'try again'):
@@ -567,19 +567,19 @@ def main():
              model=model, escalated=escalated, escalate_why=escalate_why, attempt_usd=attempt_usd)
     # clicks inside an app pull it forward; give the user back the app the user was in unless the user asked to go somewhere
     macos.restore_focus(app, task, attempt.ran)
-    if replacement and attempt.ok and os.environ.get('RABIK_UI') == '1':
+    if replacement and attempt.ok and environ.in_box():
         print('↺ ' + json.dumps({'t': '' if replacement == 'delete' else reply, 'mode': replacement}, ensure_ascii=False), flush=True)
     protocol.say('✓' if attempt.ok else '!', drawing.guide_reply(attempt.observed, reply) if attempt.ok and not replacement else reply)
     receipt = memory.memory_receipt(remembered)   # remembered or forgot something: one row under the answer that opens Settings → Memory there
-    if receipt and os.environ.get('RABIK_UI') == '1':
+    if receipt and environ.in_box():
         print('✎ ' + json.dumps(receipt, ensure_ascii=False), flush=True)
     # "When I say focus mode, …" saved: a green Learned pill
     said = shortcut or learned_say   # a new shortcut, named or learned from these words
     tips.tip(reply, f'Learned: Say “{said}” any time.' if said else 'Learned: Procedure saved for next time.' if workflow else taught[1].strip() if taught else '',
              work=attempt.work)
     asked = os.path.join(paths.DIR, 'improve-asked')   # people who updated never saw setup's question: ask once a day after a task that worked, until they answer
-    if attempt.ok and not failed and telemetry.POSTHOG_KEY and not prefs.pref('improveAsked', False) and os.environ.get('RABIK_UI') == '1' \
+    if attempt.ok and not failed and telemetry.POSTHOG_KEY and not prefs.pref('improveAsked', False) and environ.in_box() \
             and not (os.path.exists(asked) and Path(asked).read_text() == time.strftime('%Y-%m-%d')):
         Path(asked).write_text(time.strftime('%Y-%m-%d')); protocol.say('!', 'improve')
-    if os.environ.get('RABIK_UI') != '1':   # typed from the menu bar: no overlay, so a notification
+    if not environ.in_box():   # typed from the menu bar: no overlay, so a notification
         macos.osa('on run argv\ndisplay notification (item 1 of argv) with title "Rabik"\nend run', reply)
