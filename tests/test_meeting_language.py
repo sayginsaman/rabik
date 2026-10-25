@@ -36,6 +36,7 @@ class MeetingLanguageTests(unittest.TestCase):
         self.assertIn('guard Prefs.bool("meetingTranslate"), let source = locale.language.languageCode, source != Locale.current.language.languageCode', speech)
         self.assertIn('TranslationSession(installedSource: locale.language, target: Locale.current.language)', speech)
         self.assertIn('if !you, let session = translator, !translationFailed {', meeting)
+        self.assertIn('await previous?.value', meeting)   # one translation at a time, in order
         self.assertIn('Translation Languages', meeting)
 
     def test_the_summary_keeps_the_meetings_language(self):

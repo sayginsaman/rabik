@@ -148,7 +148,7 @@ final class MeetingWebView: WKWebView {
 
 final class MeetingCopilot: NSObject, WKScriptMessageHandler {
     var panel: KeyPanel?, web: WKWebView?, audio: MeetingAudio?, analyzer: SpeechAnalyzer?, reading: Task<Void, Never>?, starting: Task<Void, Never>?
-    var translator: TranslationSession?, translationFailed = false   // Translate the call (MeetingSpeech)
+    var translator: TranslationSession?, translationFailed = false, translating: Task<Void, Never>?   // Translate the call (MeetingSpeech), one line at a time
     var people: [String] = [], named: [String: String] = [:], sinceGuess = 0, lastGuess = Date.distantPast, guessing: Process?   // speaker names: callPeople, guessSpeakers
     var other: String? { room || people.count != 1 ? nil : people[0] }   // a 1:1 on the calendar: who "Them" is
     var micAnalyzer: SpeechAnalyzer?, micReading: Task<Void, Never>?, analyzing: Task<Void, Never>?, micAnalyzing: Task<Void, Never>?, stopping: Task<Void, Never>?
@@ -467,7 +467,10 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
         js("line", row)
         if !you { sinceGuess += 1; guessSpeakers() }
         if !you, let session = translator, !translationFailed {   // the other side, in the Mac's language, under the line
-            Task { @MainActor [weak self] in
+            let previous = translating
+            translating = Task { @MainActor [weak self] in
+                await previous?.value
+                guard self?.translationFailed == false else { return }
                 do { let done = try await session.translate(text); self?.js("translated", ["id": id, "text": done.targetText]) }
                 catch { guard self?.translationFailed == false else { return }; self?.translationFailed = true
                     self?.js("translated", ["id": id, "error": "Translation needs both languages: System Settings → General → Language & Region → Translation Languages."]) }
