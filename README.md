@@ -208,7 +208,7 @@ A recap costs one Haiku call, and a day with nothing in it costs nothing. With A
 
 **Connector offers.** Open Notion, Slack, Linear, Figma, Asana or ClickUp while its Claude connector isn't connected, and the box offers it once, saying what Rabik would read: Connect, Not now (a week) or Don't ask again. It never shows during a call, an ask or dictation. Turn it off in Settings → Account & Access.
 
-**Rabik in Claude Code.** Settings → Account & Access → Add to Claude Code runs `claude mcp add` so Claude Code can read Rabik's memory, meetings, people, goals, recaps and Activity history through a read-only MCP server (`rabik.py --mcp`). Copy for Claude Desktop copies the same config to paste into Claude Desktop. With AI meeting summaries off, meetings give their recap but never the transcript.
+**Rabik in Claude Code.** Settings → Account & Access → Add to Claude Code runs `claude mcp add` so Claude Code can read Rabik's memory, meetings, people, goals, recaps and Activity history through a read-only MCP server (`rabik.py --mcp`). Copy for Claude Desktop copies the same config to paste into Claude Desktop. With AI meeting summaries off, meetings give their recap but never the transcript. **Add to ChatGPT** does the same for the ChatGPT Mac app, through the `codex mcp add` tool it ships with (ChatGPT on the web can't reach a server on your Mac).
 
 ## Routines
 

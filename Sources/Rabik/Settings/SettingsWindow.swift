@@ -280,10 +280,11 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         case "set":
             guard let k = b["k"] as? String, let v = b["v"] else { return }
             apply(k, v)
-        case "mcpStatus", "mcpAdd":   // Settings → Rabik in Claude Code: `claude mcp add` on the user's click (brain/mcp.py)
+        case "mcpStatus", "mcpAdd":   // Settings → Rabik in Claude Code / ChatGPT: each app's own `mcp add`, on the user's click (brain/mcp.py)
             let arg = b["do"] as? String == "mcpAdd" ? "--mcp-install" : "--mcp-status"
+            let target = b["target"] as? String == "chatgpt" ? ["chatgpt"] : []
             DispatchQueue.global().async { [weak self] in
-                let p = py([arg]), out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
+                let p = py([arg] + target), out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
                 self?.send("mcp", (try? JSONSerialization.jsonObject(with: runToEnd(p, out))) as? [String: Any] ?? ["added": false, "error": "Could not reach Claude Code."])
             }
         case "mcpCopy":   // Claude Desktop: its own settings file stays the user's to edit

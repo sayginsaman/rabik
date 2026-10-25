@@ -61,8 +61,8 @@ def main():
         return print(json.dumps(support.feedback(json.load(sys.stdin))))
     if args == ['--mcp']:
         return mcp.mcp_serve()
-    if args in (['--mcp-install'], ['--mcp-status']):
-        return print(json.dumps(mcp.mcp_install(check=args == ['--mcp-status'])))
+    if args[:1] in (['--mcp-install'], ['--mcp-status']) and args[1:] in ([], ['chatgpt']):   # Claude Code, or the ChatGPT Mac app
+        return print(json.dumps(mcp.mcp_install(check=args[0] == '--mcp-status', target=args[1] if args[1:] else 'claude')))
     if args[:1] == ['--goals']:
         try: return print(json.dumps(goals.goals_command(args[1:]), ensure_ascii=False))
         except ValueError as e: return print(json.dumps({'error': str(e)}))

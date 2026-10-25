@@ -78,12 +78,28 @@ class McpTests(unittest.TestCase):
         def fake(args, **kw):
             ran.append(args[1:]); return subprocess.CompletedProcess(args, 0 if args[2] == 'add' else 1, '', '')
         with patch.object(brain.mcp.subprocess, 'run', side_effect=fake), patch.dict(os.environ, {'RABIK_CLAUDE': '/fake/claude'}):
-            self.assertEqual(brain.mcp.mcp_install(check=True), {'added': False})
-            self.assertEqual(brain.mcp.mcp_install(), {'added': True})
+            self.assertEqual(brain.mcp.mcp_install(check=True), {'target': 'claude', 'added': False})
+            self.assertEqual(brain.mcp.mcp_install(), {'target': 'claude', 'added': True})
         self.assertEqual(ran[-1], ['mcp', 'add', '--scope', 'user', 'rabik', '--', '/bin/sh', brain.mcp.paths.ME, '--mcp'])
         settings = (ROOT / 'Sources/Rabik/Settings/SettingsWindow.swift').read_text()
         self.assertIn('let arg = b["do"] as? String == "mcpAdd" ? "--mcp-install" : "--mcp-status"', settings)
         self.assertIn('"args": [dir + "/rabik.py", "--mcp"]', settings)
+
+
+    def test_adding_to_the_chatgpt_mac_app_uses_its_codex_tool(self):
+        ran = []
+        def fake(args, **kw):
+            ran.append(args); return subprocess.CompletedProcess(args, 0 if args[2] == 'add' else 1, '', '')
+        with patch.object(brain.mcp.subprocess, 'run', side_effect=fake), patch.dict(os.environ, {'RABIK_CODEX': '/fake/codex'}):
+            self.assertEqual(brain.mcp.mcp_install(check=True, target='chatgpt'), {'target': 'chatgpt', 'added': False})
+            self.assertEqual(brain.mcp.mcp_install(target='chatgpt'), {'target': 'chatgpt', 'added': True})
+        self.assertEqual(ran[-1], ['/fake/codex', 'mcp', 'add', 'rabik', '--', '/bin/sh', brain.mcp.paths.ME, '--mcp'])
+        self.assertIn('/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex', brain.mcp.MCP_CODEX)   # the app ships it
+        with patch.object(brain.mcp.shutil, 'which', return_value=None), patch.object(brain.mcp.os.path, 'isfile', return_value=False), patch.dict(os.environ, {'RABIK_CODEX': ''}):
+            self.assertEqual(brain.mcp.mcp_install(target='chatgpt'), {'target': 'chatgpt', 'added': False, 'error': 'Install the ChatGPT app for Mac first.'})
+        page = (ROOT / 'ui/settings.html').read_text()
+        self.assertIn("post({do: 'mcpAdd', target: 'chatgpt'})", page)
+        self.assertIn('let target = b["target"] as? String == "chatgpt" ? ["chatgpt"] : []', (ROOT / 'Sources/Rabik/Settings/SettingsWindow.swift').read_text())
 
 
 if __name__ == '__main__':

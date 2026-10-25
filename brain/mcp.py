@@ -10,10 +10,14 @@ import tempfile
 from datetime import date, datetime
 from brain import activity, environ, goals, meeting, memory, paths, people, prefs, recap
 
-__all__ = ['MCP_VERSIONS', 'MCP_TOOLS', 'mcp_call', 'mcp_reply', 'mcp_serve', 'mcp_install']
+__all__ = ['MCP_VERSIONS', 'MCP_TOOLS', 'MCP_CODEX', 'mcp_call', 'mcp_reply', 'mcp_serve', 'mcp_install']
 
 
 MCP_VERSIONS = ('2025-06-18', '2025-03-26', '2024-11-05')
+
+
+# The ChatGPT Mac app runs local MCP servers from Codex's config (~/.codex/config.toml) and ships the codex CLI that edits it.
+MCP_CODEX = ('/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex', '~/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex')
 
 
 def _tool(name, title, description, properties=None, required=()):
@@ -117,15 +121,24 @@ def mcp_serve(inp=None, out=None):
         if reply is not None: out.write(json.dumps(reply, ensure_ascii=False) + '\n'); out.flush()
 
 
-def mcp_install(check=False):
-    """Settings → Add Rabik to Claude Code: `claude mcp add --scope user rabik -- /bin/sh <rabik.py> --mcp`. check: only whether it is there."""
-    claude = environ.claude() or shutil.which('claude') or os.path.expanduser('~/.local/bin/claude')
-    run = lambda *a: subprocess.run([claude, 'mcp', *a], capture_output=True, text=True, timeout=30, cwd=tempfile.gettempdir(),
-                                    env={k: v for k, v in os.environ.items() if k != 'ANTHROPIC_API_KEY'})
+def mcp_install(check=False, target='claude'):
+    """Settings → Add to Claude Code / Add to ChatGPT, on the user's click, through each app's own CLI (never by editing its
+    config): `claude mcp add --scope user rabik -- /bin/sh <rabik.py> --mcp`, or `codex mcp add rabik -- …` for the ChatGPT Mac
+    app. check: only whether it is there."""
+    if target == 'chatgpt':
+        tool = environ.codex() or shutil.which('codex') or next((os.path.expanduser(p) for p in MCP_CODEX if os.path.isfile(os.path.expanduser(p))), None)
+        name, add = 'the ChatGPT app', ('add', 'rabik')
+        if not tool: return {'target': target, 'added': False, **({} if check else {'error': 'Install the ChatGPT app for Mac first.'})}
+    else:
+        tool = environ.claude() or shutil.which('claude') or os.path.expanduser('~/.local/bin/claude')
+        name, add = 'Claude Code', ('add', '--scope', 'user', 'rabik')
+    run = lambda *a: subprocess.run([tool, 'mcp', *a], capture_output=True, text=True, timeout=30, cwd=tempfile.gettempdir(),
+                                    env={k: v for k, v in os.environ.items() if k not in ('ANTHROPIC_API_KEY', 'OPENAI_API_KEY')})
     try:
-        if run('get', 'rabik').returncode == 0: return {'added': True}
-        if check: return {'added': False}
-        done = run('add', '--scope', 'user', 'rabik', '--', '/bin/sh', paths.ME, '--mcp')
-        return {'added': done.returncode == 0, **({} if done.returncode == 0 else {'error': (done.stderr or done.stdout).strip()[:300] or 'Claude Code could not add it.'})}
+        if run('get', 'rabik').returncode == 0: return {'target': target, 'added': True}
+        if check: return {'target': target, 'added': False}
+        done = run(*add, '--', '/bin/sh', paths.ME, '--mcp')
+        return {'target': target, 'added': done.returncode == 0,
+                **({} if done.returncode == 0 else {'error': (done.stderr or done.stdout).strip()[:300] or f'{name} could not add it.'})}
     except (OSError, subprocess.TimeoutExpired):
-        return {'added': False, 'error': 'Claude Code is not installed.'}
+        return {'target': target, 'added': False, 'error': f'{name[0].upper() + name[1:]} is not installed.'}

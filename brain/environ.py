@@ -11,7 +11,7 @@ from contextlib import contextmanager
 __all__ = ['ask_dir', 'set_ask_dir', 'agent', 'front_app', 'set_front_app', 'in_box', 'live', 'commit', 'request', 'requested',
            'hands_file', 'set_hands_file', 'screen', 'caret', 'selection', 'relay_active_here', 'set_relay_active',
            'relay_owner_here', 'set_relay_owner', 'agent_prep', 'focus_guard', 'in_menu_bar_click', 'clicking_menu_bar',
-           'sandbox_dir', 'app', 'client_override', 'claude', 'posthog_key', 'probe_key', 'probe_base']
+           'sandbox_dir', 'app', 'client_override', 'claude', 'codex', 'posthog_key', 'probe_key', 'probe_base']
 
 
 def _read(name, default=None, required=False):
@@ -161,6 +161,11 @@ def client_override(default=None):
 def claude(default=None):
     """The Claude Code binary to run (RABIK_CLAUDE), instead of the one on PATH."""
     return _read('RABIK_CLAUDE', default)
+
+
+def codex(default=None):
+    """The Codex binary that adds MCP servers for the ChatGPT Mac app (RABIK_CODEX), instead of the one Rabik finds."""
+    return _read('RABIK_CODEX', default)
 
 
 def posthog_key(default=None):

@@ -90,6 +90,7 @@ Bu build hakkında:
 - [ ] "Hedefim: beta'yı cuma çıkarmak" de → Settings → General → Goals'ta görünür; akşam özetinde günün katkısı varsa "Goals" satırı çıkar; "beta hedefini tamamladım" işaretler.
 - [ ] Notion'u (veya Slack'i) aç; bağlayıcısı bağlı değilse kutuda bir kez öneri kartı çıkar. Not now bir hafta, Don't ask again kalıcı susturur. Toplantıdayken çıkmaz.
 - [ ] Settings → Account & Access → "Add to Claude Code" → düğme "Added" olur; Claude Code'da `/mcp` listesinde rabik görünür ve "Rabik'te hedeflerim neler?" çalışır. "Copy for Claude Desktop" yapılandırmayı kopyalar.
+- [ ] "Add to ChatGPT" → düğme "Added" olur; ChatGPT Mac uygulamasını yeniden başlat, Settings → MCP servers'ta rabik görünür ve "Rabik'te hedeflerim neler?" çalışır.
 
 ## 10. Settings ve modlar
 - [ ] Spotlight'tan "Rabik" → Settings açılır; açık/koyu görünüme uyar.
