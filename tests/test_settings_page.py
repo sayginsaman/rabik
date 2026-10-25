@@ -113,6 +113,17 @@ class SettingsPageTests(unittest.TestCase):
         self.assertTrue(out['result']['translate'])
         self.assertIn({'do': 'set', 'k': 'meetingLanguage', 'v': 'en-US'}, out['posts'])
 
+    def test_voice_lists_natural_voices_and_follows_read_aloud(self):
+        out = self.page("""st.load({prefs: {hotkeyLabel: '⌃⌥Space', speak: false}, voices: []}); await tick(20);
+            const s = $('voice'), off = [s.disabled, s.closest('.row').classList.contains('dim'), $('voicehint').textContent];
+            st.load({prefs: {hotkeyLabel: '⌃⌥Space', speak: true, voice: ''}, voices: [{id: 'com.apple.voice.premium.en-US.Zoe', name: 'Zoe (Premium) · English (US)'}]}); await tick(20);
+            const on = [s.disabled, [...s.options].map(o => o.text), $('voicehint').textContent];
+            s.value = 'com.apple.voice.premium.en-US.Zoe'; s.dispatchEvent(new Event('change'));
+            return {off, on};""")
+        self.assertEqual(out['result']['off'], [True, True, 'Add natural voices: Accessibility → Spoken Content → Manage Voices.'])
+        self.assertEqual(out['result']['on'], [False, ['Automatic (Siri)', 'Zoe (Premium) · English (US)'], 'Other languages use their best voice.'])
+        self.assertIn({'do': 'set', 'k': 'voice', 'v': 'com.apple.voice.premium.en-US.Zoe'}, out['posts'])
+
     def test_notice_shows_and_its_action_runs_once(self):
         out = self.page('''st.notice({text: 'Couldn’t save that change, so the old setting is back.'});
             const shown = !$('notice').hidden && $('noticebtn').hidden;

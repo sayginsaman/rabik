@@ -143,20 +143,27 @@ final class App: NSObject, WKScriptMessageHandler {
     let drawing = ScreenDrawing()
     var drawingReply = false
     var pointContext: [String:Any]?
-    var voice: Process?   // `say`: the Mac's system voice (a Siri voice if picked in Spoken Content); AVSpeechSynthesizer can't use Siri voices
+    let speaker = Speaker()   // read answers aloud (Overlay/Speaker.swift)
+    var said: [String] = [], sayVoice: AVSpeechSynthesisVoice?, sayFinal = false   // this answer's sentences queued so far, and its voice
     @discardableResult func shush() -> Bool {
-        guard let v = voice else { return false }; voice = nil
-        guard v.isRunning else { return false }; v.terminate(); return true
+        let was = speaker.speaking; speaker.stop(); said = []; sayFinal = false; return was
+    }
+    // The streamed answer so far: its finished sentences start speaking before the answer ends. A later attempt that
+    // rewrites what was said starts over at the final answer.
+    func speakAhead(_ partial: String) {
+        let all = Speaker.sentences(spoken(partial)), done = Array(all.dropLast())
+        guard done.count > said.count else { return }
+        guard done.starts(with: said) else { shush(); return }
+        if said.isEmpty { siriVoice(); sayVoice = Speaker.voice(for: Speaker.language(of: partial)) }
+        speaker.say(Array(done[said.count...]), voice: sayVoice); said = done
     }
     func deliver(_ a: String, aloud: Bool = true) {   // Settings: read answers aloud, copy them
         if Prefs.bool("autoCopy") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(a, forType: .string) }
         if Prefs.bool("speak") && aloud {
-            siriVoice()   // a voice not downloaded at first use may become available later
-            shush(); let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/say"); p.arguments = ["--", spoken(a)]
-            p.terminationHandler = { [weak self] _ in DispatchQueue.main.async {
-                guard let self, self.voice === p else { return }; self.voice = nil; self.hide(after: 2)
-            } }
-            try? p.run(); voice = p
+            let all = Speaker.sentences(spoken(a))
+            if said.isEmpty || !all.starts(with: said) { shush(); siriVoice(); sayVoice = Speaker.voice(for: Speaker.language(of: a)) }   // a voice not downloaded at first use may become available later
+            speaker.say(Array(all.dropFirst(said.count)), voice: sayVoice); said = all; sayFinal = true
+            if !speaker.speaking { said = []; sayFinal = false }
         }
     }
     // A source chip under an answer (brain/sources.py): the meeting, day, page or file, person or fact the answer read.
@@ -287,6 +294,8 @@ final class App: NSObject, WKScriptMessageHandler {
         drawing.cleanup = Hands.restoreAccessibility
         drawing.status = { [weak self] words in self?.js("msg",words) }
         drawing.speechEnabled = { Prefs.bool("speak") }
+        speaker.onIdle = { [weak self] in guard let self, sayFinal else { return }; said = []; sayFinal = false; hide(after: 2) }   // spoken to the end
+        speaker.onInterrupted = { [weak self] in self?.said = []; self?.sayFinal = false }   // the user talked over it
         drawing.autoSteps = { Prefs.str("guideSteps") != "next" }
         drawing.inputCleared = { [weak self] in self?.clearPointContext() }
         drawing.inputAway = { [weak self] in self?.finishPointing() }
@@ -574,7 +583,7 @@ final class App: NSObject, WKScriptMessageHandler {
         let g = gen
         DispatchQueue.main.asyncAfter(deadline: .now() + s) { [self] in
             guard g == gen, !busy, !engine.isRunning, !hovering else { return }
-            guard !pinned, !stuck, !composing, !mini.holds, !drawing.active, !drawing.hasInput, ringGone == nil, voice?.isRunning != true else {   // moved or drawn on: only ✕ (Esc for a drawing); an answer's ring keeps its text up
+            guard !pinned, !stuck, !composing, !mini.holds, !drawing.active, !drawing.hasInput, ringGone == nil, !speaker.speaking else {   // moved or drawn on: only ✕ (Esc for a drawing); an answer's ring keeps its text up
                 if pillOn && !dictating { pill(false) }   // the box stays up for its answer or drawing: give it back, not a pill stuck on its check
                 return
             }
@@ -1576,6 +1585,7 @@ final class App: NSObject, WKScriptMessageHandler {
                         if self.mode == "draft" && target && (now || Prefs.str("draftInsert") == "auto") { self.applyReplacement() }
                         continue
                     }
+                    if line.hasPrefix("… "), Prefs.bool("speak"), !guided { self.speakAhead(line.dropFirst(2).replacingOccurrences(of: "\u{2028}", with: "\n")) }
                     if line.hasPrefix("✓") {
                         let result = self.replacement.flatMap { $0.isEmpty ? nil : $0 } ?? line.dropFirst(2).replacingOccurrences(of: "\u{2028}", with: "\n")
                         let finish = self.drawing.request?.steps.count == 1 ? "Done. It’s on your screen." : "Done. Steps are on screen."

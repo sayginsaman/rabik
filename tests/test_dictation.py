@@ -549,10 +549,10 @@ print("dictation states ok")
 final class Ctx { var duration = 0.0 }
 enum NSAnimationContext { static func runAnimationGroup(_ a: (Ctx) -> Void, completionHandler: (() -> Void)?) { a(Ctx()); completionHandler?() } }
 final class Panel { var alphaValue = 1.0; func animator() -> Panel { self } }
-final class Flag { var active = false, hasInput = false, holds = false, isRunning = false }
+final class Flag { var active = false, hasInput = false, holds = false, isRunning = false, speaking = false }
 final class Harness {
     var gen = 1, busy = false, hovering = false, pinned = false, stuck = false, composing = false, pillOn = true, dictating = false
-    let engine = Flag(), mini = Flag(), drawing = Flag(), panel = Panel(); var ringGone: Int?, voice: Flag?
+    let engine = Flag(), mini = Flag(), drawing = Flag(), panel = Panel(), speaker = Flag(); var ringGone: Int?
     var log: [String] = []
     func pill(_ on: Bool) { pillOn = on; log.append("pill \(on)") }
     func gone() { log.append("gone") }

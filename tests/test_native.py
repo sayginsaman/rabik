@@ -478,8 +478,8 @@ scheduleNudge(); meeting.discard(); meeting.generation += 1; meeting.nudge = 2; 
 DispatchQueue.main.pending.removeFirst()(); precondition(meeting.panel == 2, "old timer dismissed new nudge")
 scheduleNudge(); DispatchQueue.main.pending.removeFirst()(); precondition(meeting.panel == nil, "current nudge did not dismiss")
 final class Engine { var isRunning = false }
-final class Voice { var isRunning = false }
-final class App { var busy = false, engine = Engine(), voice: Voice? }
+final class Voice { var speaking = false }
+final class App { var busy = false, engine = Engine(), speaker = Voice() }
 final class Window { var isKeyWindow = false }
 final class Settings { var win: Window? }
 struct Agents { var hasLive = false }

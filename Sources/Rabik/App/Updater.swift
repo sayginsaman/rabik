@@ -58,7 +58,7 @@ enum Updater {
         }
     }
     static func restartWhenIdle() {
-        if app.busy || agentsUI.hasLive || app.engine.isRunning || app.voice?.isRunning == true || meeting.panel != nil || settings.win?.isKeyWindow == true || onboarding.win != nil {
+        if app.busy || agentsUI.hasLive || app.engine.isRunning || app.speaker.speaking || meeting.panel != nil || settings.win?.isKeyWindow == true || onboarding.win != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) { restartWhenIdle() }
         } else { relaunchSoon() }
     }

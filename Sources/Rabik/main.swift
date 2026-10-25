@@ -285,6 +285,7 @@ func borrowPasteboard(_ text: String, _ pb: NSPasteboard = .general) -> (() -> V
 // final class PassView lives in MiniScreen/MiniScreen.swift
 // final class MiniScreen lives in MiniScreen/MiniScreen.swift
 
+// final class Speaker lives in Overlay/Speaker.swift
 // final class App lives in Overlay/App.swift
 
 // final class ShelfPanel lives in Overlay/Panels.swift

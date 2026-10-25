@@ -370,6 +370,8 @@
     <div class="group">
       <div class="row"><div class="t"><b>Show answers</b><span>Word by word as Rabik writes, or all at the end.</span></div><div class="seg" data-k="showAnswers"><button data-v="stream">As they arrive</button><button data-v="once">All at once</button></div></div>
       <div class="row"><div class="t"><b>Read answers aloud</b><span>Esc stops it.</span></div><label class="sw"><input type="checkbox" data-k="speak"></label></div>
+      <div class="row"><div class="t"><b>Voice</b><span id="voicehint">Other languages use their best voice.</span></div><select data-k="voice" id="voice" aria-label="Voice"></select></div>
+      <div class="row"><div class="t"><b>Stop when I talk</b><span>Speak over Rabik to stop it. Nothing is recorded.</span></div><label class="sw"><input type="checkbox" data-k="bargeIn"></label></div>
       <div class="row"><div class="t"><b>Draw on screen to show you</b><span>Esc clears. To mark a spot yourself, use Point at your screen.</span></div><label class="sw"><input type="checkbox" data-k="draw" aria-label="Draw on screen to show you"></label></div>
     </div>
     <h3>Rabik</h3>
@@ -665,6 +667,13 @@
   $('recapat').onchange = e => { if (/^([01]\d|2[0-3]):[0-5]\d$/.test(e.target.value)) set('recapAt', e.target.value); else paint(); };
   $('reminderslist').onchange = e => set('remindersList', e.target.value);
   $('meetinglanguage').onchange = e => set('meetingLanguage', e.target.value);
+  $('voice').onchange = e => set('voice', e.target.value);
+  let voices = [];   // the Mac's natural voices (Premium, Enhanced), from Rabik.app
+  const paintVoices = () => { const s = $('voice'); s.replaceChildren(new Option('Automatic (Siri)', ''), ...voices.map(v => new Option(v.name, v.id)));
+    if (P.voice && !voices.some(v => v.id === P.voice)) s.append(new Option('Chosen voice', P.voice)); s.value = P.voice || '';
+    $('voicehint').textContent = voices.length ? 'Other languages use their best voice.' : 'Add natural voices: Accessibility → Spoken Content → Manage Voices.';
+    for (const k of ['voice', 'bargeIn']) { const row = document.querySelector(`[data-k=${k}]`).closest('.row'); row.classList.toggle('dim', !P.speak); }
+    $('voice').disabled = !P.speak; document.querySelector('[data-k=bargeIn]').disabled = !P.speak; };
   let meetingLanguages = [];   // Rabik.app reads them from Apple's speech models once it starts
   const paintMeetingLanguages = () => { const s = $('meetinglanguage'); s.replaceChildren(new Option('Automatic', ''), ...meetingLanguages.map(l => new Option(l.name, l.id)));
     if (P.meetingLanguage && !meetingLanguages.some(l => l.id === P.meetingLanguage)) s.append(new Option(P.meetingLanguage, P.meetingLanguage)); s.value = P.meetingLanguage || ''; };
@@ -705,7 +714,7 @@
       s.value = s.dataset.k === 'microphone' && ![...s.options].some(o => o.value === value) ? 'automatic' : value;
     });
     document.querySelectorAll('input[type=range]').forEach(r => r.value = P[r.dataset.k]);
-    $('recapat').value = P.recapAt || '21:00'; paintMeetingLanguages();
+    $('recapat').value = P.recapAt || '21:00'; paintMeetingLanguages(); paintVoices();
     const lists = $('reminderslist'), chosen = P.remindersList || '';
     lists.replaceChildren(new Option('Default list', ''), ...reminderLists.map(l => new Option(l.title + (l.isDefault ? ' (default)' : ''), l.id)));
     if (chosen && !reminderLists.some(l => l.id === chosen)) lists.append(new Option('Your chosen list', chosen));   // not readable now: keep it, never reset
@@ -1028,7 +1037,7 @@
     globe(on) { $('globefix').hidden = !on; },   // fn alone also fires macOS's own 🌐 action
     load(d) {
       P = {talkMode: 'hold', dictateMode: 'verbatim', dictateHotkeyLabel: '', microphone: 'automatic', meetingSave: true, meetingSummary: true, client: 'claude', ...d.prefs}; recording = '';
-      P.routines = d.routines || []; paintRoutines(); reminderLists = d.reminderLists || []; if (d.meetingLanguages?.length) meetingLanguages = d.meetingLanguages;
+      P.routines = d.routines || []; paintRoutines(); reminderLists = d.reminderLists || []; if (d.meetingLanguages?.length) meetingLanguages = d.meetingLanguages; if (d.voices) voices = d.voices;
       $('shortcut').classList.remove('rec'); $('change').textContent = 'Change Shortcut'; $('dictatechange').classList.remove('rec');
       hotkeyTaken = !!d.hotkeyTaken; dictateHotkeyTaken = !!d.dictateHotkeyTaken; if ($('schint').className !== 'warn') $('schint').className = hotkeyTaken ? 'taken' : '';
       if (d.icon) $('icon').src = $('bigicon').src = d.icon;
