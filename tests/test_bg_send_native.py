@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import patch
 
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
-import rabik
+import brain.agents, brain.paths, brain.policy, brain.prefs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -194,9 +194,9 @@ for line in sys.stdin:
  time.sleep(.1)
 """)
         events = []
-        with patch.object(rabik, "DIR", str(self.root / "agents-state")), \
-             patch.object(rabik, "pref", side_effect=lambda key, default: default):
-            manager = rabik.Agents(emit=lambda event: events.append(event))
+        with patch.object(brain.paths, "DIR", str(self.root / "agents-state")), \
+             patch.object(brain.prefs, "pref", side_effect=lambda key, default: default):
+            manager = brain.agents.Agents(emit=lambda event: events.append(event))
             self.addCleanup(manager.close)
             row = manager.new()
             row.update(status="running", title="Fixture agent", brief="Original task")
@@ -237,7 +237,7 @@ print(json.dumps({'ok':True,'inputAccepted':True,'enterSent':True,'submission':'
         receipt = json.loads(result.stdout)
         self.assertTrue(receipt["inputAccepted"] and receipt["enterSent"])
         self.assertEqual(json.loads(record.read_text())[5], prompt)
-        self.assertTrue(any(rule.startswith("orca terminal send ") for rule in rabik.SAFE_OUT))
+        self.assertTrue(any(rule.startswith("orca terminal send ") for rule in brain.policy.SAFE_OUT))
         print(f"BACKGROUND SEND Orca CLI: {elapsed:.1f} ms, focus loss {self.status('user')['longestFocusLoss'] * 1000:.1f} ms", flush=True)
 
 

@@ -11,7 +11,8 @@ import unittest
 from unittest.mock import patch
 
 from tests import prompt_chars, scratch_dir
-import rabik
+import brain.drawing, brain.hands, brain.interaction, brain.macos, brain.paths, brain.prefs, brain.prompts, brain.protocol
+import brain.screen, brain.situation, brain.skills
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,46 +26,46 @@ class DrawingTests(unittest.TestCase):
         shapes += [{'kind':k,'points':[[10,20],[30,40]]} for k in ('line','arrow','path')]
         shapes += [{'kind':'label','at':[10,20],'text':'Leg B'},{'kind':'pointer','at':[20,30]}]
         payload = {'steps':[{'id':'teach','shapes':shapes,'say':'This is the side.'}]}
-        self.assertEqual(len(rabik.drawing(payload)['steps'][0]['shapes']),7)
+        self.assertEqual(len(brain.drawing.drawing(payload)['steps'][0]['shapes']),7)
         anchored = {'steps':[{'target':'Exact control','wait':True,'shapes':[{'kind':'rect'},{'kind':'pointer'},{'kind':'label','text':'Here'}]}]}
-        self.assertEqual(rabik.drawing(anchored)['steps'][0]['target'],'Exact control')
+        self.assertEqual(brain.drawing.drawing(anchored)['steps'][0]['target'],'Exact control')
 
     def test_large_text_lines_for_worked_math(self):
         mapping = {'2':{'frame':[-1920,0,1920,1080],'pixels':[1280,720]}}
         steps = [{'screen':2,'say':'Split the 12.','shapes':[{'kind':'text','text':'12x⁵ = (3·4)·x⁵','at':[640,360],'size':'l'}]},
                  {'say':'Check it.','shapes':[{'kind':'text','text':'3·4 = 12 ✓','color':'green'}]}]
-        value = rabik.drawing({'steps':steps},mapping)
+        value = brain.drawing.drawing({'steps':steps},mapping)
         self.assertEqual(value['steps'][0]['shapes'][0],{'kind':'text','text':'12x⁵ = (3·4)·x⁵','at':[-960,540],'size':'l'})
         self.assertTrue(value['teaching'])
         for bad in ({'kind':'text'},{'kind':'text','text':''},{'kind':'text','text':'x'*301},{'kind':'text','text':'a','size':'xl'},
                     {'kind':'text','text':'a','rect':[1,2,3,4]}):
-            with self.subTest(bad=bad), self.assertRaises(ValueError): rabik.drawing({'steps':[{'say':'s','shapes':[bad]}]})
-        self.assertIn('text "text" (one large line',rabik.DRAW_HELP)
-        self.assertIn('Drawings stay through later asks',rabik.DRAW_HELP)
+            with self.subTest(bad=bad), self.assertRaises(ValueError): brain.drawing.drawing({'steps':[{'say':'s','shapes':[bad]}]})
+        self.assertIn('text "text" (one large line',brain.prompts.DRAW_HELP)
+        self.assertIn('Drawings stay through later asks',brain.prompts.DRAW_HELP)
 
     def test_filled_diagram_parts_and_sized_labels(self):
         shapes = [{'kind':'circle','rect':[100,100,300,220],'color':'green','fill':True},
                   {'kind':'rect','rect':[130,130,240,160],'color':'blue','fill':False},
                   {'kind':'label','at':[250,210],'text':'Cell membrane','size':'l'}]
-        value = rabik.drawing({'steps':[{'say':'Compare the two layers.','shapes':shapes}]})
+        value = brain.drawing.drawing({'steps':[{'say':'Compare the two layers.','shapes':shapes}]})
         self.assertEqual(value['steps'][0]['shapes'],shapes)
-        self.assertIn('circle may be an ellipse; add "fill":true',rabik.DRAW_HELP)
-        self.assertIn('optional "size":"s"|"m"|"l"',rabik.DRAW_HELP)
+        self.assertIn('circle may be an ellipse; add "fill":true',brain.prompts.DRAW_HELP)
+        self.assertIn('optional "size":"s"|"m"|"l"',brain.prompts.DRAW_HELP)
         for bad in ({'kind':'circle','rect':[1,2,3,4],'fill':'yes'},
                     {'kind':'line','points':[[1,2],[3,4]],'fill':True},
                     {'kind':'label','at':[1,2],'text':'x','size':'xl'}):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
-                rabik.drawing({'steps':[{'say':'s','shapes':[bad]}]})
+                brain.drawing.drawing({'steps':[{'say':'s','shapes':[bad]}]})
 
     def test_help_names_the_order_and_keys_the_validator_takes(self):
-        help_ = rabik.DRAW_HELP
-        self.assertLess(help_.index(rabik.LOOK),help_.index(rabik.DRAW + " '<JSON>'"))   # draw() refuses without this ask's --look
+        help_ = brain.prompts.DRAW_HELP
+        self.assertLess(help_.index(brain.paths.LOOK),help_.index(brain.paths.DRAW + " '<JSON>'"))   # draw() refuses without this ask's --look
         for said in ('"size":"s"|"m"|"l"','"screen":N on the step (never in a shape)','(exactly 2; path for more)'): self.assertIn(said,help_)
         for bad in ({'kind':'text','text':'a','s':'l'},{'kind':'label','at':[1,1],'text':'a','screen':2},{'kind':'line','points':[[0,0],[1,1],[2,2]]}):
-            with self.subTest(bad=bad), self.assertRaises(ValueError): rabik.drawing({'steps':[{'say':'s','shapes':[bad]}]})
+            with self.subTest(bad=bad), self.assertRaises(ValueError): brain.drawing.drawing({'steps':[{'say':'s','shapes':[bad]}]})
 
     def test_explain_asks_get_a_diagram_not_marks_on_words(self):
-        help_ = rabik.DRAW_HELP   # Oct 20 "draw and explain cell wall vs membrane": two rects around the study guide's words
+        help_ = brain.prompts.DRAW_HELP   # Oct 20 "draw and explain cell wall vs membrane": two rects around the study guide's words
         self.assertIn('Pick the kind from the ask, not from what is on screen',help_)
         self.assertLess(help_.index('- Locate ('),help_.index('Fit the mark'),help_.index('- Explain ('))   # rect/circle fitting is for locating only
         for said in ('draw the idea itself','clear space','otherwise draw your own',"marks around on-screen words are not an explanation"): self.assertIn(said,help_)
@@ -79,53 +80,53 @@ class DrawingTests(unittest.TestCase):
                                 {'kind':'label','at':[1110,280],'text':'wall + membrane'},{'kind':'arrow','points':[[792,516],[1100,190]],'color':'green'}]},
                             {'screen':2,'say':'Side by side.','shapes':[{'kind':'text','text':'membrane: flexible gate, every cell','at':[940,330]},
                                 {'kind':'text','text':'wall: rigid, outside, stops bursting'}]}]}
-        for value in (logged,diagram): self.assertTrue(rabik.drawing(value,mapping)['teaching'])   # both valid: only the help tells them apart
+        for value in (logged,diagram): self.assertTrue(brain.drawing.drawing(value,mapping)['teaching'])   # both valid: only the help tells them apart
 
     def test_follow_up_sees_the_drawing_and_a_selected_mark(self):
         drawn = {'steps':[{'say':'The shared x.','shapes':[{'kind':'circle','rect':[600,170,60,60],'color':'red'}]}],'shown':1}
-        context = rabik.drawing_context(drawn)
+        context = brain.situation.drawing_context(drawn)
         self.assertIn('still on screen, step 1 of 1',context)
         self.assertIn('"rect":[600,170,60,60]',context)
         self.assertIn('more drawing, run --look && --draw --help (one call), then one --draw',context)   # the help carries the locate/explain split
         for bad in (None,{},{'steps':[]},{'steps':'x'},'steps'):
-            self.assertEqual(rabik.drawing_context(bad),'')
+            self.assertEqual(brain.situation.drawing_context(bad),'')
         many = {'steps':[{'say':f'Step {i}','shapes':[{'kind':'path','points':[[j,j] for j in range(256)]}]} for i in range(12)]}
-        squeezed = rabik.drawing_context(many)
+        squeezed = brain.situation.drawing_context(many)
         self.assertIn('"Step 11"',squeezed); self.assertLess(len(squeezed),2300)
         with tempfile.NamedTemporaryFile(prefix='rabik-point-',suffix='.jpg') as image:
             value = {'bounds':[570,140,120,120],'path':[[594,164],[666,236]],'image':image.name,'element':'',
                      'mark':'circle in step 1 of 1: The shared x.'}
-            context, shots = rabik.point_context(value)
+            context, shots = brain.situation.point_context(value)
         self.assertIn('User selected a mark of your drawing',context)
         self.assertIn('The shared x.',context)
         self.assertIn('selected this mark',shots[0][1])
-        self.assertEqual(rabik.point_context({**value,'image':'/etc/hosts','mark':'circle'})[0][:30],'User selected a mark of your d')   # text alone still counts
-        self.assertEqual(rabik.point_context({**value,'image':'/etc/hosts','mark':7})[0],'')
+        self.assertEqual(brain.situation.point_context({**value,'image':'/etc/hosts','mark':'circle'})[0][:30],'User selected a mark of your d')   # text alone still counts
+        self.assertEqual(brain.situation.point_context({**value,'image':'/etc/hosts','mark':7})[0],'')
 
     def test_pointer_rejects_stale_or_off_picture_coordinates(self):
         displays = [('Laptop',0,0,1440,900,True),('Monitor',-1920,-180,1920,1080,False)]
-        with patch.object(rabik,'screens',return_value=displays), patch.object(rabik,'say') as say:
-            self.assertEqual(rabik.point('Here. [point 2 640 360]'),'Here.')
+        with patch.object(brain.macos,'screens',return_value=displays), patch.object(brain.protocol,'say') as say:
+            self.assertEqual(brain.drawing.point('Here. [point 2 640 360]'),'Here.')
             say.assert_called_once_with('@','-960 360 answer')
             say.reset_mock()
             for tag in ('[point 3 20 30]','[point 2 1281 30]','[point 2 20 721]','[point 2 -1 20]','[point nope]'):
                 with self.subTest(tag=tag):
-                    self.assertEqual(rabik.point('Here. ' + tag),'Here.')
+                    self.assertEqual(brain.drawing.point('Here. ' + tag),'Here.')
             say.assert_not_called()
 
     def test_bad_coordinates_and_unbounded_payloads_are_rejected(self):
         good = {'steps':[{'shapes':[{'kind':'rect','rect':[1,2,3,4]}]}]}
         for rect in ([0,0,0,1],[0,0,-2,1],[True,0,1,1],[float('nan'),0,1,1],[float('inf'),0,1,1],[100001,0,1,1],[0,0,1],'bad'):
             value = copy.deepcopy(good); value['steps'][0]['shapes'][0]['rect'] = rect
-            with self.subTest(rect=rect), self.assertRaises(ValueError): rabik.drawing(value)
+            with self.subTest(rect=rect), self.assertRaises(ValueError): brain.drawing.drawing(value)
         for step in ({'shapes':[]},{'shapes':[{'kind':'html','text':'bad'}]},
                      {'shapes':[{'kind':'pointer'}]}, {'wait':True,'shapes':[{'kind':'rect','rect':[0,0,1,1]}]},
                      {'timeout':1000,'shapes':[{'kind':'rect','rect':[0,0,1,1]}]}):
-            with self.subTest(step=step), self.assertRaises(ValueError): rabik.drawing({'steps':[step]})
-        with self.assertRaises(ValueError): rabik.drawing({'steps':good['steps']*13})
+            with self.subTest(step=step), self.assertRaises(ValueError): brain.drawing.drawing({'steps':[step]})
+        with self.assertRaises(ValueError): brain.drawing.drawing({'steps':good['steps']*13})
         for kind in ('line','arrow','path'):
             with self.assertRaises(ValueError):
-                rabik.drawing({'steps':[{'shapes':[{'kind':kind,'points':[[1,2],[3,4]],'rect':[1]}]}]})
+                brain.drawing.drawing({'steps':[{'shapes':[{'kind':kind,'points':[[1,2],[3,4]],'rect':[1]}]}]})
 
     def test_retina_scaled_and_non_retina_pixel_mapping(self):
         mapping = {'1':{'frame':[0,0,1440,900],'pixels':[2880,1800]},
@@ -133,25 +134,25 @@ class DrawingTests(unittest.TestCase):
                    '3':{'frame':[1440,0,1920,1080],'pixels':[1920,1080]}}
         step = lambda n,p: {'screen':n,'say':'Look here.','shapes':[{'kind':'pointer','at':p}]}
         second = step(2,[640,360]); second['shapes'].append({'kind':'rect','rect':[0,0,1280,720]})
-        result = rabik.drawing({'steps':[step(1,[1440,900]),second,step(3,[960,540])]},mapping)
+        result = brain.drawing.drawing({'steps':[step(1,[1440,900]),second,step(3,[960,540])]},mapping)
         self.assertEqual(result['steps'][0]['shapes'][0]['at'],[720,450])
         self.assertEqual(result['steps'][1]['shapes'][0]['at'],[-960,360])
         self.assertEqual(result['steps'][1]['shapes'][1]['rect'],[-1920,-180,1920,1080])
         self.assertEqual(result['steps'][2]['shapes'][0]['at'],[2400,540])
         for pixel in ([-1,0],[1281,0],[0,721]):
-            with self.assertRaises(ValueError): rabik.drawing({'steps':[step(2,pixel)]},mapping)
-        with self.assertRaises(ValueError): rabik.drawing({'steps':[step(4,[0,0])]},mapping)
+            with self.assertRaises(ValueError): brain.drawing.drawing({'steps':[step(2,pixel)]},mapping)
+        with self.assertRaises(ValueError): brain.drawing.drawing({'steps':[step(4,[0,0])]},mapping)
 
     def test_disabled_tool_and_prompt_budget(self):
-        with patch.object(rabik,'pref',side_effect=lambda k,d: False if k == 'draw' else d):
-            self.assertNotIn('--draw',rabik.system_prompt(rabik.ASK_FIRST))
-            with self.assertRaisesRegex(ValueError,'off'): rabik.draw({'steps':[]})
-        prompt = rabik.system_prompt(rabik.ASK_FIRST)
+        with patch.object(brain.prefs,'pref',side_effect=lambda k,d: False if k == 'draw' else d):
+            self.assertNotIn('--draw',brain.prompts.system_prompt(brain.prompts.ASK_FIRST))
+            with self.assertRaisesRegex(ValueError,'off'): brain.drawing.draw({'steps':[]})
+        prompt = brain.prompts.system_prompt(brain.prompts.ASK_FIRST)
         self.assertIn('--draw',prompt)
-        self.assertIn('use ' + rabik.DRAW + ' once on Request screen unless user names another',prompt)
+        self.assertIn('use ' + brain.paths.DRAW + ' once on Request screen unless user names another',prompt)
         self.assertLessEqual(prompt_chars(prompt),10050)   # +50 for the send-to-running-input rule (1.3.2)
-        self.assertIn('draw',rabik.switches())
-        self.assertFalse(rabik.replayable(rabik.DRAW + " '{}'"))
+        self.assertIn('draw',brain.interaction.switches())
+        self.assertFalse(brain.skills.replayable(brain.paths.DRAW + " '{}'"))
 
     def test_confirmation_and_request_relay(self):
         data = {'steps':[{'say':'Look here.','shapes':[{'kind':'pointer','at':[10,10]}]}]}
@@ -159,34 +160,34 @@ class DrawingTests(unittest.TestCase):
         (self.root/'draw-screens.json').write_text(json.dumps({
             'screens':{'1':{'frame':[0,0,800,600],'pixels':[1600,1200]}}, 'target':target}))
         with patch.dict(os.environ,{'RABIK_ASK':str(self.root)},clear=False), \
-             patch.object(rabik,'draw_target',return_value=target), patch.object(rabik,'emit') as emit:
-            with patch.object(rabik,'wait_commit',return_value=False):
-                with self.assertRaises(ValueError): rabik.draw(data)
+             patch.object(brain.drawing,'draw_target',return_value=target), patch.object(brain.protocol,'emit') as emit:
+            with patch.object(brain.interaction,'wait_commit',return_value=False):
+                with self.assertRaises(ValueError): brain.drawing.draw(data)
             emit.assert_not_called()
             def shown(lines):
                 Path(json.loads(lines[0][2:])['receipt']).write_text('shown')
             emit.side_effect = shown
-            with patch.object(rabik,'wait_commit',return_value=True):
-                self.assertEqual(rabik.draw(data),'Guide shown (step 1 of 1). Leave it running.')
+            with patch.object(brain.interaction,'wait_commit',return_value=True):
+                self.assertEqual(brain.drawing.draw(data),'Guide shown (step 1 of 1). Leave it running.')
             value = json.loads(emit.call_args.args[0][0][2:])
             self.assertEqual(value['target'],target)
-            self.assertEqual(value['state'],rabik.hands_state())
+            self.assertEqual(value['state'],brain.paths.hands_state())
             self.assertTrue(value['teaching'])
 
     def test_draw_requires_fresh_screen_context(self):
         data = {'steps':[{'say':'Look here.','shapes':[{'kind':'pointer','at':[10,10]}]}]}
         with patch.dict(os.environ,{'RABIK_ASK':str(self.root)},clear=False), \
-             patch.object(rabik,'wait_commit',return_value=True), patch.object(rabik,'emit') as emit, \
-             patch.object(rabik,'draw_target') as target:
+             patch.object(brain.interaction,'wait_commit',return_value=True), patch.object(brain.protocol,'emit') as emit, \
+             patch.object(brain.drawing,'draw_target') as target:
             with self.assertRaisesRegex(ValueError,'--look before drawing'):
-                rabik.draw(data)
+                brain.drawing.draw(data)
         emit.assert_not_called()
         target.assert_not_called()
 
     def test_failed_look_clears_old_drawing_snapshot(self):
         snapshot=self.root/'draw-screens.json';snapshot.write_text('{"screens":{"1":{"frame":[0,0,10,10],"pixels":[10,10]}}}')
-        with patch.dict(os.environ,{'RABIK_ASK':str(self.root)},clear=False),patch.object(rabik,'screens',return_value=[]):
-            self.assertEqual(rabik.look(cleanup=False),[])
+        with patch.dict(os.environ,{'RABIK_ASK':str(self.root)},clear=False),patch.object(brain.macos,'screens',return_value=[]):
+            self.assertEqual(brain.screen.look(cleanup=False),[])
         self.assertFalse(snapshot.exists())
 
     def test_look_finds_the_drawing_target_while_it_captures(self):
@@ -198,9 +199,9 @@ class DrawingTests(unittest.TestCase):
                 assert asked.wait(2), 'the target lookup waited for the capture'
                 Path(args[-1]).write_bytes(b'x'); return subprocess.CompletedProcess(args, 0)
             return subprocess.CompletedProcess(args, 0, stdout='pixelWidth: 1280\npixelHeight: 800\n')
-        with patch.dict(os.environ,{'RABIK_ASK':str(self.root)},clear=False), patch.object(rabik,'screens',return_value=[('Laptop',0,0,1440,900,True)]), \
-             patch.object(rabik,'draw_target',target), patch.object(rabik.subprocess,'run',run):
-            self.assertEqual(len(rabik.look(cleanup=False)), 1)
+        with patch.dict(os.environ,{'RABIK_ASK':str(self.root)},clear=False), patch.object(brain.macos,'screens',return_value=[('Laptop',0,0,1440,900,True)]), \
+             patch.object(brain.drawing,'draw_target',target), patch.object(subprocess,'run',run):
+            self.assertEqual(len(brain.screen.look(cleanup=False)), 1)
         snapshot = json.loads((self.root/'draw-screens.json').read_text())
         self.assertEqual((snapshot['target'], snapshot['screens']['1']['pixels']), ({'windowID': '7'}, [1280, 800]))
 
@@ -210,22 +211,22 @@ class DrawingTests(unittest.TestCase):
             'screens':{'1':{'frame':[0,0,800,600],'pixels':[1600,1200]}},'target':target}))
         data={'steps':[{'target':'Send','wait':True,'shapes':[{'kind':'rect'}]}]}
         def shown(lines): Path(json.loads(lines[0][2:])['receipt']).write_text('shown')
-        with patch.dict(os.environ,{'RABIK_ASK':str(self.root)},clear=False),patch.object(rabik,'wait_commit',return_value=True), \
-             patch.object(rabik,'hands_map',return_value=target) as mapped,patch.object(rabik,'emit',side_effect=shown) as emit:
-            self.assertIn('Guide shown',rabik.draw(data))
+        with patch.dict(os.environ,{'RABIK_ASK':str(self.root)},clear=False),patch.object(brain.interaction,'wait_commit',return_value=True), \
+             patch.object(brain.hands,'hands_map',return_value=target) as mapped,patch.object(brain.protocol,'emit',side_effect=shown) as emit:
+            self.assertIn('Guide shown',brain.drawing.draw(data))
             mapped.assert_called_once_with(target=target)
             self.assertEqual(json.loads(emit.call_args.args[0][0][2:])['target'],target)
             mapped.reset_mock()
             (self.root/'draw-screens.json').write_text(json.dumps({
                 'screens':{'1':{'frame':[0,0,800,600],'pixels':[1600,1200]}}}))
-            with self.assertRaisesRegex(ValueError,'--look again'): rabik.draw(data)
+            with self.assertRaisesRegex(ValueError,'--look again'): brain.drawing.draw(data)
             mapped.assert_not_called()
 
     def test_verified_guide_replaces_a_long_final_answer(self):
         long_answer = 'A long duplicate explanation that belongs in the guide.'
-        self.assertEqual(rabik.guide_reply([{'error':False,'result':'Guide shown (step 1 of 4). Leave it running.'}],long_answer),
+        self.assertEqual(brain.drawing.guide_reply([{'error':False,'result':'Guide shown (step 1 of 4). Leave it running.'}],long_answer),
                          'Done. Steps are on screen.')
-        self.assertEqual(rabik.guide_reply([{'error':True,'result':'Guide shown (step 1 of 4). Leave it running.'},
+        self.assertEqual(brain.drawing.guide_reply([{'error':True,'result':'Guide shown (step 1 of 4). Leave it running.'},
                                               {'error':False,'result':long_answer}],long_answer),long_answer)
 
     def test_teaching_steps_keep_order_and_visible_captions(self):
@@ -235,12 +236,12 @@ class DrawingTests(unittest.TestCase):
             {'id':'formula','say':'Now use a² + b² = c².','shapes':[{'kind':'label','at':[20,20],'text':'a² + b² = c²'}]},
             {'id':'example','say':'For 3 and 4, c is 5.','shapes':[{'kind':'label','at':[20,35],'text':'3² + 4² = 5²'}]},
         ]}
-        value = rabik.drawing(data)
+        value = brain.drawing.drawing(data)
         self.assertTrue(value['teaching'])
         self.assertEqual([step['id'] for step in value['steps']],['triangle','labels','formula','example'])
         self.assertEqual([step['say'] for step in value['steps']],[step['say'] for step in data['steps']])
         with self.assertRaisesRegex(ValueError,'visible say caption'):
-            rabik.drawing({'steps':[{'shapes':[{'kind':'pointer','at':[10,10]}]}]})
+            brain.drawing.drawing({'steps':[{'shapes':[{'kind':'pointer','at':[10,10]}]}]})
 
     def test_app_lifecycle_connects_to_clear(self):
         source = (ROOT/'Rabik.swift').read_text()
@@ -300,7 +301,7 @@ class DrawingTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile(prefix='rabik-point-',suffix='.jpg') as image:
             value = {'bounds':[10,20,40,50], 'path':[[12,22],[20,30]], 'image':image.name,
                      'element':'Fixture AXButton: Continue'}
-            context, shots = rabik.point_context(value)
+            context, shots = brain.situation.point_context(value)
             self.assertIn('path',context)
             self.assertIn('Fixture AXButton',context)
             self.assertEqual(shots[0][0],os.path.realpath(image.name))
@@ -308,7 +309,7 @@ class DrawingTests(unittest.TestCase):
                     {'bounds':[0,0,-1,1],'path':[[0,0]],'element':'x'},
                     {'bounds':[0,0,1,1],'path':[[float('nan'),0]],'element':'x'}):
             with self.subTest(bad=bad):
-                self.assertEqual(rabik.point_context(bad),('',[]))
+                self.assertEqual(brain.situation.point_context(bad),('',[]))
         app = (ROOT/'Rabik.swift').read_text().split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
         self.assertIn('if let point { request["point"] = point }',app)
         self.assertIn('if drawing.hasInput { drawing.clearInput(); return }',app)

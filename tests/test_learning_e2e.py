@@ -12,10 +12,12 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
-import rabik
+import brain.apps, brain.ask, brain.cli, brain.hands, brain.instant, brain.interaction, brain.macos, brain.memory, brain.paths
+import brain.protocol, brain.screen, brain.situation, brain.skills, brain.telemetry, brain.tips, brain.toolhelp, brain.web
+import brain.windows
 from tests import scratch_dir
 
-PLACE_MANY, THREAD = rabik.place_many, threading.Thread
+PLACE_MANY, THREAD = brain.windows.place_many, threading.Thread
 URL = 'https://board.example'
 APPS = {'Safari', 'Obsidian', 'Mail', 'Fixture Board', 'Other Fixture'}
 
@@ -32,35 +34,40 @@ class Ask(unittest.TestCase):
         self.show = Mock(side_effect=lambda target, bg=False: f'opened {target} ' + ('in the background' if bg else 'in front'))
         self.place = Mock(side_effect=lambda args: ' '.join(args) + ' -> placed')
         self.shell = Mock(return_value=subprocess.CompletedProcess([], 0, '', ''))
-        for p in [patch.object(rabik, 'SKILLS', str(self.root / 'skills.json')), patch.object(rabik, 'RECENT', str(self.root / 'recent.jsonl')),
-                  patch.object(rabik, 'WORKED', str(self.root / 'worked.json')), patch.object(rabik, 'ME_FILE', str(self.root / 'me.json')),
-                  patch.object(rabik, 'MEMORY', str(self.root / 'memory.md')), patch.object(rabik, 'LAST', str(self.root / 'last_app')),
+        for p in [patch.object(brain.skills, 'SKILLS', str(self.root / 'skills.json')), patch.object(brain.paths, 'RECENT', str(self.root / 'recent.jsonl')),
+                  patch.object(brain.paths, 'WORKED', str(self.root / 'worked.json')), patch.object(brain.memory, 'ME_FILE', str(self.root / 'me.json')),
+                  patch.object(brain.paths, 'MEMORY', str(self.root / 'memory.md')), patch.object(brain.paths, 'LAST', str(self.root / 'last_app')),
                   patch.dict(os.environ, {'RABIK_ASK': str(self.root), 'RABIK_FRONT': 'Other Fixture', 'RABIK_FOCUS_GUARD': '1'}, clear=True),
-                  patch.object(rabik.threading, 'Thread', NoThread), patch.object(rabik.subprocess, 'run', self.shell),
-                  patch.multiple(rabik, show=self.show, place_many=self.place, place=lambda *a: 'placed', installed_apps=lambda: set(APPS), proc_of=lambda a: a,
-                                 app_id=lambda a: 'com.example.' + str(a).lower().replace(' ', ''), app_running=lambda bid: True,
-                                 free_focus=lambda *a, **k: None, preview_commands=lambda *a, **k: None, preview_app=lambda *a, **k: None,
-                                 ping=lambda: None, front=lambda: ('Other Fixture', 'Scratch'), osa=lambda *a, **k: '',
-                                 screens=lambda: [], describe=lambda *a: 'Scratch display', selection_context=lambda: '', screen_for=lambda *a: None,
-                                 tool_help=lambda *a, **k: '', wait_commit=lambda: True, restore_focus=lambda *a: None, look=lambda *a, **k: [],
-                                 hands_map=lambda *a, **k: None, report=lambda *a: None, cached_hands=lambda: None, ask_user=lambda *a: '')]:
+                  patch.object(threading, 'Thread', NoThread), patch.object(subprocess, 'run', self.shell),
+                  tests.patches(patch.multiple(brain.web, show=self.show),
+                                patch.multiple(brain.windows, place_many=self.place, place=lambda *a: 'placed'),
+                                patch.multiple(brain.apps, installed_apps=lambda: set(APPS), proc_of=lambda a: a, app_id=lambda a: 'com.example.' + str(a).lower().replace(' ', ''), app_running=lambda bid: True),
+                                patch.multiple(brain.macos, free_focus=lambda *a, **k: None, preview_commands=lambda *a, **k: None, preview_app=lambda *a, **k: None, front=lambda: ('Other Fixture', 'Scratch'), osa=lambda *a, **k: '', screens=lambda: [], describe=lambda *a: 'Scratch display', restore_focus=lambda *a: None, cached_hands=lambda: None),
+                                patch.multiple(brain.telemetry, ping=lambda: None, report=lambda *a: None),
+                                patch.multiple(brain.situation, selection_context=lambda: ''),
+                                patch.multiple(brain.screen, screen_for=lambda *a: None, look=lambda *a, **k: []),
+                                patch.multiple(brain.toolhelp, tool_help=lambda *a, **k: ''),
+                                patch.multiple(brain.interaction, wait_commit=lambda: True, ask_user=lambda *a: ''),
+                                patch.multiple(brain.hands, hands_map=lambda *a, **k: None))]:
             p.start(); self.addCleanup(p.stop)
 
     def ask(self, words, reply='', cmds=(), ok=True):
         """One spoken ask. The fake model answers only if the instant path did not; returns (shown answer, Learned pill, model used)."""
-        brain = Mock(return_value=(reply, 0, []))
-        brain.ok, brain.modes, brain.cmds, brain.ran = ok, {'text'}, list(cmds), list(cmds)
-        brain.observed = [{'action': c, 'error': False, 'result': 'done'} for c in cmds]
+        fake_run = Mock(return_value=(reply, 0, []))
+        fake_run.ok, fake_run.modes, fake_run.cmds, fake_run.ran = ok, {'text'}, list(cmds), list(cmds)
+        fake_run.observed = [{'action': c, 'error': False, 'result': 'done'} for c in cmds]
         say, tip = Mock(), Mock()
-        with patch('sys.argv', ['rabik.py', words]), patch.multiple(rabik, run=brain, say=say, tip=tip):
-            rabik.main()
+        with patch('sys.argv', ['rabik.py', words]), tests.patches(patch.multiple(brain.ask, run=fake_run),
+                                                                   patch.multiple(brain.protocol, say=say),
+                                                                   patch.multiple(brain.tips, tip=tip)):
+            brain.cli.main()
         pills = [c.args[1] for c in tip.call_args_list if c.args[1]]
-        return say.call_args.args[1], (pills[-1] if pills else ''), brain.called
+        return say.call_args.args[1], (pills[-1] if pills else ''), fake_run.called
 
 
 class LearningEndToEndTests(Ask):
     def test_said_and_done_is_learned_and_close_wordings_replay_instantly(self):
-        said, pill, model = self.ask('Open the fixture board site', 'Opened the fixture board.', [f'{rabik.SHOW} "{URL}"'])
+        said, pill, model = self.ask('Open the fixture board site', 'Opened the fixture board.', [f'{brain.paths.SHOW} "{URL}"'])
         self.assertTrue(model)
         self.assertEqual(pill, 'Learned: Say “Open the fixture board site” any time.')
         for words in ('open the fixture board site', 'Hey Rabik, can you open the fixture board site please?', 'open fixture board site'):
@@ -72,11 +79,11 @@ class LearningEndToEndTests(Ask):
 
     def test_unpunctuated_when_i_say_saves_the_trigger_words_and_replays_them(self):
         # Oct 22: "when I say deep work full screen Chrome …" had no comma, so the whole sentence was saved and "deep work" never replayed
-        cmds = [f'{rabik.SHOW} "{URL}"', f'{rabik.PLACE} "Fixture Board" left current']
+        cmds = [f'{brain.paths.SHOW} "{URL}"', f'{brain.paths.PLACE} "Fixture Board" left current']
         said, pill, model = self.ask('When I say board time open the fixture board site and put fixture board on the left', 'Done. [shortcut board time]', cmds)
         self.assertEqual(said, 'Done.')   # the tag is never shown
-        self.assertEqual(set(rabik.skills()), {'board time'})   # never the teaching sentence itself
-        self.assertTrue(rabik.skills()['board time']['mine'])
+        self.assertEqual(set(brain.skills.skills()), {'board time'})   # never the teaching sentence itself
+        self.assertTrue(brain.skills.skills()['board time']['mine'])
         self.assertEqual(pill, 'Learned: Say “board time” any time.')
         said, pill, model = self.ask('Board time.')
         self.assertFalse(model)
@@ -85,13 +92,13 @@ class LearningEndToEndTests(Ask):
         self.place.assert_called_with(['Fixture Board', 'left', 'current'])
 
     def test_remember_wording_teaches_only_the_users_own_words(self):
-        self.ask('Remember that when I say board time, open the fixture board site', 'Opened it. [shortcut board time]', [f'{rabik.SHOW} "{URL}"'])
-        self.assertIn('board time', rabik.skills())
+        self.ask('Remember that when I say board time, open the fixture board site', 'Opened it. [shortcut board time]', [f'{brain.paths.SHOW} "{URL}"'])
+        self.assertIn('board time', brain.skills.skills())
         self.assertFalse(self.ask('board time')[2])
-        rabik.save_skills({})
-        said, pill, model = self.ask('Open the fixture board site', 'Opened it. [shortcut study time]', [f'{rabik.SHOW} "{URL}"'])
+        brain.skills.save_skills({})
+        said, pill, model = self.ask('Open the fixture board site', 'Opened it. [shortcut study time]', [f'{brain.paths.SHOW} "{URL}"'])
         self.assertEqual(said, 'Opened it.')
-        self.assertEqual(set(rabik.skills()), {'open the fixture board site'})   # "study time" was never said: not a trigger
+        self.assertEqual(set(brain.skills.skills()), {'open the fixture board site'})   # "study time" was never said: not a trigger
 
     def test_named_shortcut_on_the_instant_path_replays_in_front(self):
         said, pill, model = self.ask('When I say browse time, open Safari')
@@ -103,13 +110,13 @@ class LearningEndToEndTests(Ask):
         self.show.assert_called_once_with('Safari', False)   # in front, as asked; "browse time" itself says nothing about focus
 
     def test_failed_replay_unlearns_and_its_redo_is_learned_even_without_the_unlearn_tag(self):
-        rabik.save_skills({'open the fixture board site': {'cmds': [f'{rabik.SHOW} "{URL}"'], 'reply': 'Opened.', 'mine': True}})
+        brain.skills.save_skills({'open the fixture board site': {'cmds': [f'{brain.paths.SHOW} "{URL}"'], 'reply': 'Opened.', 'mine': True}})
         self.show.side_effect = lambda target, bg=False: 'could not open ' + target
-        fixed = f'{rabik.SHOW} "https://board.example/home"'
+        fixed = f'{brain.paths.SHOW} "https://board.example/home"'
         said, pill, model = self.ask('Open fixture board site', 'Opened the board home.', [fixed])   # matched by its gist, not its exact key
         self.assertTrue(model)
         self.assertEqual(said, 'Opened the board home.')
-        self.assertEqual(rabik.skills()['open the fixture board site']['cmds'], [fixed])
+        self.assertEqual(brain.skills.skills()['open the fixture board site']['cmds'], [fixed])
         self.assertEqual(pill, 'Learned: Say “open the fixture board site” any time.')
         self.show.side_effect = lambda target, bg=False: f'opened {target}'
         self.show.reset_mock()
@@ -117,22 +124,22 @@ class LearningEndToEndTests(Ask):
         self.show.assert_called_once_with('https://board.example/home', False)
 
     def test_a_failed_replay_whose_redo_also_fails_is_never_replayed_again(self):
-        rabik.save_skills({'open the fixture board site': {'cmds': [f'{rabik.SHOW} "{URL}"'], 'reply': 'Opened.', 'mine': True}})
+        brain.skills.save_skills({'open the fixture board site': {'cmds': [f'{brain.paths.SHOW} "{URL}"'], 'reply': 'Opened.', 'mine': True}})
         self.show.side_effect = lambda target, bg=False: 'could not open ' + target
         self.ask('open the fixture board site', 'I could not open it.', [], ok=False)
-        self.assertEqual(rabik.skills(), {})
+        self.assertEqual(brain.skills.skills(), {})
         self.show.reset_mock()
         self.assertTrue(self.ask('open the fixture board site', 'Still not.', [], ok=False)[2])   # the model again, no blind replay
         self.show.assert_not_called()
 
     def test_failure_after_the_first_step_does_not_save_only_the_redo(self):
         first, second = 'https://board.example/first', 'https://board.example/second'
-        rabik.save_skills({'board setup': {'cmds': [f'{rabik.SHOW} "{first}"', f'{rabik.SHOW} "{second}"'],
+        brain.skills.save_skills({'board setup': {'cmds': [f'{brain.paths.SHOW} "{first}"', f'{brain.paths.SHOW} "{second}"'],
                                               'reply': 'Board setup ready.', 'mine': True}})
         self.show.side_effect = lambda target, bg=False: ('could not open ' if target == second else 'opened ') + target
-        redo = f'{rabik.SHOW} "https://board.example/recovered"'
+        redo = f'{brain.paths.SHOW} "https://board.example/recovered"'
         self.ask('board setup', 'Recovered the remaining step.', [redo])
-        self.assertEqual(rabik.skills()['board setup']['cmds'], [f'{rabik.SHOW} "{first}"', f'{rabik.SHOW} "{second}"'])   # the user's own shortcut stays whole
+        self.assertEqual(brain.skills.skills()['board setup']['cmds'], [f'{brain.paths.SHOW} "{first}"', f'{brain.paths.SHOW} "{second}"'])   # the user's own shortcut stays whole
         row = json.loads((self.root / 'log.jsonl').read_text().splitlines()[-1])
         self.assertTrue(any(first in step for step in row['ran']))
         self.assertTrue(any(second in step for step in row['ran']))
@@ -140,8 +147,8 @@ class LearningEndToEndTests(Ask):
 
     def test_nothing_wrong_is_ever_replayed(self):
         # names the instant mover can't resolve, so the model arranged them and the layout was learned
-        self.ask('alpha pane on the left and beta pane on the right', 'Arranged.', [f'{rabik.PLACE} "Alpha" left current + "Beta" right current'])
-        self.assertIn('alpha pane on the left and beta pane on the right', rabik.skills())
+        self.ask('alpha pane on the left and beta pane on the right', 'Arranged.', [f'{brain.paths.PLACE} "Alpha" left current + "Beta" right current'])
+        self.assertIn('alpha pane on the left and beta pane on the right', brain.skills.skills())
         self.place.reset_mock()
         said, pill, model = self.ask('beta pane on the left and alpha pane on the right', 'Arranged the other way.')
         self.assertTrue(model)   # the same words in another order are another layout: never the learned one
@@ -151,11 +158,11 @@ class LearningEndToEndTests(Ask):
         mode = "osascript -e 'tell application \"System Events\" to tell appearance preferences to set dark mode to true'"
         self.ask('switch on dark mode', 'Dark mode is on.', [mode])
         self.assertFalse(self.ask('dark mode switch on')[2])   # only a word the commands never use moved: still instant
-        before = rabik.skills()
+        before = brain.skills.skills()
         self.ask('Close this', 'Closed.', ["osascript -e 'tell application \"Other Fixture\" to close window 1'"])   # "this" depends on the moment
         self.ask('Hide fixture board', 'I could not hide it.', ["osascript -e 'tell application \"Fixture Board\" to set visible to false'"])
         self.ask('Hide other fixture', 'Hidden.', ["osascript -e 'tell application \"Other Fixture\" to set visible to false'"], ok=False)
-        self.assertEqual(rabik.skills(), before)
+        self.assertEqual(brain.skills.skills(), before)
 
 
 class WorkModeTests(Ask):
@@ -172,20 +179,20 @@ class WorkModeTests(Ask):
             time.sleep(.02)   # a Space animation; another one started meanwhile would overlap it
             with lock: self.active -= 1; self.calls.append((app, where, screen))
             return f'NOT DONE: {app} entered full screen on the wrong display.' if self.fail else f'{app} window -> fullscreen of {screen}'
-        for p in (patch.multiple(rabik, place_many=PLACE_MANY, place=place),):
+        for p in (patch.multiple(brain.windows, place_many=PLACE_MANY, place=place),):
             p.start(); self.addCleanup(p.stop)
 
     def test_teach_replay_and_reteach_work_mode(self):
         (self.root / 'memory.md').write_text('- Work mode: Other Fixture full screen on the laptop, Fixture Board on the monitor.\n- Keep replies short.\n')
         stale = 'when i say work mode full screen other fixture on my laptop and fixture board on my monitor'
-        rabik.save_skills({stale: {'cmds': [f'{rabik.PLACE} "Other Fixture" fullscreen laptop'], 'reply': 'Done.', 'at': '2099-01-01'}})
+        brain.skills.save_skills({stale: {'cmds': [f'{brain.paths.PLACE} "Other Fixture" fullscreen laptop'], 'reply': 'Done.', 'at': '2099-01-01'}})
         said, pill, model = self.ask('No, when I say work mode, full screen Fixture Board on my laptop and full screen Other Fixture on my monitor.')
         self.assertFalse(model)
         self.assertEqual(said, 'Fixture Board: full screen on laptop; Other Fixture: full screen on monitor.')
         self.assertEqual(pill, 'Learned: Say “work mode” any time.')
-        self.assertEqual(set(rabik.skills()), {'work mode'})   # the stale whole-sentence version is gone
-        self.assertTrue(rabik.skills()['work mode']['mine'])
-        self.assertEqual(rabik.memory_rules(), ['Keep replies short.'])   # so is the rule that described the old layout
+        self.assertEqual(set(brain.skills.skills()), {'work mode'})   # the stale whole-sentence version is gone
+        self.assertTrue(brain.skills.skills()['work mode']['mine'])
+        self.assertEqual(brain.memory.memory_rules(), ['Keep replies short.'])   # so is the rule that described the old layout
         # each window reaches its display first, then they enter full screen one at a time
         self.assertEqual(self.calls, [('Fixture Board', 'full', 'laptop'), ('Other Fixture', 'full', 'monitor'),
                                       ('Fixture Board', 'fullscreen', 'laptop'), ('Other Fixture', 'fullscreen', 'monitor')])
@@ -202,16 +209,16 @@ class WorkModeTests(Ask):
         self.assertEqual(self.calls[2:], [('Other Fixture', 'fullscreen', 'laptop'), ('Fixture Board', 'fullscreen', 'monitor')])
 
     def test_plain_moves_stay_parallel(self):
-        with patch.object(threading, 'Thread', THREAD): self.assertEqual(rabik.fast('Fixture Board left, Other Fixture right'), 'Fixture Board: left; Other Fixture: right.')
+        with patch.object(threading, 'Thread', THREAD): self.assertEqual(brain.instant.fast('Fixture Board left, Other Fixture right'), 'Fixture Board: left; Other Fixture: right.')
 
     def test_a_failed_replay_keeps_the_users_shortcut_when_the_redo_works(self):
         self.ask('When I say work mode, full screen Fixture Board on my laptop and full screen Other Fixture on my monitor')
-        taught = rabik.skills()['work mode']
+        taught = brain.skills.skills()['work mode']
         self.fail = True
         checks = "osascript -e 'tell application \"System Events\" to get value of attribute \"AXFullScreen\" of window 1' 2>&1; echo ---"
-        said, pill, model = self.ask('Work mode.', 'Both are full screen now.', [f'{rabik.PLACE} "Fixture Board" fullscreen laptop', checks])
+        said, pill, model = self.ask('Work mode.', 'Both are full screen now.', [f'{brain.paths.PLACE} "Fixture Board" fullscreen laptop', checks])
         self.assertTrue(model)
-        self.assertEqual(rabik.skills()['work mode']['cmds'], taught['cmds'])   # the redo could not be learned: what the user taught stays
+        self.assertEqual(brain.skills.skills()['work mode']['cmds'], taught['cmds'])   # the redo could not be learned: what the user taught stays
 
 
 class OpenAppsAndSitesTests(Ask):
@@ -230,14 +237,14 @@ class OpenAppsAndSitesTests(Ask):
         self.shell.assert_called_once_with(['open', 'https://nike.com'])
 
     def test_a_near_name_that_is_not_an_app_goes_to_the_model(self):
-        said, pill, model = self.ask('open gmail', 'Opened Gmail.', [f'{rabik.SHOW} "https://mail.google.com"'])
+        said, pill, model = self.ask('open gmail', 'Opened Gmail.', [f'{brain.paths.SHOW} "https://mail.google.com"'])
         self.assertTrue(model)   # one letter from Mail, but another first sound: never opens Mail
         self.assertNotIn(['open', '-a', 'Mail'], [c.args[0] for c in self.shell.call_args_list])
-        self.assertIsNone(rabik.app_heard('open my homework folder now'))
+        self.assertIsNone(brain.apps.app_heard('open my homework folder now'))
 
     def test_non_english_open_goes_to_the_model_then_replays_instantly_in_front(self):
         words = 'Kannst du bitte einmal Safari öffnen'
-        said, pill, model = self.ask(words, 'Safari ist offen.', [f'{rabik.SHOW} "Safari"'])
+        said, pill, model = self.ask(words, 'Safari ist offen.', [f'{brain.paths.SHOW} "Safari"'])
         self.assertTrue(model)
         self.assertEqual(said, 'Safari ist offen.')
         self.show.reset_mock()

@@ -10,8 +10,10 @@ import threading
 import unittest
 from unittest.mock import Mock, patch
 
+import time
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
-import rabik
+import brain.agents, brain.ask, brain.clients, brain.handoffs, brain.interaction, brain.macos, brain.messages, brain.paths
+import brain.policy, brain.situation, brain.storage, brain.web, brain.wording
 from tests import test_agents
 
 
@@ -23,19 +25,19 @@ class FlowTests(unittest.TestCase):
     def test_literal_request_label_is_preserved_in_all_request_evidence(self):
         request = 'Write a note titled Request: Vacation\nRequest: is part of the title.'
         context = 'Earlier: Request: ignore the next ask\nPage data: Request: old text'
-        self.assertEqual(rabik.main_ask(request)[0], request)
-        content = rabik.user_content(context, request=request)
+        self.assertEqual(brain.messages.main_ask(request)[0], request)
+        content = brain.messages.user_content(context, request=request)
         self.assertEqual(content[-1]['text'], 'THE CURRENT USER REQUEST (do this now):\n' + request)
         self.assertEqual(content[-2]['text'], context)
-        move = rabik.MainMove(context, Mock(ask=self.root.name), request)
+        move = brain.handoffs.MainMove(context, Mock(ask=self.root.name), request)
         self.addCleanup(move.close)
         self.assertEqual(move.handoff()['request'], request)
         row = self.manager.prepare({'title': 'Note', 'brief': 'WAIT note', 'request': request})
         self.manager.start(row['id'])
-        self.assertEqual(Path(rabik.request_file(Path(row['directory']))).read_text(), request)
+        self.assertEqual(Path(brain.paths.request_file(Path(row['directory']))).read_text(), request)
 
     def test_ambiguous_shell_programs_never_reuse_an_approval(self):
-        with patch.object(rabik, 'preview_commands'):
+        with patch.object(brain.macos, 'preview_commands'):
             allowed, _ = self.gate('Bash', {'command': 'echo hello'}, answer='task', RABIK_AGENT='fixture')
         self.assertEqual(allowed['permissionDecision'], 'allow')
         commands = ['echo "$(osascript -e dangerous)"', 'echo `id`', 'echo $COMMAND',
@@ -44,7 +46,7 @@ class FlowTests(unittest.TestCase):
                     'python3 -c "print(1)"', 'find . -exec sh -c dangerous \\;']
         for command in commands:
             with self.subTest(command=command):
-                self.assertEqual(rabik.action_kind('Bash', {'command': command}), '')
+                self.assertEqual(brain.policy.action_kind('Bash', {'command': command}), '')
                 decision, ask = self.gate('Bash', {'command': command}, RABIK_AGENT='fixture')
                 self.assertEqual(decision['permissionDecision'], 'deny')
                 ask.assert_called_once()
@@ -52,7 +54,7 @@ class FlowTests(unittest.TestCase):
 
     def test_pending_handoff_is_saved_before_cancelling_and_disk_failure_keeps_main(self):
         p = Mock(ask=self.root.name, waiting=threading.Event(), pid=0)
-        move = rabik.MainMove('WAIT preserve the task', p)
+        move = brain.handoffs.MainMove('WAIT preserve the task', p)
         self.addCleanup(move.close)
         move.elapsed = 16
         move.record({'message': {'content': [{'type': 'tool_use', 'id': 'read', 'name': 'Read', 'input': {}}]}})
@@ -60,14 +62,14 @@ class FlowTests(unittest.TestCase):
             files = list((Path(self.root.name)/'pending-handoffs').glob('*.json'))
             self.assertEqual(len(files), 1)
             self.assertEqual(json.loads(files[0].read_text())['brief']['request'], 'WAIT preserve the task')
-        with patch.object(rabik, 'stop_claude', side_effect=stopped), contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(brain.clients, 'stop_claude', side_effect=stopped), contextlib.redirect_stdout(io.StringIO()):
             move.poll()
         self.assertTrue(move.moved)
-        other = rabik.MainMove('Keep working', p)
+        other = brain.handoffs.MainMove('Keep working', p)
         self.addCleanup(other.close)
         other.elapsed = 16
         other.record({'message': {'content': [{'type': 'tool_use', 'id': 'read', 'name': 'Read', 'input': {}}]}})
-        with patch.object(rabik, 'persist_handoff', side_effect=OSError('disk full')), patch.object(rabik, 'stop_claude') as stop, contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(brain.handoffs, 'persist_handoff', side_effect=OSError('disk full')), patch.object(brain.clients, 'stop_claude') as stop, contextlib.redirect_stdout(io.StringIO()):
             other.poll()
         self.assertFalse(other.moved)
         stop.assert_not_called()
@@ -75,7 +77,7 @@ class FlowTests(unittest.TestCase):
     def test_supervisor_recovers_failed_delivery_once_and_retries_failed_reads(self):
         brief = {'title': 'Preserved task', 'brief': 'WAIT preserve original work', 'accepted': True,
                  'context': 'Completed work: verified. In-flight action: inspect before retrying.'}
-        rabik.persist_handoff(brief, 0)
+        brain.handoffs.persist_handoff(brief, 0)
         path = Path(self.root.name)/'pending-handoffs'/(brief['handoffId']+'.json')
         with patch.object(self.manager, 'prepare', side_effect=OSError('supervisor unavailable')):
             self.manager.recover_handoffs()
@@ -87,24 +89,24 @@ class FlowTests(unittest.TestCase):
         self.assertIn('inspect before retrying', row['context'])
         count = len(self.manager.rows)
         self.assertEqual(self.manager.prepare(brief)['id'], row['id'])
-        rabik.persist_handoff(brief, 0)  # replay after a lost acknowledgement
+        brain.handoffs.persist_handoff(brief, 0)  # replay after a lost acknowledgement
         self.manager.recover_handoffs()
         self.assertEqual(len(self.manager.rows), count)
-        self.until(lambda: any(e.get('event') == 'followup' for e in rabik.read_rows(str(Path(row['directory'])/'log.jsonl'))))
-        sent = [e for e in rabik.read_rows(str(Path(row['directory'])/'log.jsonl')) if e.get('event') == 'followup']
+        self.until(lambda: any(e.get('event') == 'followup' for e in brain.storage.read_rows(str(Path(row['directory'])/'log.jsonl'))))
+        sent = [e for e in brain.storage.read_rows(str(Path(row['directory'])/'log.jsonl')) if e.get('event') == 'followup']
         self.assertEqual(len(sent), 1)
 
     def test_recovery_waits_for_foreground_exit_and_survives_supervisor_restart(self):
         brief = {'title': 'Restart task', 'brief': 'WAIT resumed', 'accepted': True}
-        rabik.persist_handoff(brief, os.getpid())
+        brain.handoffs.persist_handoff(brief, os.getpid())
         self.manager.recover_handoffs()
         self.assertFalse(self.manager.rows)
         # Simulate the cancelled worker exiting and the supervisor dying after saving the offer.
-        rabik.persist_handoff(brief, 0)
+        brain.handoffs.persist_handoff(brief, 0)
         with patch.object(self.manager, 'warm'):
             row = self.manager.prepare(brief)
         self.manager.close()
-        manager = rabik.Agents(emit=lambda _: None, launch=self.manager.launch)
+        manager = brain.agents.Agents(emit=lambda _: None, launch=self.manager.launch)
         self.addCleanup(manager.close)
         manager.recover_handoffs()
         self.assertEqual(manager.rows[row['id']]['status'], 'running')
@@ -115,8 +117,8 @@ class FlowTests(unittest.TestCase):
             with self.subTest(prefs=prefs, env=env):
                 self.prefs.update(prefs)
                 p = Mock(ask=self.root.name, returncode=0, stdin=Mock(), stdout=[json.dumps({'type': 'result', 'result': '[draft] Full answer', 'total_cost_usd': 0})])
-                with patch.dict(os.environ, {'RABIK_UI': '1', **env}), patch.object(rabik, 'MainMove') as moving, patch.object(rabik, 'relay'), contextlib.redirect_stdout(io.StringIO()) as output:
-                    reply, _, _ = rabik.run('Context', p, request='Write this')
+                with patch.dict(os.environ, {'RABIK_UI': '1', **env}), patch.object(brain.handoffs, 'MainMove') as moving, patch.object(brain.interaction, 'relay'), contextlib.redirect_stdout(io.StringIO()) as output:
+                    reply, _, _ = brain.ask.run('Context', p, request='Write this')
                 moving.assert_not_called()
                 self.assertNotIn('⤴', output.getvalue())
                 self.assertEqual(reply, '[draft] Full answer')
@@ -125,21 +127,21 @@ class FlowTests(unittest.TestCase):
     def test_drawing_settings_alone_never_block_agents(self):
         self.prefs.update(draw=True, pointer=True)
         self.addCleanup(self.prefs.update, draw=False, pointer=False)
-        with patch.dict(os.environ, {'RABIK_SELECTION': '', 'RABIK_CARET': ''}), patch.object(rabik, 'selection_context', return_value=''):
-            self.assertFalse(rabik.main_delivery_required())
+        with patch.dict(os.environ, {'RABIK_SELECTION': '', 'RABIK_CARET': ''}), patch.object(brain.situation, 'selection_context', return_value=''):
+            self.assertFalse(brain.situation.main_delivery_required())
 
     def test_a_text_cursor_alone_lets_the_model_hand_off_but_never_moves(self):
         marker = '[agent {"title":"Desk research","brief":"Compare standing desks"}]'
         p = Mock(ask=self.root.name, returncode=0, stdin=Mock(), stdout=[json.dumps({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': marker}]}}),
                                                                           json.dumps({'type': 'result', 'result': marker, 'total_cost_usd': .001})])
-        with patch.dict(os.environ, {'RABIK_UI': '1', 'RABIK_CARET': '1', 'RABIK_SELECTION': ''}), patch.object(rabik, 'selection_context', return_value=''), \
-             patch.object(rabik, 'MainMove') as moving, patch.object(rabik, 'wait_commit', return_value=True), patch.object(rabik, 'relay'), \
-             patch.object(rabik.threading, 'Timer'), contextlib.redirect_stdout(io.StringIO()) as output:
-            self.assertFalse(rabik.main_delivery_required())
-            rabik.run('Context', p, request='Find 3 standing desks under $600')
+        with patch.dict(os.environ, {'RABIK_UI': '1', 'RABIK_CARET': '1', 'RABIK_SELECTION': ''}), patch.object(brain.situation, 'selection_context', return_value=''), \
+             patch.object(brain.handoffs, 'MainMove') as moving, patch.object(brain.interaction, 'wait_commit', return_value=True), patch.object(brain.interaction, 'relay'), \
+             patch.object(threading, 'Timer'), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertFalse(brain.situation.main_delivery_required())
+            brain.ask.run('Context', p, request='Find 3 standing desks under $600')
         moving.assert_not_called()
         self.assertNotIn('main-window delivery', p.stdin.write.call_args.args[0])
-        self.assertEqual(output.getvalue().count('⤴ '), 1); self.assertEqual(rabik.run.handoff['title'], 'Desk research')
+        self.assertEqual(output.getvalue().count('⤴ '), 1); self.assertEqual(brain.ask.run.handoff['title'], 'Desk research')
 
     def test_each_separate_task_in_one_ask_is_its_own_handoff(self):
         marker = '[agent {"title":"Ebike research","brief":"Best ebikes","app":"Alpha"}]\n[agent {"title":"Helmet research","brief":"Best helmets","app":"Beta"}]'
@@ -154,43 +156,43 @@ class FlowTests(unittest.TestCase):
                 self.assertEqual(len(list((Path(self.root.name)/'pending-handoffs').glob('*.json'))), 1)
             resolved.append(app)
             return {'app': app}
-        with patch.dict(os.environ, {'RABIK_UI': '1', 'RABIK_CARET': '1', 'RABIK_SELECTION': ''}), patch.object(rabik, 'selection_context', return_value=''), \
-             patch.object(rabik, 'wait_commit', return_value=True), patch.object(rabik, 'relay'), \
-             patch.object(rabik, 'running_app', side_effect=lambda app: app), patch.object(rabik, 'work_page', side_effect=work_page), \
-             patch.object(rabik.threading, 'Timer'), contextlib.redirect_stdout(io.StringIO()) as output:
-            rabik.run('Context', p, request='Research the best ebikes and, second, the best helmets')
+        with patch.dict(os.environ, {'RABIK_UI': '1', 'RABIK_CARET': '1', 'RABIK_SELECTION': ''}), patch.object(brain.situation, 'selection_context', return_value=''), \
+             patch.object(brain.interaction, 'wait_commit', return_value=True), patch.object(brain.interaction, 'relay'), \
+             patch.object(brain.web, 'running_app', side_effect=lambda app: app), patch.object(brain.web, 'work_page', side_effect=work_page), \
+             patch.object(threading, 'Timer'), contextlib.redirect_stdout(io.StringIO()) as output:
+            brain.ask.run('Context', p, request='Research the best ebikes and, second, the best helmets')
         sent = [json.loads(l[2:]) for l in output.getvalue().splitlines() if l.startswith('⤴ ')]
         self.assertEqual([h['title'] for h in sent], ['Ebike research', 'Helmet research'])
-        self.assertEqual(len({h['handoffId'] for h in sent}), 2); self.assertIs(rabik.run.handoff, rabik.run.handoffs[0])
-        self.assertEqual(len(rabik.parse_handoffs('[agent {"title":"Desk research","brief":"Compare desks"}] Sure.')), 1)
-        both = rabik.parse_handoffs('```\n[steer {"id":"abc","text":"under $200"}]\n[agent {"title":"Helmets","brief":"Best helmets"}]\n```')
+        self.assertEqual(len({h['handoffId'] for h in sent}), 2); self.assertIs(brain.ask.run.handoff, brain.ask.run.handoffs[0])
+        self.assertEqual(len(brain.handoffs.parse_handoffs('[agent {"title":"Desk research","brief":"Compare desks"}] Sure.')), 1)
+        both = brain.handoffs.parse_handoffs('```\n[steer {"id":"abc","text":"under $200"}]\n[agent {"title":"Helmets","brief":"Best helmets"}]\n```')
         self.assertEqual([d.get('steer', d['title']) for d in both], ['abc', 'Helmets'])
         pretty = '[agent ' + json.dumps({'title': 'Locks', 'brief': 'Bike locks'}, indent=2) + ']'
         for shape in ('```json\n{a}\n```\n```json\n{b}\n```', '{a}\n```\n{b}\n```', '{a}{b} Started both.'):   # one fence per tag, or none on the first
             text = shape.format(a=marker.split('\n')[0], b=pretty)
-            self.assertEqual([d['title'] for d in rabik.parse_handoffs(text)], ['Ebike research', 'Locks'], text)
-        self.assertEqual(len(rabik.parse_handoffs('[agent-profile {"action":"list"}]\n[agent {"title":"X","brief":"Y"}]')), 1)
+            self.assertEqual([d['title'] for d in brain.handoffs.parse_handoffs(text)], ['Ebike research', 'Locks'], text)
+        self.assertEqual(len(brain.handoffs.parse_handoffs('[agent-profile {"action":"list"}]\n[agent {"title":"X","brief":"Y"}]')), 1)
         pretty = '[agent\n' + json.dumps({'title': 'Helmets', 'brief': 'Best helmets'}, indent=2) + '\n]'
         for text, titles in ((f'```json\n{marker.splitlines()[0]}\n```\n```json\n{pretty}\n```', ['Ebike research', 'Helmets']),   # a fence per tag
                              (pretty + ' Sure, two agents.\n[agent {"title":"Late"', ['Helmets']), ('[agent {"title":"X"}]', []), ('[agent [1]]', [])):
-            self.assertEqual([d['title'] for d in rabik.parse_handoffs(text)], titles, text)
+            self.assertEqual([d['title'] for d in brain.handoffs.parse_handoffs(text)], titles, text)
 
     def question_run(self, request, final):
         clock = [100.0]
         def lines():
             for i, cmd in enumerate([' --window Preview', ' --window Preview --offset 8000', ' --window Preview --offset 16000']):
-                yield json.dumps({'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': f't{i}', 'name': 'Bash', 'input': {'command': rabik.ME + cmd}}]}})
+                yield json.dumps({'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': f't{i}', 'name': 'Bash', 'input': {'command': brain.paths.ME + cmd}}]}})
                 clock[0] += 1
                 yield json.dumps({'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': f't{i}', 'content': 'study guide page'}]}})
             clock[0] += 20   # the model writes its answer
             yield json.dumps({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': final}]}})
             yield json.dumps({'type': 'result', 'result': final, 'total_cost_usd': 0})
         p = Mock(ask=self.root.name, returncode=0, stdin=Mock(), stdout=lines(), pid=0)
-        with patch.dict(os.environ, {'RABIK_UI': '1', 'RABIK_CARET': '', 'RABIK_SELECTION': ''}), patch.object(rabik, 'selection_context', return_value=''), \
-             patch.object(rabik, 'wait_commit', return_value=True), patch.object(rabik, 'relay'), patch.object(rabik, 'preview_commands'), \
-             patch.object(rabik, 'stop_claude'), patch.object(rabik.threading, 'Timer'), patch.object(rabik.time, 'monotonic', side_effect=lambda: clock[0]), \
+        with patch.dict(os.environ, {'RABIK_UI': '1', 'RABIK_CARET': '', 'RABIK_SELECTION': ''}), patch.object(brain.situation, 'selection_context', return_value=''), \
+             patch.object(brain.interaction, 'wait_commit', return_value=True), patch.object(brain.interaction, 'relay'), patch.object(brain.macos, 'preview_commands'), \
+             patch.object(brain.clients, 'stop_claude'), patch.object(threading, 'Timer'), patch.object(time, 'monotonic', side_effect=lambda: clock[0]), \
              contextlib.redirect_stdout(io.StringIO()) as output:
-            reply, _, _ = rabik.run('Context: Front app: Preview.', p, request=request)
+            reply, _, _ = brain.ask.run('Context: Front app: Preview.', p, request=request)
         return reply, output.getvalue()
 
     def test_a_question_answered_from_window_pages_stays_in_the_box(self):
@@ -199,30 +201,30 @@ class FlowTests(unittest.TestCase):
         answer = "Don't cross-multiply; divide straight across: outside with outside, inside with inside."
         reply, output = self.question_run(request, answer)
         self.assertEqual(reply, answer)
-        self.assertIsNone(rabik.run.handoff)
+        self.assertIsNone(brain.ask.run.handoff)
         self.assertNotIn('⤴', output)
-        title = rabik.agent_title(request).lower().split()
+        title = brain.handoffs.agent_title(request).lower().split()
         self.assertEqual(len(title), len(set(title)), title)
-        self.assertFalse(set(title) & (rabik.FILLER | {'have', 'by', 'do', 'i'}), title)
+        self.assertFalse(set(title) & (brain.wording.FILLER | {'have', 'by', 'do', 'i'}), title)
 
     def test_an_explicit_background_ask_hands_off_with_the_model_title(self):
         marker = '[agent {"title":"Cross-multiplying radicals","brief":"Explain problem C"}]'
         reply, output = self.question_run('Do this in the background: explain problem C.', marker)
         self.assertEqual(reply, '')
-        self.assertEqual(rabik.run.handoff['title'], 'Cross-multiplying radicals')
+        self.assertEqual(brain.ask.run.handoff['title'], 'Cross-multiplying radicals')
         self.assertEqual(output.count('⤴ '), 1)
 
     def test_long_writing_only_ask_stays_main_before_its_result_mode_arrives(self):
-        move = rabik.MainMove('Write a long draft', Mock(ask=self.root.name, waiting=threading.Event()))
+        move = brain.handoffs.MainMove('Write a long draft', Mock(ask=self.root.name, waiting=threading.Event()))
         self.addCleanup(move.close)
         move.elapsed = 60
-        with patch.object(rabik, 'stop_claude') as stop, contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(brain.clients, 'stop_claude') as stop, contextlib.redirect_stdout(io.StringIO()):
             move.poll()
         self.assertFalse(move.moved)
         stop.assert_not_called()
 
     def test_move_tracking_ignores_malformed_message_frames(self):
-        move = rabik.MainMove('Keep working', Mock(ask=self.root.name, waiting=threading.Event()))
+        move = brain.handoffs.MainMove('Keep working', Mock(ask=self.root.name, waiting=threading.Event()))
         self.addCleanup(move.close)
         move.record({'message': None})
         move.record({'message': {'content': [None, {'type': 'text', 'text': None},
@@ -241,15 +243,15 @@ class FlowTests(unittest.TestCase):
         first.rabik_model = 'sonnet'
         second = Mock(ask=self.root.name, returncode=0, stdin=Mock(), stdout=[json.dumps({
             'type': 'result', 'result': '[draft] Full draft', 'total_cost_usd': 0})])
-        with patch.dict(os.environ, {'RABIK_UI': '1'}), patch.object(rabik, 'start_claude', return_value=second) as start, \
-             patch.object(rabik, 'stop_claude') as stop, patch.object(rabik, 'persist_handoff') as persist, \
-             patch.object(rabik, 'relay'), contextlib.redirect_stdout(io.StringIO()) as output:
-            reply, cost, _ = rabik.run('Context: active guide', first, request='Write the draft', main_only=True)
+        with patch.dict(os.environ, {'RABIK_UI': '1'}), patch.object(brain.clients, 'start_claude', return_value=second) as start, \
+             patch.object(brain.clients, 'stop_claude') as stop, patch.object(brain.handoffs, 'persist_handoff') as persist, \
+             patch.object(brain.interaction, 'relay'), contextlib.redirect_stdout(io.StringIO()) as output:
+            reply, cost, _ = brain.ask.run('Context: active guide', first, request='Write the draft', main_only=True)
         self.assertEqual(reply, '[draft] Full draft')
         self.assertIsNone(cost)
         start.assert_called_once_with('sonnet')
-        self.assertTrue(rabik.run.ok)
-        self.assertIsNone(rabik.run.handoff)
+        self.assertTrue(brain.ask.run.ok)
+        self.assertIsNone(brain.ask.run.handoff)
         self.assertNotIn('⤴', output.getvalue())
         persist.assert_not_called()
         stop.assert_called_once_with(first)
@@ -257,15 +259,15 @@ class FlowTests(unittest.TestCase):
 
     def test_draft_insert_replace_point_and_guide_protocols_disable_even_manual_move(self):
         for block in [{'type': 'text', 'text': marker} for marker in ('[draft] text', '[insert] text', '[replace] text', '[point 0 1 2]')] + [
-                {'type': 'tool_use', 'id': 'draw', 'name': 'Bash', 'input': {'command': rabik.DRAW + ' --help'}}]:
+                {'type': 'tool_use', 'id': 'draw', 'name': 'Bash', 'input': {'command': brain.paths.DRAW + ' --help'}}]:
             with self.subTest(block=block):
                 p = Mock(ask=self.root.name, waiting=threading.Event())
-                move = rabik.MainMove('Main result', p)
+                move = brain.handoffs.MainMove('Main result', p)
                 self.addCleanup(move.close)
                 move.elapsed = 16
                 Path(move.answer).write_text('go')
                 move.record({'message': {'content': [block]}})
-                with patch.object(rabik, 'stop_claude') as stop, contextlib.redirect_stdout(io.StringIO()):
+                with patch.object(brain.clients, 'stop_claude') as stop, contextlib.redirect_stdout(io.StringIO()):
                     move.poll()
                 self.assertFalse(move.moved)
                 stop.assert_not_called()
@@ -277,14 +279,14 @@ class FlowTests(unittest.TestCase):
             row.update(title=title, brief=brief, status=status, summary='Verified summary', result='DUPLICATE RAW RESULT')
             self.manager.rows[row['id']] = row
             self.manager.save(row)
-        unrelated = rabik.agent_context('Explain differential equations')
+        unrelated = brain.agents.agent_context('Explain differential equations')
         self.assertIn('Live task', unrelated)
         self.assertNotIn('Audio report', unrelated)
         self.assertNotIn('Old task', unrelated)
-        matching = rabik.agent_context('What did the microphones comparison find?')
+        matching = brain.agents.agent_context('What did the microphones comparison find?')
         self.assertIn('Audio report', matching)
         self.assertNotIn('DUPLICATE RAW RESULT', matching)
-        self.assertIn('Audio report', rabik.agent_context('Expand that result'))
+        self.assertIn('Audio report', brain.agents.agent_context('Expand that result'))
         context = json.loads((Path(row['directory'])/'context.json').read_text())
         self.assertNotIn('result', context)
 
@@ -293,11 +295,11 @@ class FlowTests(unittest.TestCase):
         row.update(title='Audio report', brief='Compare budget microphones', status='done', summary='Verified summary')
         self.manager.rows[row['id']] = row
         self.manager.save(row)
-        self.assertNotIn('Audio report', rabik.agent_context('Make the table shorter'))
-        context = rabik.agent_context('Make the table shorter', row['id'])
+        self.assertNotIn('Audio report', brain.agents.agent_context('Make the table shorter'))
+        context = brain.agents.agent_context('Make the table shorter', row['id'])
         self.assertIn('Audio report', context)
         self.assertIn(f'done card of task {row["id"]} was on screen', context)
-        self.assertNotIn('was on screen', rabik.agent_context('Make the table shorter', 'f' * 32))
+        self.assertNotIn('was on screen', brain.agents.agent_context('Make the table shorter', 'f' * 32))
 
     def test_a_main_ask_shows_a_tasks_card_read_only_and_learns_of_it_only_with_task_rows(self):
         row = self.manager.new()
@@ -305,23 +307,23 @@ class FlowTests(unittest.TestCase):
                    made=[{'title': 'Desk picks', 'url': 'https://docs.google.com/document/d/x/edit', 'type': ''}])
         self.manager.rows[row['id']] = row
         self.manager.save(row)
-        context = rabik.agent_context('Did the standing desk agent finish?')
+        context = brain.agents.agent_context('Did the standing desk agent finish?')
         self.assertIn('--agent-show <ID>', context)
         self.assertIn('https://docs.google.com/document/d/x/edit', context)   # made things reach the reply as links
-        self.assertNotIn('--agent-show', rabik.agent_context('Explain differential equations'))
+        self.assertNotIn('--agent-show', brain.agents.agent_context('Explain differential equations'))
         ask = Path(self.root.name, 'ask'); ask.mkdir()
         with patch.dict(os.environ, {'RABIK_ASK': str(ask), 'RABIK_UI': '1'}):
-            self.assertIn('No such task', rabik.agent_show('f' * 32))
+            self.assertIn('No such task', brain.agents.agent_show('f' * 32))
             replies = []
-            showing = threading.Thread(target=lambda: replies.append(rabik.agent_show(row['id']))); showing.start()
+            showing = threading.Thread(target=lambda: replies.append(brain.agents.agent_show(row['id']))); showing.start()
             worker = Mock(ask=str(ask)); worker.poll.side_effect = lambda: None if showing.is_alive() else 0
             with patch('sys.stdout', new_callable=io.StringIO) as out:
-                rabik.relay(worker)
+                brain.interaction.relay(worker)
             showing.join()
         self.assertEqual(out.getvalue().splitlines(), ['▤ ' + row['id']])
         self.assertIn('card shows under your reply', replies[0])
-        with patch.object(rabik, 'preview_commands'):
-            allowed, asked = self.gate('Bash', {'command': f'{rabik.ME} --agent-show {row["id"]}'})
+        with patch.object(brain.macos, 'preview_commands'):
+            allowed, asked = self.gate('Bash', {'command': f'{brain.paths.ME} --agent-show {row["id"]}'})
         asked.assert_not_called()   # Safe mode: showing is read-only, no Allow card
         self.assertNotEqual(allowed.get('permissionDecision'), 'deny')
 
@@ -329,6 +331,6 @@ class FlowTests(unittest.TestCase):
     def test_python_selftest_uses_current_settings_rows(self):
         home = Path(self.root.name, 'home'); (home / 'Applications' / 'TradingView.app').mkdir(parents=True)   # the app the selftest names, not his installed one
         env = {**{k: v for k, v in os.environ.items() if not k.startswith('RABIK_')}, 'RABIK_DIR': self.root.name, 'HOME': str(home)}   # earlier tests leave RABIK_* set
-        result = subprocess.run([sys.executable, rabik.ME, '--selftest'], env=env, capture_output=True, text=True)
+        result = subprocess.run([sys.executable, brain.paths.ME, '--selftest'], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('selftest ok', result.stdout)

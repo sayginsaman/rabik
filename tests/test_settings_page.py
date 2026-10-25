@@ -138,7 +138,7 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual(out['result'], [True, True, 'Updates are managed by Nix', 'Run nix profile upgrade or nix run again.', 'Version 1.3.3 · Nix'])
 
     def test_retired_settings_are_hidden_and_keep_saved_values(self):
-        sys.path.insert(0, str(ROOT)); import tests, rabik
+        sys.path.insert(0, str(ROOT)); import tests, brain.interaction
         source, page = (ROOT / 'Rabik.swift').read_text(), (ROOT / 'ui/settings.html').read_text()
         retired = re.findall(r'"(\w+)"', source[source.index('static let retiredKeys'):source.index(']', source.index('static let retiredKeys'))])
         self.assertIn('workIn', retired)
@@ -149,8 +149,8 @@ class SettingsPageTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertIn(f'"{key}":', defaults)   # new users still receive a value
                 self.assertNotIn(f'data-k="{key}"', page)
-                self.assertNotIn(key, rabik.switches())
-                self.assertNotIn(key, rabik.picks())
+                self.assertNotIn(key, brain.interaction.switches())
+                self.assertNotIn(key, brain.interaction.picks())
         self.assertEqual(len(page.split('<nav>')[1].split('</nav>')[0].split('data-s=')) - 1, 9)   # 8 pages and Report feedback
 
     def test_pages_wear_their_sidebar_color_and_row_actions_show_on_focus(self):
@@ -167,12 +167,12 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual((quit_general, quit_account), (True, False))
 
     def test_long_asks_always_move_so_there_is_no_choice(self):
-        sys.path.insert(0, str(ROOT)); import rabik
+        sys.path.insert(0, str(ROOT)); import brain.interaction
         for gone in ('agentsAuto', 'longAsks'):
             self.assertNotIn(gone, (ROOT / 'ui/settings.html').read_text())
-            self.assertNotIn(gone, rabik.switches())
-            self.assertNotIn(gone, rabik.picks())
-        self.assertEqual(rabik.picks()['dictateMode'][1], {'Verbatim': 'verbatim', 'Clean up': 'cleanup'})
+            self.assertNotIn(gone, brain.interaction.switches())
+            self.assertNotIn(gone, brain.interaction.picks())
+        self.assertEqual(brain.interaction.picks()['dictateMode'][1], {'Verbatim': 'verbatim', 'Clean up': 'cleanup'})
 
     def test_scheduled_routines_list_and_remove(self):
         out = self.page("""st.load({prefs:{hotkeyLabel:'⌃⌥Space'},routines:[
@@ -266,17 +266,17 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual(out['result'][2], 0)
 
     def test_state_lists_recent_answers_newest_first(self):
-        sys.path.insert(0, str(ROOT)); import rabik
+        sys.path.insert(0, str(ROOT)); import brain.cli, brain.clients, brain.memory, brain.paths, brain.skills
         rows = [{'at': '2026-10-14 08:00:00', 'task': 'open notes', 'reply': 'Opened Notes', 'usd': 0, 'secs': 1},
                 {'id': '1-1', 'at': '2026-10-15 09:00:00', 'task': 'weather', 'status': 'running', 'pid': os.getpid()},   # a checkpoint with no answer yet
                 {'at': '2026-10-15 09:30:00', 'task': 'weather', 'reply': 'Sunny', 'usd': 0, 'secs': 1}]
         with tempfile.TemporaryDirectory() as root:
             Path(root, 'log.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
-            with patch.object(rabik, 'DIR', root), patch.object(rabik, 'MEMORY', str(Path(root) / 'memory.md')), \
-                 patch.object(rabik, 'SKILLS', str(Path(root) / 'skills.json')), patch.object(rabik, 'plan', return_value={}), \
-                 patch.object(rabik, 'me', return_value={}), patch('sys.argv', ['rabik.py', '--state']), \
+            with patch.object(brain.paths, 'DIR', root), patch.object(brain.paths, 'MEMORY', str(Path(root) / 'memory.md')), \
+                 patch.object(brain.skills, 'SKILLS', str(Path(root) / 'skills.json')), patch.object(brain.clients, 'plan', return_value={}), \
+                 patch.object(brain.memory, 'me', return_value={}), patch('sys.argv', ['rabik.py', '--state']), \
                  contextlib.redirect_stdout(io.StringIO()) as out:
-                rabik.main()
+                brain.cli.main()
         self.assertEqual([(a['task'], a['reply']) for a in json.loads(out.getvalue())['asks']], [('weather', 'Sunny'), ('open notes', 'Opened Notes')])
 
 

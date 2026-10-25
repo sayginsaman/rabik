@@ -1,4 +1,5 @@
 """Dictation routing and delivery with fake model, focus, and selection targets."""
+import threading
 import io
 import json
 from pathlib import Path
@@ -18,10 +19,10 @@ ROOT = Path(__file__).resolve().parents[1]
 class DictationCleanupTests(unittest.TestCase):
     def test_cleanup_chunks_without_truncating_and_uses_cheapest(self):
         sys.path.insert(0, str(ROOT))
-        import rabik
-        with patch.object(rabik, 'relevant_rules', return_value='Spell my name Saarth.'), \
-             patch.object(rabik, 'meeting_call', return_value=('<cleaned>Clean text.</cleaned>', {})) as call:
-            cleaned = rabik.dictate_cleanup('um Clean text. ' + 'x' * 7000)
+        import brain.dictation, brain.meeting, brain.memory, brain.prefs
+        with patch.object(brain.memory, 'relevant_rules', return_value='Spell my name Saarth.'), \
+             patch.object(brain.meeting, 'meeting_call', return_value=('<cleaned>Clean text.</cleaned>', {})) as call:
+            cleaned = brain.dictation.dictate_cleanup('um Clean text. ' + 'x' * 7000)
         self.assertTrue(cleaned.startswith('Clean text. '))
         self.assertNotIn('\n', cleaned)
         self.assertTrue(cleaned.endswith('x' * 1000))
@@ -32,55 +33,55 @@ class DictationCleanupTests(unittest.TestCase):
             self.assertIn('Spell my name Saarth.', args[1])
             self.assertLessEqual(len(args[1]), 7100)
         paragraph = 'a ' * 3000 + '\n\n' + 'b ' * 3000
-        with patch.object(rabik, 'client', return_value='pi'):
-            self.assertEqual(rabik.dictate_cleanup(paragraph), paragraph.replace(' \n\n', '\n\n').strip())
-        with patch.object(rabik, 'meeting_call') as empty:
-            self.assertEqual(rabik.dictate_cleanup('   '), '')
+        with patch.object(brain.prefs, 'client', return_value='pi'):
+            self.assertEqual(brain.dictation.dictate_cleanup(paragraph), paragraph.replace(' \n\n', '\n\n').strip())
+        with patch.object(brain.meeting, 'meeting_call') as empty:
+            self.assertEqual(brain.dictation.dictate_cleanup('   '), '')
             empty.assert_not_called()
 
     def test_cleanup_failure_keeps_all_text_and_removes_fillers_locally(self):
-        import rabik
+        import brain.dictation, brain.meeting, brain.memory, brain.prefs
         source = 'I um need this. ' + ('word ' * 1400) + 'Uh, final words.'
-        with patch.object(rabik, 'client', return_value='claude'), \
-             patch.object(rabik, 'relevant_rules', return_value=''), \
-             patch.object(rabik, 'meeting_call', side_effect=RuntimeError('offline')):
-            cleaned = rabik.dictate_cleanup(source)
+        with patch.object(brain.prefs, 'client', return_value='claude'), \
+             patch.object(brain.memory, 'relevant_rules', return_value=''), \
+             patch.object(brain.meeting, 'meeting_call', side_effect=RuntimeError('offline')):
+            cleaned = brain.dictation.dictate_cleanup(source)
         self.assertIn('final words.', cleaned)
         self.assertNotRegex(cleaned.lower(), r'\b(?:um|uh)\b')
         self.assertGreater(len(cleaned), 6000)
 
     def test_cleanup_accepts_small_grammar_and_saved_spelling_edits(self):
-        import rabik
-        self.assertEqual(rabik.dictate_result('he go to school', '<cleaned>He goes to school.</cleaned>'), 'He goes to school.')
-        with patch.object(rabik, 'relevant_rules', return_value='Spell my name Saarth.'), \
-             patch.object(rabik, 'meeting_call', return_value=('<cleaned>My name is Saarth.</cleaned>', {})):
-            self.assertEqual(rabik.dictate_cleanup('My name is Sarth.'), 'My name is Saarth.')
+        import brain.dictation, brain.meeting, brain.memory
+        self.assertEqual(brain.dictation.dictate_result('he go to school', '<cleaned>He goes to school.</cleaned>'), 'He goes to school.')
+        with patch.object(brain.memory, 'relevant_rules', return_value='Spell my name Saarth.'), \
+             patch.object(brain.meeting, 'meeting_call', return_value=('<cleaned>My name is Saarth.</cleaned>', {})):
+            self.assertEqual(brain.dictation.dictate_cleanup('My name is Sarth.'), 'My name is Saarth.')
 
     def test_hint_scan_is_bounded_at_the_largest_dictionary(self):
-        import rabik
+        import brain.dictation
         words = ['s' + ''.join(chr(98 + i // 26 % 20) + chr(98 + i % 20) for _ in range(4)) for i in range(500)]
         text = ' '.join(f'sapphire{i}' for i in range(400))
         started = time.monotonic()
-        rabik.dictate_hints(text, words)
+        brain.dictation.dictate_hints(text, words)
         self.assertLess(time.monotonic() - started, .25)
 
     def test_cleanup_rejects_scattered_extracts_but_keeps_one_restart(self):
-        import rabik
+        import brain.dictation
         source = 'We should send the complete release report to everyone on the team before lunch today.'
         extract = '<cleaned>Send the report to the team.</cleaned>'
-        self.assertEqual(rabik.dictate_result(source, extract), source)
-        self.assertEqual(rabik.dictate_result(source, '<cleaned>Send the report to the team today.</cleaned>'), source)
+        self.assertEqual(brain.dictation.dictate_result(source, extract), source)
+        self.assertEqual(brain.dictation.dictate_result(source, '<cleaned>Send the report to the team today.</cleaned>'), source)
         retries = 'So, yeah, could you release it by this window? Um, Can you read you see by this Wednesday? We know, um, this Friday, actually. Um, and then we can get working on deployment.'
         fixed = 'Could you release it by this Friday? And then we can get working on deployment.'
-        self.assertEqual(rabik.dictate_result(retries, f'<cleaned>{fixed}</cleaned>'), fixed)
+        self.assertEqual(brain.dictation.dictate_result(retries, f'<cleaned>{fixed}</cleaned>'), fixed)
         long = 'I tested the build this morning. It crashed twice when I opened settings, and the logs show a nil window. I want it fixed before Friday.'
-        self.assertEqual(rabik.dictate_result(long, '<cleaned>I tested the build this morning. I want it fixed before Friday.</cleaned>'), long)
+        self.assertEqual(brain.dictation.dictate_result(long, '<cleaned>I tested the build this morning. I want it fixed before Friday.</cleaned>'), long)
         restart = 'Book the table for six, scratch that, book it for eight.'
-        self.assertEqual(rabik.dictate_result(restart, '<cleaned>Book the table for eight.</cleaned>'),
+        self.assertEqual(brain.dictation.dictate_result(restart, '<cleaned>Book the table for eight.</cleaned>'),
                          'Book the table for eight.')
 
     def test_warmed_cleanup_ignores_malformed_stream_frames(self):
-        import rabik
+        import brain.dictation
         result = json.dumps({'type': 'result', 'result': '<cleaned>I need this.</cleaned>'})
         process = type('Process', (), {
             'stdin': io.StringIO(),
@@ -88,35 +89,35 @@ class DictationCleanupTests(unittest.TestCase):
                             '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"text":null}}}\n',
                             result + '\n'])
         })()
-        self.assertEqual(rabik.dictate_warmed(process, 'I um need this.', ''), 'I need this.')
+        self.assertEqual(brain.dictation.dictate_warmed(process, 'I um need this.', ''), 'I need this.')
 
     def test_non_claude_cleanup_falls_back_without_starting_claude(self):
-        import rabik
-        with patch.object(rabik, 'client', return_value='pi'), patch.object(rabik, 'meeting_call') as call:
-            self.assertEqual(rabik.dictate_cleanup('Um, keep every word.'), 'keep every word.')
+        import brain.dictation, brain.meeting, brain.prefs
+        with patch.object(brain.prefs, 'client', return_value='pi'), patch.object(brain.meeting, 'meeting_call') as call:
+            self.assertEqual(brain.dictation.dictate_cleanup('Um, keep every word.'), 'keep every word.')
         call.assert_not_called()
-        with patch.object(rabik, 'client', return_value='pi'), patch.object(rabik, 'meeting_process') as process, \
+        with patch.object(brain.prefs, 'client', return_value='pi'), patch.object(brain.meeting, 'meeting_process') as process, \
              patch('sys.stdin', io.StringIO('Um, keep every word.')), patch('sys.stdout', new_callable=io.StringIO) as out:
-            rabik.dictate_cleanup_wait()
+            brain.dictation.dictate_cleanup_wait()
         process.assert_not_called()
         self.assertEqual(out.getvalue(), 'keep every word.\n')
 
     def test_short_dictation_skips_ai_and_cursor_text_reaches_cleanup(self):
-        import rabik
-        with patch.object(rabik, 'client', return_value='claude'), patch.object(rabik, 'meeting_call') as call:
-            self.assertEqual(rabik.dictate_cleanup('Um, okay'), 'okay')
+        import brain.clients, brain.dictation, brain.meeting, brain.memory, brain.prefs
+        with patch.object(brain.prefs, 'client', return_value='claude'), patch.object(brain.meeting, 'meeting_call') as call:
+            self.assertEqual(brain.dictation.dictate_cleanup('Um, okay'), 'okay')
         call.assert_not_called()
-        with patch.object(rabik, 'client', return_value='claude'), patch.object(rabik, 'meeting_process'), \
-             patch.object(rabik, 'stop_claude'), patch.object(rabik, 'dictate_warmed') as warmed, \
+        with patch.object(brain.prefs, 'client', return_value='claude'), patch.object(brain.meeting, 'meeting_process'), \
+             patch.object(brain.clients, 'stop_claude'), patch.object(brain.dictation, 'dictate_warmed') as warmed, \
              patch('sys.stdin', io.StringIO('Notes from Saarth\0uh I')), patch('sys.stdout', new_callable=io.StringIO) as out:
-            rabik.dictate_cleanup_wait()
+            brain.dictation.dictate_cleanup_wait()
         warmed.assert_not_called()
         self.assertEqual(out.getvalue(), 'I\n')
-        with patch.object(rabik, 'client', return_value='claude'), patch.object(rabik, 'meeting_process'), \
-             patch.object(rabik, 'stop_claude'), patch.object(rabik, 'relevant_rules', return_value=''), \
-             patch.object(rabik, 'dictate_warmed', return_value='Tell Saarth hi.') as warmed, \
+        with patch.object(brain.prefs, 'client', return_value='claude'), patch.object(brain.meeting, 'meeting_process'), \
+             patch.object(brain.clients, 'stop_claude'), patch.object(brain.memory, 'relevant_rules', return_value=''), \
+             patch.object(brain.dictation, 'dictate_warmed', return_value='Tell Saarth hi.') as warmed, \
              patch('sys.stdin', io.StringIO('Notes from Saarth\0tell sarth hi')), patch('sys.stdout', new_callable=io.StringIO) as out:
-            rabik.dictate_cleanup_wait()
+            brain.dictation.dictate_cleanup_wait()
         self.assertEqual(out.getvalue(), 'Tell Saarth hi.\n')
         _, text, corrections, hints = warmed.call_args.args
         self.assertEqual(text, 'tell sarth hi')
@@ -124,16 +125,16 @@ class DictationCleanupTests(unittest.TestCase):
         self.assertEqual(hints, {})
 
     def test_cleanup_start_failure_still_returns_local_cleanup(self):
-        import rabik
-        with patch.object(rabik, 'client', return_value='claude'), \
-             patch.object(rabik, 'meeting_process', side_effect=OSError('missing')), \
+        import brain.dictation, brain.meeting, brain.prefs
+        with patch.object(brain.prefs, 'client', return_value='claude'), \
+             patch.object(brain.meeting, 'meeting_process', side_effect=OSError('missing')), \
              patch('sys.stdin', io.StringIO('I um need uh every word.')), \
              patch('sys.stdout', new_callable=io.StringIO) as out:
-            rabik.dictate_cleanup_wait()
+            brain.dictation.dictate_cleanup_wait()
         self.assertEqual(out.getvalue(), 'I need every word.\n')
 
     def test_warmed_cleanup_deadline_starts_before_hint_work(self):
-        import rabik
+        import brain.clients, brain.dictation, brain.meeting, brain.prefs
         started = []
         class Timer:
             daemon = False
@@ -143,11 +144,11 @@ class DictationCleanupTests(unittest.TestCase):
         def hints(*_):
             self.assertTrue(started)
             return {}
-        with patch.object(rabik, 'client', return_value='claude'), patch.object(rabik, 'meeting_process'), \
-             patch.object(rabik, 'stop_claude'), patch.object(rabik.threading, 'Timer', Timer), \
-             patch.object(rabik, 'dictate_hints', side_effect=hints), patch.object(rabik, 'dictate_warmed', return_value='Keep every word.'), \
+        with patch.object(brain.prefs, 'client', return_value='claude'), patch.object(brain.meeting, 'meeting_process'), \
+             patch.object(brain.clients, 'stop_claude'), patch.object(threading, 'Timer', Timer), \
+             patch.object(brain.dictation, 'dictate_hints', side_effect=hints), patch.object(brain.dictation, 'dictate_warmed', return_value='Keep every word.'), \
              patch('sys.stdin', io.StringIO('keep every word')), patch('sys.stdout', new_callable=io.StringIO) as out:
-            rabik.dictate_cleanup_wait()
+            brain.dictation.dictate_cleanup_wait()
         self.assertEqual(out.getvalue(), 'Keep every word.\n')
 
 

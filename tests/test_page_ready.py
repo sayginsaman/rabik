@@ -10,8 +10,10 @@ import unittest
 from unittest.mock import Mock,patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import select
+import time
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
-import rabik
+import brain.apps, brain.handoffs, brain.hands, brain.interaction, brain.labels, brain.macos, brain.paths, brain.prefs, brain.web
 
 
 class PageReadyTests(unittest.TestCase):
@@ -20,10 +22,10 @@ class PageReadyTests(unittest.TestCase):
             with self.subTest(adapter=adapter), tempfile.TemporaryDirectory() as scratch:
                 Path(scratch, 'background-page.json').write_text(json.dumps(
                     {'app': 'Browser Fixture', 'adapter': adapter, 'window': 10, 'tab': 2, 'url': 'https://old.invalid/'}))
-                with patch.object(rabik, 'DIR', scratch), patch.dict(os.environ, {'RABIK_ASK': scratch}), \
-                     patch.object(rabik, 'browser_adapter', return_value=adapter), \
-                     patch.object(rabik.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '', '')) as run:
-                    self.assertTrue(rabik.background_tab('https://new.invalid/', 'Browser Fixture'))
+                with patch.object(brain.paths, 'DIR', scratch), patch.dict(os.environ, {'RABIK_ASK': scratch}), \
+                     patch.object(brain.web, 'browser_adapter', return_value=adapter), \
+                     patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '', '')) as run:
+                    self.assertTrue(brain.web.background_tab('https://new.invalid/', 'Browser Fixture'))
                 self.assertIn(target, run.call_args.args[0][2])
                 self.assertIn('Rabik page changed', run.call_args.args[0][2])
                 self.assertEqual(run.call_args.args[0][-2:], ['https://old.invalid/', 'https://new.invalid/'])
@@ -36,18 +38,18 @@ class PageReadyTests(unittest.TestCase):
             Path(scratch, 'background-page.json').write_text(json.dumps(
                 {'app': 'Browser Fixture', 'adapter': 'chromium', 'window': 10, 'tab': 2, 'url': 'https://old.invalid/'}))
             refused = subprocess.CompletedProcess([], 1, '', 'Rabik page changed')
-            with patch.object(rabik, 'DIR', scratch), patch.dict(os.environ, {'RABIK_ASK': scratch}), \
-                 patch.object(rabik, 'browser_adapter', return_value='chromium'), patch.object(rabik.subprocess, 'run', return_value=refused):
-                self.assertFalse(rabik.background_tab('https://new.invalid/', 'Browser Fixture'))
+            with patch.object(brain.paths, 'DIR', scratch), patch.dict(os.environ, {'RABIK_ASK': scratch}), \
+                 patch.object(brain.web, 'browser_adapter', return_value='chromium'), patch.object(subprocess, 'run', return_value=refused):
+                self.assertFalse(brain.web.background_tab('https://new.invalid/', 'Browser Fixture'))
             self.assertFalse(Path(scratch, 'web.json').exists())
 
     def test_background_show_navigates_the_dedicated_tab_without_opening_another(self):
         handler = subprocess.CompletedProcess([], 0, 'Browser Fixture\n', '')
-        with patch.dict(os.environ, {'RABIK_FOCUS_GUARD': '1'}), patch.object(rabik.subprocess, 'run', return_value=handler) as run, \
-             patch.object(rabik, 'background_tab', return_value=True), patch.object(rabik, 'remember_background_tab') as remember, \
-             patch.object(rabik, 'web', return_value='Page ready.') as web:
-            self.assertEqual(rabik.show('https://fixture.invalid', bg=True), 'opened https://fixture.invalid in the background')
-        self.assertEqual(run.call_args_list, [unittest.mock.call([rabik.APP, '--target-app', 'https://fixture.invalid'], capture_output=True, text=True, timeout=1)])
+        with patch.dict(os.environ, {'RABIK_FOCUS_GUARD': '1'}), patch.object(subprocess, 'run', return_value=handler) as run, \
+             patch.object(brain.web, 'background_tab', return_value=True), patch.object(brain.web, 'remember_background_tab') as remember, \
+             patch.object(brain.web, 'web', return_value='Page ready.') as web:
+            self.assertEqual(brain.web.show('https://fixture.invalid', bg=True), 'opened https://fixture.invalid in the background')
+        self.assertEqual(run.call_args_list, [unittest.mock.call([brain.paths.APP, '--target-app', 'https://fixture.invalid'], capture_output=True, text=True, timeout=1)])
         web.assert_called_once_with('wait', text='https://fixture.invalid', app='Browser Fixture')
         remember.assert_called_once_with('Browser Fixture')
 
@@ -59,18 +61,18 @@ class PageReadyTests(unittest.TestCase):
                 if script.startswith('id of application'): return subprocess.CompletedProcess(args, 0, 'org.fixture.nebula\n', '')
                 if 'return (id of window' in script: return subprocess.CompletedProcess(args, 0, '10\t2', '')
                 return subprocess.CompletedProcess(args, 0, '{"ready":true,"signature":"fixture"}', '')
-            with patch.object(rabik, 'DIR', scratch), patch.object(rabik.subprocess, 'run', side_effect=worker) as run:
-                self.assertEqual(rabik.browser_adapter('Nebula'), 'chromium')
+            with patch.object(brain.paths, 'DIR', scratch), patch.object(subprocess, 'run', side_effect=worker) as run:
+                self.assertEqual(brain.web.browser_adapter('Nebula'), 'chromium')
                 calls = run.call_count
-                self.assertEqual(rabik.browser_adapter('Nebula'), 'chromium')
+                self.assertEqual(brain.web.browser_adapter('Nebula'), 'chromium')
             self.assertEqual(run.call_count, calls + 2)   # running + bundle-id lookup only; no protocol probe
             cache = json.loads(Path(scratch, 'web-capabilities.json').read_text())
             self.assertEqual(cache['org.fixture.nebula'], 'chromium')
 
     def test_adapter_never_events_a_stopped_app_or_caches_permission_denials(self):
         with tempfile.TemporaryDirectory() as scratch:
-            with patch.object(rabik, 'DIR', scratch), patch.object(rabik.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, '', '')) as run:
-                self.assertEqual(rabik.browser_adapter('Stopped Fixture'), '')
+            with patch.object(brain.paths, 'DIR', scratch), patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, '', '')) as run:
+                self.assertEqual(brain.web.browser_adapter('Stopped Fixture'), '')
             self.assertEqual(run.call_args.args[0], ['pgrep', '-xq', 'Stopped Fixture'])
             self.assertFalse(Path(scratch, 'web-capabilities.json').exists())
 
@@ -81,10 +83,10 @@ class PageReadyTests(unittest.TestCase):
                 if script.startswith('id of application'): return subprocess.CompletedProcess(args, 0, 'org.fixture.native\n', '')
                 if 'return (id of window' in script: return subprocess.CompletedProcess(args, 0, '10\t2', '')
                 return subprocess.CompletedProcess(args, 1, '', 'Not allowed to send Apple events')
-            with patch.object(rabik, 'DIR', scratch), patch.object(rabik.subprocess, 'run', side_effect=worker):
-                self.assertEqual(rabik.browser_adapter('Native Fixture'), '')
+            with patch.object(brain.paths, 'DIR', scratch), patch.object(subprocess, 'run', side_effect=worker):
+                self.assertEqual(brain.web.browser_adapter('Native Fixture'), '')
                 count = len(probes)
-                self.assertEqual(rabik.browser_adapter('Native Fixture'), '')
+                self.assertEqual(brain.web.browser_adapter('Native Fixture'), '')
             self.assertGreater(len(probes), count + 1)
             self.assertFalse(Path(scratch, 'web-capabilities.json').exists())
 
@@ -96,8 +98,8 @@ class PageReadyTests(unittest.TestCase):
                 if script.startswith('id of application'): return subprocess.CompletedProcess(args, 0, 'org.fixture.browser\n', '')
                 if 'return (id of window' in script: return subprocess.CompletedProcess(args, 0, '10\t2', '')
                 return subprocess.CompletedProcess(args, 1, '', 'You must enable Allow JavaScript from Apple Events')
-            with patch.object(rabik, 'DIR', scratch), patch.object(rabik.subprocess, 'run', side_effect=worker):
-                self.assertEqual(rabik.browser_adapter('Browser Fixture'), 'chromium')
+            with patch.object(brain.paths, 'DIR', scratch), patch.object(subprocess, 'run', side_effect=worker):
+                self.assertEqual(brain.web.browser_adapter('Browser Fixture'), 'chromium')
 
     def test_window_query_permission_denial_is_retried_later(self):
         with tempfile.TemporaryDirectory() as scratch:
@@ -105,53 +107,53 @@ class PageReadyTests(unittest.TestCase):
                 if args[:2] == ['pgrep', '-xq']: return subprocess.CompletedProcess(args, 0, '', '')
                 if args[2].startswith('id of application'): return subprocess.CompletedProcess(args, 0, 'org.fixture.browser\n', '')
                 return subprocess.CompletedProcess(args, 1, '', 'Not authorized to send Apple events')
-            with patch.object(rabik, 'DIR', scratch), patch.object(rabik.subprocess, 'run', side_effect=worker) as run:
-                self.assertEqual(rabik.browser_adapter('Browser Fixture'), '')
+            with patch.object(brain.paths, 'DIR', scratch), patch.object(subprocess, 'run', side_effect=worker) as run:
+                self.assertEqual(brain.web.browser_adapter('Browser Fixture'), '')
                 first = run.call_count
-                self.assertEqual(rabik.browser_adapter('Browser Fixture'), '')
+                self.assertEqual(brain.web.browser_adapter('Browser Fixture'), '')
             self.assertGreater(run.call_count, first + 2)
             self.assertFalse(Path(scratch, 'web-capabilities.json').exists())
 
     def test_label_hides_flags_query_and_chained_commands(self):
-        for tail in ('', ' && sleep 3 && '+rabik.WEB+' read', '; '+rabik.WEB+' read'):
-            self.assertEqual(rabik.label('Bash',{'command':rabik.SHOW+' --bg "https://www.amazon.com/s?k=epsom+salt"'+tail}),'Opening amazon.com')
-        self.assertEqual(rabik.label('Bash',{'command':rabik.SHOW+' --bg "/tmp/Fixture Notes.md" && echo ok'}),'Opening Fixture Notes.md')
+        for tail in ('', ' && sleep 3 && '+brain.paths.WEB+' read', '; '+brain.paths.WEB+' read'):
+            self.assertEqual(brain.labels.label('Bash',{'command':brain.paths.SHOW+' --bg "https://www.amazon.com/s?k=epsom+salt"'+tail}),'Opening amazon.com')
+        self.assertEqual(brain.labels.label('Bash',{'command':brain.paths.SHOW+' --bg "/tmp/Fixture Notes.md" && echo ok'}),'Opening Fixture Notes.md')
         # real log chains: the label names this command's target, never a later helper or its quoted words
-        self.assertEqual(rabik.label('Bash',{'command':f'A={shlex.quote(rabik.ME)}; $A --front Orca && $A --hands click "rabik"'}),'Bringing Orca forward')
-        self.assertEqual(rabik.label('Bash',{'command':'open -g -a Spotify && '+shlex.quote(rabik.ME)+' --queue "violet"'}),'Opening Spotify')
-        self.assertEqual(rabik.label('Bash',{'command':'open "x-apple.systempreferences:sound" && '+rabik.HANDS+' see "System Settings"'}),'Opening x-apple.systempreferences:sound')
+        self.assertEqual(brain.labels.label('Bash',{'command':f'A={shlex.quote(brain.paths.ME)}; $A --front Orca && $A --hands click "rabik"'}),'Bringing Orca forward')
+        self.assertEqual(brain.labels.label('Bash',{'command':'open -g -a Spotify && '+shlex.quote(brain.paths.ME)+' --queue "violet"'}),'Opening Spotify')
+        self.assertEqual(brain.labels.label('Bash',{'command':'open "x-apple.systempreferences:sound" && '+brain.paths.HANDS+' see "System Settings"'}),'Opening x-apple.systempreferences:sound')
 
     def test_poll_waits_for_ready_and_stable_dom_with_a_five_second_cap(self):
         now=[0];seen=[]
         def sleep(seconds): now[0]+=seconds
         def read(timeout):
             seen.append(timeout);return json.dumps({'ready':now[0]>=.2,'signature':'loaded' if now[0]>=.3 else 'old'})
-        with patch.object(rabik.time,'monotonic',side_effect=lambda:now[0]),patch.object(rabik.time,'sleep',side_effect=sleep):
-            self.assertTrue(rabik.page_ready(read));self.assertLess(now[0],.7);self.assertGreaterEqual(now[0],.5)
-            now[0]=0;self.assertFalse(rabik.page_ready(lambda timeout:json.dumps({'ready':False})));self.assertLessEqual(now[0],5.01)
+        with patch.object(time,'monotonic',side_effect=lambda:now[0]),patch.object(time,'sleep',side_effect=sleep):
+            self.assertTrue(brain.web.page_ready(read));self.assertLess(now[0],.7);self.assertGreaterEqual(now[0],.5)
+            now[0]=0;self.assertFalse(brain.web.page_ready(lambda timeout:json.dumps({'ready':False})));self.assertLessEqual(now[0],5.01)
         self.assertTrue(all(0<timeout<=.5 for timeout in seen))
 
     def test_an_already_loaded_other_tab_is_not_ready(self):
         now=[0]
         def sleep(seconds): now[0]+=seconds
         def read(timeout): return json.dumps({'ready':True,'signature':('https://mail.google.com/x|1' if now[0]<1 else 'https://www.amazon.com/s?k=x|2')})
-        with patch.object(rabik.time,'monotonic',side_effect=lambda:now[0]),patch.object(rabik.time,'sleep',side_effect=sleep):
-            self.assertTrue(rabik.page_ready(read,'https://amazon.com/s?k=x'));self.assertGreaterEqual(now[0],1)   # Gmail was loaded, but Amazon is what we opened
+        with patch.object(time,'monotonic',side_effect=lambda:now[0]),patch.object(time,'sleep',side_effect=sleep):
+            self.assertTrue(brain.web.page_ready(read,'https://amazon.com/s?k=x'));self.assertGreaterEqual(now[0],1)   # Gmail was loaded, but Amazon is what we opened
 
     def test_permission_error_is_not_hidden_by_polling(self):
-        with patch.object(rabik.time,'sleep') as sleep:
-            with self.assertRaisesRegex(RuntimeError,'blocks this'):rabik.page_ready(Mock(side_effect=RuntimeError('Browser blocks this. Enable JavaScript.')))
+        with patch.object(time,'sleep') as sleep:
+            with self.assertRaisesRegex(RuntimeError,'blocks this'):brain.web.page_ready(Mock(side_effect=RuntimeError('Browser blocks this. Enable JavaScript.')))
             sleep.assert_not_called()
 
     def test_background_url_waits_in_its_handler_browser(self):
-        with patch.dict(os.environ,{'RABIK_FOCUS_GUARD':'1'}),patch.object(rabik.subprocess,'run',return_value=Mock(returncode=0)),patch.object(rabik,'preview_app',return_value={'app':'Safari'}),patch.object(rabik,'web',return_value='Page ready.') as web:
-            self.assertEqual(rabik.show('https://fixture.invalid',bg=True),'opened https://fixture.invalid in the background')
+        with patch.dict(os.environ,{'RABIK_FOCUS_GUARD':'1'}),patch.object(subprocess,'run',return_value=Mock(returncode=0)),patch.object(brain.macos,'preview_app',return_value={'app':'Safari'}),patch.object(brain.web,'web',return_value='Page ready.') as web:
+            self.assertEqual(brain.web.show('https://fixture.invalid',bg=True),'opened https://fixture.invalid in the background')
         web.assert_called_once_with('wait',text='https://fixture.invalid',app='Safari',fresh=True)
 
     def test_read_after_open_keeps_the_handler_browser_instead_of_another_running_browser(self):
-        with tempfile.TemporaryDirectory() as scratch,patch.dict(os.environ,{'RABIK_ASK':scratch,'RABIK_FRONT':'Google Chrome'}),patch.object(rabik,'browser_adapter',return_value='webkit'),patch.object(rabik,'page_ready',return_value=True),patch.object(rabik,'preview_app',return_value=None),patch.object(rabik,'hands_map',return_value=None),patch.object(rabik.subprocess,'run',side_effect=lambda args,**kw:subprocess.CompletedProcess([],0,'10\t2' if 'return (id of window' in args[2] else 'Fixture, 0, 0, 300, 200' if 'get {name, bounds}' in args[2] else 'Fixture page','')) as run:
-            self.assertEqual(rabik.web('wait',app='Safari',fresh=True),'Page ready.')
-            self.assertEqual(rabik.web('read'),'Fixture page')
+        with tempfile.TemporaryDirectory() as scratch,patch.dict(os.environ,{'RABIK_ASK':scratch,'RABIK_FRONT':'Google Chrome'}),patch.object(brain.web,'browser_adapter',return_value='webkit'),patch.object(brain.web,'page_ready',return_value=True),patch.object(brain.macos,'preview_app',return_value=None),patch.object(brain.hands,'hands_map',return_value=None),patch.object(subprocess,'run',side_effect=lambda args,**kw:subprocess.CompletedProcess([],0,'10\t2' if 'return (id of window' in args[2] else 'Fixture, 0, 0, 300, 200' if 'get {name, bounds}' in args[2] else 'Fixture page','')) as run:
+            self.assertEqual(brain.web.web('wait',app='Safari',fresh=True),'Page ready.')
+            self.assertEqual(brain.web.web('read'),'Fixture page')
             self.assertIn('in tab 2 of window id 10',run.call_args.args[0][2])
             self.assertNotIn('front document',run.call_args.args[0][2])
             self.assertEqual(sum('return (id of window' in c.args[0][2] for c in run.call_args_list),1)
@@ -164,14 +166,14 @@ class PageReadyTests(unittest.TestCase):
             def browser(args,**kwargs):
                 return subprocess.CompletedProcess(args,0,'Work, 10, 20, 610, 420' if 'get {name, bounds}' in args[2] else 'Fixture page','')
             with patch.dict(os.environ,{'RABIK_ASK':scratch,'RABIK_AGENT':'agent','RABIK_HANDS_STATE':str(Path(scratch,'hands.json'))}), \
-                 patch.object(rabik,'browser_adapter',return_value='webkit'),patch.object(rabik,'preview_app',return_value=target), \
-                 patch.object(rabik.subprocess,'run',side_effect=browser),patch.object(rabik.subprocess,'Popen',return_value=process) as popen:
-                self.assertEqual(rabik.web('read'),'Fixture page')
+                 patch.object(brain.web,'browser_adapter',return_value='webkit'),patch.object(brain.macos,'preview_app',return_value=target), \
+                 patch.object(subprocess,'run',side_effect=browser),patch.object(subprocess,'Popen',return_value=process) as popen:
+                self.assertEqual(brain.web.web('read'),'Fixture page')
             self.assertEqual(popen.call_args.kwargs['env']['RABIK_HANDS_WINDOW'],'77')
             Path(scratch,'hands.json').write_text(json.dumps(target))
             with patch.dict(os.environ,{'RABIK_AGENT':'agent','RABIK_HANDS_STATE':str(Path(scratch,'hands.json'))}), \
-                 patch.object(rabik.subprocess,'run',return_value=subprocess.CompletedProcess([],0,json.dumps(target),'')) as run:
-                rabik.preview_app('Browser Fixture')
+                 patch.object(subprocess,'run',return_value=subprocess.CompletedProcess([],0,json.dumps(target),'')) as run:
+                brain.macos.preview_app('Browser Fixture')
             self.assertEqual(json.loads(run.call_args.args[0][-1]),target['windowFrame'])
 
     def test_agent_hands_stay_in_the_tasks_own_browser_window_or_fail(self):
@@ -184,13 +186,13 @@ class PageReadyTests(unittest.TestCase):
                     self.assertIn('window id 5',args[2]);return subprocess.CompletedProcess(args,0,'10, 20, 610, 420\n','')
                 self.assertEqual(json.loads(args[-1]),[10,20,600,400]);return subprocess.CompletedProcess(args,0,json.dumps({'windowID':'88'}),'')
             env={'RABIK_ASK':scratch,'RABIK_AGENT':'agent','RABIK_HANDS_STATE':str(Path(scratch,'hands.json'))}
-            with patch.dict(os.environ,env),patch.object(rabik.subprocess,'run',side_effect=native),patch.object(rabik.subprocess,'Popen',return_value=process) as popen, \
-                 patch.object(rabik.select,'select',return_value=([1],[],[])):
-                rabik.hands_call(['see','Browser Fixture']);rabik.hands_action(['click','Search'],lambda target:True)
+            with patch.dict(os.environ,env),patch.object(subprocess,'run',side_effect=native),patch.object(subprocess,'Popen',return_value=process) as popen, \
+                 patch.object(select,'select',return_value=([1],[],[])):
+                brain.hands.hands_call(['see','Browser Fixture']);brain.hands.hands_action(['click','Search'],lambda target:True)
             self.assertEqual([c.kwargs['env']['RABIK_HANDS_WINDOW'] for c in popen.call_args_list],['88','88'])
-            with patch.dict(os.environ,env),patch.object(rabik.subprocess,'run',return_value=subprocess.CompletedProcess([],1,'','no such window')),patch.object(rabik.subprocess,'Popen') as popen:
-                self.assertEqual(rabik.hands_call(['see','Browser Fixture']).stdout,rabik.GONE)
-                self.assertEqual(rabik.hands_action(['click','Search'],lambda target:True)[1].stdout,rabik.GONE)
+            with patch.dict(os.environ,env),patch.object(subprocess,'run',return_value=subprocess.CompletedProcess([],1,'','no such window')),patch.object(subprocess,'Popen') as popen:
+                self.assertEqual(brain.hands.hands_call(['see','Browser Fixture']).stdout,brain.hands.GONE)
+                self.assertEqual(brain.hands.hands_action(['click','Search'],lambda target:True)[1].stdout,brain.hands.GONE)
             popen.assert_not_called()
 
     def test_agent_look_maps_afresh_after_its_last_window_closed_and_other_apps_are_unpinned(self):
@@ -200,56 +202,56 @@ class PageReadyTests(unittest.TestCase):
                 p=Mock(returncode=code,args=[]);p.communicate.return_value=(out,'');p.poll.return_value=code;return p
             env={'RABIK_ASK':scratch,'RABIK_AGENT':'agent','RABIK_HANDS_STATE':str(Path(scratch,'hands.json'))}
             closed="This task's Notes window closed or changed. Nothing was done; run see again."
-            with patch.dict(os.environ,env),patch.object(rabik.subprocess,'Popen',side_effect=[process(1,closed),process(0,'App: Notes'),process(0,'App: Safari'),process(1,closed)]) as popen:
-                self.assertEqual(rabik.hands_call(['see','Notes']).stdout,'App: Notes')
-                self.assertEqual(rabik.hands_call(['see','Safari']).stdout,'App: Safari')
-                self.assertEqual(rabik.hands_call(['click','Done']).stdout,closed)   # an action never drifts to another window
+            with patch.dict(os.environ,env),patch.object(subprocess,'Popen',side_effect=[process(1,closed),process(0,'App: Notes'),process(0,'App: Safari'),process(1,closed)]) as popen:
+                self.assertEqual(brain.hands.hands_call(['see','Notes']).stdout,'App: Notes')
+                self.assertEqual(brain.hands.hands_call(['see','Safari']).stdout,'App: Safari')
+                self.assertEqual(brain.hands.hands_call(['click','Done']).stdout,closed)   # an action never drifts to another window
             pins=[c.kwargs['env'].get('RABIK_HANDS_WINDOW') for c in popen.call_args_list]
             self.assertEqual(pins,['31',None,None,'31'])
 
     def test_agent_page_actions_stay_out_of_the_users_window(self):
         with tempfile.TemporaryDirectory() as scratch:
             Path(scratch,'web.json').write_text(json.dumps({'app':'Browser Fixture','adapter':'webkit','window':10,'tab':2,'target':None}))
-            with patch.dict(os.environ,{'RABIK_ASK':scratch,'RABIK_AGENT':'agent'}),patch.object(rabik,'browser_adapter',return_value='webkit'), \
-                 patch.object(rabik.subprocess,'run') as run:
+            with patch.dict(os.environ,{'RABIK_ASK':scratch,'RABIK_AGENT':'agent'}),patch.object(brain.web,'browser_adapter',return_value='webkit'), \
+                 patch.object(subprocess,'run') as run:
                 for cmd in ('click','fill','type-after'):
-                    self.assertIn("user's own window",rabik.web(cmd,'1','text'))
+                    self.assertIn("user's own window",brain.web.web(cmd,'1','text'))
             run.assert_not_called()
 
     def test_work_page_reuses_the_asks_page_else_finds_the_tab_or_window(self):
         with tempfile.TemporaryDirectory() as scratch:
-            self.assertEqual(rabik.work_page(ask=scratch),{})   # nothing used, nothing named: no page
+            self.assertEqual(brain.web.work_page(ask=scratch),{})   # nothing used, nothing named: no page
             Path(scratch,'web.json').write_text(json.dumps({'app':'Browser Fixture','adapter':'webkit','window':4,'tab':2,'target':{'x':1}}))
             used={'app':'Browser Fixture','adapter':'webkit','window':4,'tab':2,'title':'Form','url':'https://form.fixture.test/'}
-            with patch.object(rabik,'osa',return_value='4\t2\tForm\thttps://form.fixture.test/') as osa,patch.object(rabik,'browser_adapter') as probe:
-                self.assertEqual(rabik.work_page(ask=scratch),used)   # its URL too: the agent may act only while the tab stays on that site
-                self.assertEqual(rabik.work_page('Browser Fixture',ask=scratch),used)
+            with patch.object(brain.macos,'osa',return_value='4\t2\tForm\thttps://form.fixture.test/') as osa,patch.object(brain.web,'browser_adapter') as probe:
+                self.assertEqual(brain.web.work_page(ask=scratch),used)   # its URL too: the agent may act only while the tab stays on that site
+                self.assertEqual(brain.web.work_page('Browser Fixture',ask=scratch),used)
             probe.assert_not_called();self.assertEqual(osa.call_args.args[1:],('','4','2'));self.assertIn('tab ((item 3 of argv) as integer) of w',osa.call_args.args[0])
-            with patch.object(rabik,'osa',return_value=''):
-                self.assertEqual(rabik.work_page(ask=scratch),{'app':'Browser Fixture'})   # its tab closed: no page, never the front tab
-            with patch.object(rabik,'browser_adapter',return_value='webkit'),patch.object(rabik,'osa',return_value='4\t3\tInbox\thttps://mail.fixture.test/') as osa:
-                self.assertEqual(rabik.work_page('Browser Fixture','Inbox',scratch)['tab'],3)
+            with patch.object(brain.macos,'osa',return_value=''):
+                self.assertEqual(brain.web.work_page(ask=scratch),{'app':'Browser Fixture'})   # its tab closed: no page, never the front tab
+            with patch.object(brain.web,'browser_adapter',return_value='webkit'),patch.object(brain.macos,'osa',return_value='4\t3\tInbox\thttps://mail.fixture.test/') as osa:
+                self.assertEqual(brain.web.work_page('Browser Fixture','Inbox',scratch)['tab'],3)
             self.assertIn('current tab of w',osa.call_args.args[0]);self.assertIn('index of t',osa.call_args.args[0])
-            with patch.object(rabik,'browser_adapter',return_value=''),patch.object(rabik,'proc_of',side_effect=lambda app:app), \
-                 patch.object(rabik,'osa',return_value='Re: Lunch') as osa:
-                self.assertEqual(rabik.work_page('Mail Fixture',ask=scratch),{'app':'Mail Fixture','title':'Re: Lunch'})
+            with patch.object(brain.web,'browser_adapter',return_value=''),patch.object(brain.apps,'proc_of',side_effect=lambda app:app), \
+                 patch.object(brain.macos,'osa',return_value='Re: Lunch') as osa:
+                self.assertEqual(brain.web.work_page('Mail Fixture',ask=scratch),{'app':'Mail Fixture','title':'Re: Lunch'})
                 Path(scratch,'hands.json.windows').write_text('{"123":["43"]}')
-                with patch.object(rabik,'hands_state',return_value=str(Path(scratch,'hands.json'))):
-                    self.assertEqual(rabik.work_page('Mail Fixture',ask=scratch)['windows'],{'123':['43']})   # the user's other window at ask time goes with the handoff
-            with patch.object(rabik,'browser_adapter',return_value='chromium'),patch.object(rabik,'osa',return_value=''):
-                self.assertEqual(rabik.work_page('Browser Two',ask=scratch),{'app':'Browser Two'})   # no window: no page to act on
-            with patch.dict(os.environ,{'RABIK_FRONT':'Notes'}),patch.object(rabik,'wants_focus',return_value=False), \
-                 patch.object(rabik,'osa',return_value='4\t2\tForm\thttps://form.fixture.test/'):
-                moved=rabik.MainMove('Request: finish filling this form',type('Worker',(),{'ask':scratch})()).handoff()
+                with patch.object(brain.paths,'hands_state',return_value=str(Path(scratch,'hands.json'))):
+                    self.assertEqual(brain.web.work_page('Mail Fixture',ask=scratch)['windows'],{'123':['43']})   # the user's other window at ask time goes with the handoff
+            with patch.object(brain.web,'browser_adapter',return_value='chromium'),patch.object(brain.macos,'osa',return_value=''):
+                self.assertEqual(brain.web.work_page('Browser Two',ask=scratch),{'app':'Browser Two'})   # no window: no page to act on
+            with patch.dict(os.environ,{'RABIK_FRONT':'Notes'}),patch.object(brain.macos,'wants_focus',return_value=False), \
+                 patch.object(brain.macos,'osa',return_value='4\t2\tForm\thttps://form.fixture.test/'):
+                moved=brain.handoffs.MainMove('Request: finish filling this form',type('Worker',(),{'ask':scratch})()).handoff()
             self.assertEqual((moved['app'],moved['page']),('Browser Fixture',used))   # a moved ask keeps the page it was working in
 
     def test_handed_app_resolves_the_name_as_said_to_the_running_app(self):
         native=lambda args,**kw:subprocess.CompletedProcess(args,0,'Fixture Browser\n' if args[-1]=='Fixture Browser' else '','')   # --target-app matches exact names only
-        with patch.object(rabik,'app_named',side_effect=lambda w:'Fixture Browser' if w.lower() in ('browser','fixture browser') else None), \
-             patch.object(rabik.subprocess,'run',side_effect=native):
-            self.assertEqual(rabik.running_app('browser'),'Fixture Browser')   # "fill the form in <its short name>"
-            self.assertEqual(rabik.running_app('Fixture Browser'),'Fixture Browser')
-            self.assertEqual(rabik.running_app('Elsewhere'),'')
+        with patch.object(brain.apps,'app_named',side_effect=lambda w:'Fixture Browser' if w.lower() in ('browser','fixture browser') else None), \
+             patch.object(subprocess,'run',side_effect=native):
+            self.assertEqual(brain.web.running_app('browser'),'Fixture Browser')   # "fill the form in <its short name>"
+            self.assertEqual(brain.web.running_app('Fixture Browser'),'Fixture Browser')
+            self.assertEqual(brain.web.running_app('Elsewhere'),'')
 
     def test_readiness_failure_after_a_click_keeps_success_without_repeating(self):
         with tempfile.TemporaryDirectory() as scratch:
@@ -257,8 +259,8 @@ class PageReadyTests(unittest.TestCase):
                 if 'return (id of window' in args[2]: return subprocess.CompletedProcess(args,0,'10\t2','')
                 if 'get {name, bounds}' in args[2]: return subprocess.CompletedProcess(args,0,'Fixture, 0, 0, 300, 200','')
                 return subprocess.CompletedProcess(args,0,json.dumps({'what':'Go','short':'Go','url':'https://fixture.invalid'}) if '"name"' in args[-1] else 'Clicked 1: Go','')
-            with patch.dict(os.environ,{'RABIK_FRONT':'Safari','RABIK_ASK':scratch}),patch.object(rabik,'browser_adapter',return_value='webkit'),patch.object(rabik,'preview_app',return_value=None),patch.object(rabik,'hands_map',return_value=None),patch.object(rabik.subprocess,'run',side_effect=run) as worker,patch.object(rabik,'page_ready',side_effect=subprocess.TimeoutExpired('fixture',.5)):
-                result=rabik.web('click','1')
+            with patch.dict(os.environ,{'RABIK_FRONT':'Safari','RABIK_ASK':scratch}),patch.object(brain.web,'browser_adapter',return_value='webkit'),patch.object(brain.macos,'preview_app',return_value=None),patch.object(brain.hands,'hands_map',return_value=None),patch.object(subprocess,'run',side_effect=run) as worker,patch.object(brain.web,'page_ready',side_effect=subprocess.TimeoutExpired('fixture',.5)):
+                result=brain.web.web('click','1')
             self.assertTrue(result.startswith('Clicked 1'));self.assertIn('Read again',result)
             self.assertEqual(sum('"click"' in call.args[0][-1] for call in worker.call_args_list),1)
 
@@ -269,8 +271,8 @@ class PageReadyTests(unittest.TestCase):
                 if 'return (id of window' in args[2]: return subprocess.CompletedProcess(args, 0, '10\t2', '')
                 if 'get {name, bounds}' in args[2]: return subprocess.CompletedProcess(args, 0, 'Fixture, 0, 0, 300, 200', '')
                 return subprocess.CompletedProcess(args, 0, json.dumps({'what': 'Go', 'short': 'Go', 'url': 'https://fixture.invalid', 'submit': True}), '')
-            with patch.dict(os.environ, {'RABIK_FRONT': 'Safari', 'RABIK_ASK': scratch}), patch.object(rabik, 'browser_adapter', return_value='webkit'), patch.object(rabik, 'pref', return_value=False), patch.object(rabik, 'preview_app', return_value=None), patch.object(rabik.subprocess, 'run', side_effect=worker) as run, patch.object(rabik, 'ask_user', return_value='n') as ask:
-                self.assertIn('user said no', rabik.web('click', '1'))
+            with patch.dict(os.environ, {'RABIK_FRONT': 'Safari', 'RABIK_ASK': scratch}), patch.object(brain.web, 'browser_adapter', return_value='webkit'), patch.object(brain.prefs, 'pref', return_value=False), patch.object(brain.macos, 'preview_app', return_value=None), patch.object(subprocess, 'run', side_effect=worker) as run, patch.object(brain.interaction, 'ask_user', return_value='n') as ask:
+                self.assertIn('user said no', brain.web.web('click', '1'))
             ask.assert_called_once()
             self.assertFalse(any(')("click"' in call.args[0][-1] for call in run.call_args_list))
 
@@ -280,11 +282,11 @@ class PageReadyTests(unittest.TestCase):
                 if 'return (id of window' in args[2]: return subprocess.CompletedProcess(args, 0, '10\t2', '')
                 if 'get {name, bounds}' in args[2]: return subprocess.CompletedProcess(args, 0, 'Fixture, 0, 0, 300, 200', '')
                 return subprocess.CompletedProcess(args, 0, json.dumps({'what': 'Submit', 'short': 'Submit', 'url': 'https://fixture.invalid', 'submit': True}), '')
-            with patch.dict(os.environ, {'RABIK_FRONT': 'Safari'}, clear=True), patch.object(rabik, 'DIR', scratch), \
-                 patch.object(rabik, 'browser_adapter', return_value='webkit'), patch.object(rabik, 'pref', return_value=False), \
-                 patch.object(rabik, 'preview_app', return_value=None), patch.object(rabik.subprocess, 'run', side_effect=worker), \
-                 patch.object(rabik, 'ask_user') as ask:
-                result = rabik.web('click', '1')
+            with patch.dict(os.environ, {'RABIK_FRONT': 'Safari'}, clear=True), patch.object(brain.paths, 'DIR', scratch), \
+                 patch.object(brain.web, 'browser_adapter', return_value='webkit'), patch.object(brain.prefs, 'pref', return_value=False), \
+                 patch.object(brain.macos, 'preview_app', return_value=None), patch.object(subprocess, 'run', side_effect=worker), \
+                 patch.object(brain.interaction, 'ask_user') as ask:
+                result = brain.web.web('click', '1')
             self.assertIn('needs the user', result)
             self.assertNotIn('Safe mode', result)
             ask.assert_not_called()
@@ -297,7 +299,7 @@ class PageReadyTests(unittest.TestCase):
                 expression = args[-1]
                 output = '{"value":"Current answer"}' if ')("state"' in expression else 'Filled 1' if ')("fill"' in expression else 'Changed page'
                 return subprocess.CompletedProcess(args, 0, output, '')
-            with patch.dict(os.environ, {'RABIK_FRONT': 'Safari', 'RABIK_ASK': scratch}), patch.object(rabik, 'browser_adapter', return_value='webkit'), patch.object(rabik, 'preview_app', return_value=None), patch.object(rabik.subprocess, 'run', side_effect=worker), patch.object(rabik, 'page_ready', return_value=True):
-                result = rabik.web('fill', '1', 'Answer')
+            with patch.dict(os.environ, {'RABIK_FRONT': 'Safari', 'RABIK_ASK': scratch}), patch.object(brain.web, 'browser_adapter', return_value='webkit'), patch.object(brain.macos, 'preview_app', return_value=None), patch.object(subprocess, 'run', side_effect=worker), patch.object(brain.web, 'page_ready', return_value=True):
+                result = brain.web.web('fill', '1', 'Answer')
         self.assertIn('Current answer', result)
         self.assertIn('Changed state:', result)

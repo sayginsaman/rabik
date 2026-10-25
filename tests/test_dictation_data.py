@@ -135,36 +135,36 @@ print("learned fixes ok")
         self.assertEqual(source.count('DictationData.forget('), 2)   # Undo and Settings remove both drop the fix
 
     def test_dictionary_reaches_cleanup_and_keeps_saved_rules(self):
-        import rabik
-        with patch.object(rabik, 'pref', return_value=['Saarth', 'Rabik', None, 'bad\nword']), \
-             patch.object(rabik, 'relevant_rules', return_value='Spell my name Saarth.'):
-            request = rabik.dictate_request('say Sarth')
+        import brain.dictation, brain.memory, brain.prefs
+        with patch.object(brain.prefs, 'pref', return_value=['Saarth', 'Rabik', None, 'bad\nword']), \
+             patch.object(brain.memory, 'relevant_rules', return_value='Spell my name Saarth.'):
+            request = brain.dictation.dictate_request('say Sarth')
             self.assertIn('["Saarth", "Rabik"]', request)
             self.assertIn('Spell my name Saarth.', request)
             self.assertNotIn('bad', request)
-            self.assertEqual(rabik.dictate_result('say Sarth', '<cleaned>Say Saarth.</cleaned>', {'Sarth': 'Saarth'}), 'Say Saarth.')
+            self.assertEqual(brain.dictation.dictate_result('say Sarth', '<cleaned>Say Saarth.</cleaned>', {'Sarth': 'Saarth'}), 'Say Saarth.')
 
     def test_cleanup_gets_sound_alike_hints_and_may_write_the_name(self):
-        import rabik
+        import brain.dictation, brain.memory, brain.prefs, brain.wording
         prefs = {'dictateWords': ['Saarth'], 'dictateFixes': {'some veto': 'Saarth', 'old': 'Gone'}}
-        with patch.object(rabik, 'pref', side_effect=lambda k, d=None: prefs.get(k, d)), \
-             patch.object(rabik, 'relevant_rules', return_value=''):
-            self.assertEqual(rabik.dictate_hints('Can you make sure Sarda does that?', ['Saarth']), {'Sarda': 'Saarth'})
-            self.assertEqual(rabik.dictate_hints('You make sure some veto that.', ['Saarth']), {'some veto': 'Saarth'})   # a learned heard form
-            self.assertEqual(rabik.dictate_hints('Saarth sorted it', ['Saarth']), {})   # already said right
-            self.assertEqual(rabik.dictate_hints('Hi there', ['Saarth']), {})
-            self.assertEqual(rabik.dictate_hints('Can you ask some of you to do that?', ['Semva']).get('some of you'), 'Semva')
+        with patch.object(brain.prefs, 'pref', side_effect=lambda k, d=None: prefs.get(k, d)), \
+             patch.object(brain.memory, 'relevant_rules', return_value=''):
+            self.assertEqual(brain.dictation.dictate_hints('Can you make sure Sarda does that?', ['Saarth']), {'Sarda': 'Saarth'})
+            self.assertEqual(brain.dictation.dictate_hints('You make sure some veto that.', ['Saarth']), {'some veto': 'Saarth'})   # a learned heard form
+            self.assertEqual(brain.dictation.dictate_hints('Saarth sorted it', ['Saarth']), {})   # already said right
+            self.assertEqual(brain.dictation.dictate_hints('Hi there', ['Saarth']), {})
+            self.assertEqual(brain.dictation.dictate_hints('Can you ask some of you to do that?', ['Semva']).get('some of you'), 'Semva')
             text = 'You make sure start to does that.'
-            request = rabik.dictate_spellings(text)
+            request = brain.dictation.dictate_spellings(text)
             self.assertIn('"start": "Saarth"', request)
-            hints = rabik.dictate_hints(text, ['Saarth'])
-            self.assertEqual(rabik.dictate_result(text, '<cleaned>You make sure Saarth does that.</cleaned>', hints), 'You make sure Saarth does that.')
+            hints = brain.dictation.dictate_hints(text, ['Saarth'])
+            self.assertEqual(brain.dictation.dictate_result(text, '<cleaned>You make sure Saarth does that.</cleaned>', hints), 'You make sure Saarth does that.')
             ordinary = 'Send the update to him this afternoon please.'
             changed = '<cleaned>Send the update to Saarth this afternoon please.</cleaned>'
-            self.assertEqual(rabik.dictate_result(ordinary, changed, {}), ordinary)
-            self.assertEqual(rabik.dictate_result(ordinary, changed, {'him': 'Saarth'}),
+            self.assertEqual(brain.dictation.dictate_result(ordinary, changed, {}), ordinary)
+            self.assertEqual(brain.dictation.dictate_result(ordinary, changed, {'him': 'Saarth'}),
                              'Send the update to Saarth this afternoon please.')
-        self.assertEqual((rabik.dictate_sound('Saarth'), rabik.dictate_sound('start to'), rabik.dictate_sound('André')), ('srt', 'strt', 'amtr'))   # same as DictationData.sound
+        self.assertEqual((brain.wording.dictate_sound('Saarth'), brain.wording.dictate_sound('start to'), brain.wording.dictate_sound('André')), ('srt', 'strt', 'amtr'))   # same as DictationData.sound
 
     def test_correction_window_is_scoped_and_secure_before_read(self):
         source = (ROOT / 'Rabik.swift').read_text()

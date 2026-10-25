@@ -10,13 +10,38 @@ os.environ['RABIK_POSTHOG_KEY'] = ''   # tests that clear os.environ also drop R
 atexit.register(config.cleanup)
 
 
+class patches:
+    """Several patchers as one, for names in more than one brain module: starts, stops and works in `with` like a single
+    patch.multiple, and returns the DEFAULT mocks of all of them by name."""
+    def __init__(self, *patchers):
+        self.patchers, self.started = patchers, []
+
+    def start(self):
+        made = {}
+        try:
+            for p in self.patchers:
+                got = p.start(); self.started.append(p)
+                if isinstance(got, dict): made.update(got)
+        except BaseException:
+            self.stop(); raise
+        return made
+
+    def stop(self):
+        while self.started: self.started.pop().stop()
+
+    __enter__ = start
+
+    def __exit__(self, *exc):
+        self.stop()
+
+
 def scratch_dir(test):
-    """A temp rabik.DIR with default prefs for one test, undone at cleanup; returns the folder."""
+    """A temp brain.paths.DIR with default prefs for one test, undone at cleanup; returns the folder."""
     from pathlib import Path
     from unittest.mock import patch
-    import rabik
+    import brain.paths, brain.prefs
     root = tempfile.TemporaryDirectory(); test.addCleanup(root.cleanup)
-    for p in (patch.object(rabik, 'DIR', root.name), patch.object(rabik, 'pref', side_effect=lambda k, d: d)):
+    for p in (patch.object(brain.paths, 'DIR', root.name), patch.object(brain.prefs, 'pref', side_effect=lambda k, d: d)):
         p.start(); test.addCleanup(p.stop)
     return Path(root.name)
 
@@ -28,8 +53,8 @@ INSTALLED_HELPER = '/Users/exampleuser/Applications/Rabik.app/Contents/Resources
 
 def prompt_chars(text):
     import shlex
-    import rabik
-    return len(text.replace(shlex.quote(rabik.ME), INSTALLED_HELPER).replace(rabik.ME, INSTALLED_HELPER))
+    import brain.paths
+    return len(text.replace(shlex.quote(brain.paths.ME), INSTALLED_HELPER).replace(brain.paths.ME, INSTALLED_HELPER))
 
 
 def run_swift(test, source, timeout=10):
@@ -82,10 +107,13 @@ def _guarded(self, args, *a, **k):
 subprocess.Popen.__init__ = _guarded
 
 
-# The app runs one ask per process. A test's in-process rabik.main() left its ask folder, env and relay thread behind;
-# the relay polls time.sleep until the folder goes, so a later test's fake clock or sleep mock counted its naps.
+# rabik.py wires the layers (PATH, the hooks the lower ones call up through), so tests load it once, as the app does.
 import rabik
-_main = rabik.main
+import brain.cli
+
+# The app runs one ask per process. A test's in-process main() left its ask folder, env and relay thread behind;
+# the relay polls time.sleep until the folder goes, so a later test's fake clock or sleep mock counted its naps.
+_main = brain.cli.main
 
 
 def _one_ask(*a, **k):
@@ -97,4 +125,4 @@ def _one_ask(*a, **k):
         if os.environ.get('RABIK_HANDS_STATE') != env.get('RABIK_HANDS_STATE') and os.path.basename(state).startswith('rabik-hands-'):
             shutil.rmtree(state, True)
         os.environ.clear(); os.environ.update(env)
-rabik.main = _one_ask
+rabik.main = _one_ask   # the facade passes it on to brain.cli.main, where callers find it

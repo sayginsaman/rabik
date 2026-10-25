@@ -11,8 +11,12 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
+import atexit
+import signal
+import sys
+import threading
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
-import rabik
+import brain.ask, brain.clients, brain.handoffs, brain.interaction, brain.macos, brain.paths, brain.protocol
 
 ROOT = Path(__file__).resolve().parents[1]
 ANSWER = ('Paris is the capital of France. It sits on the Seine in the north of the country, and about two million people '
@@ -52,35 +56,35 @@ def result(tool_id, content='Observed state'):
 class StreamTests(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.TemporaryDirectory(); self.addCleanup(self.root.cleanup)
-        patcher = patch.multiple(rabik, DIR=self.root.name, HOME=self.root.name, PREFS=str(Path(self.root.name) / 'settings.json'))
+        patcher = patch.multiple(brain.paths, DIR=self.root.name, HOME=self.root.name, PREFS=str(Path(self.root.name) / 'settings.json'))
         patcher.start(); self.addCleanup(patcher.stop)
 
     def run_stream(self, rows, final, env=None, ask=''):
         p = Mock(); p.stdin = io.StringIO(); p.ask = ask; p.returncode = 0
         p.stdout = map(json.dumps, rows + [{'type': 'result', 'result': final, 'total_cost_usd': .001}])
-        with patch.dict(os.environ, {'RABIK_UI': '1', 'RABIK_COMMIT': '', **(env or {})}), patch.object(rabik.threading, 'Thread'), \
-             patch.object(rabik.threading, 'Timer'), patch.object(rabik, 'preview_commands'), contextlib.redirect_stdout(io.StringIO()) as out:
-            reply, _, _ = rabik.run('Request: fixture', p)
+        with patch.dict(os.environ, {'RABIK_UI': '1', 'RABIK_COMMIT': '', **(env or {})}), patch.object(threading, 'Thread'), \
+             patch.object(threading, 'Timer'), patch.object(brain.macos, 'preview_commands'), contextlib.redirect_stdout(io.StringIO()) as out:
+            reply, _, _ = brain.ask.run('Request: fixture', p)
         lines = out.getvalue().rstrip('\n').split('\n')   # not splitlines(): an answer's own line breaks travel as U+2028
         return reply, lines, [line[2:] for line in lines if line.startswith('… ')]
 
     def test_streamed_answer_never_shows_tags_drafts_handoffs_or_sources(self):
         long = ANSWER + ' '
-        self.assertEqual(rabik.streamed_answer(long), ANSWER)
-        self.assertEqual(rabik.streamed_answer(ANSWER[:100]), '')   # could still be a 3-8 word note
+        self.assertEqual(brain.handoffs.streamed_answer(long), ANSWER)
+        self.assertEqual(brain.handoffs.streamed_answer(ANSWER[:100]), '')   # could still be a 3-8 word note
         for held in ('[draft] ' + long, '[insert] ' + long, '[replace] ' + long, '  \n[agent {\n  "title": "x",\n' + long,
                      '```json\n[agent ' + long, '[sonnet]', '[steer {"id":"a","text":"' + long, '[agent-profile {' + long):
-            self.assertEqual(rabik.streamed_answer(held), '', held)
+            self.assertEqual(brain.handoffs.streamed_answer(held), '', held)
         for tag in ('[tip Say "remember: x"]', '[point 1 20 30]', '[workflow x | y]', '[replay open -a Notes]', '[done]',
                     '[agent {"title":"x","brief":"y"}]', '[agent-result {}]', '[steer {"id":"a"}]'):
-            self.assertEqual(rabik.streamed_answer(long + tag + ' after the tag'), ANSWER, tag)
-        self.assertEqual(rabik.streamed_answer(long + '\nSources: https://x.example'), ANSWER)
-        self.assertEqual(rabik.streamed_answer(long + '\nSour'), ANSWER)   # may still become "Sources:"
-        self.assertEqual(rabik.streamed_answer(ANSWER + '\n- More'), ANSWER + '\n- More')
+            self.assertEqual(brain.handoffs.streamed_answer(long + tag + ' after the tag'), ANSWER, tag)
+        self.assertEqual(brain.handoffs.streamed_answer(long + '\nSources: https://x.example'), ANSWER)
+        self.assertEqual(brain.handoffs.streamed_answer(long + '\nSour'), ANSWER)   # may still become "Sources:"
+        self.assertEqual(brain.handoffs.streamed_answer(ANSWER + '\n- More'), ANSWER + '\n- More')
         for text in ('See [1], [ ] and a[0].', 'See [the guide](https://x.example) and [Apple](https://apple.example).'):
-            self.assertEqual(rabik.streamed_answer(long + text), long + text)   # not a tag: the rest keeps streaming
-        self.assertEqual(rabik.streamed_answer(long + 'See [the guide'), long + 'See')   # may still be a tag until it closes as a link
-        self.assertEqual(rabik.streamed_answer(long + '[agent {"brief":"read [x](y)"}] after'), ANSWER)
+            self.assertEqual(brain.handoffs.streamed_answer(long + text), long + text)   # not a tag: the rest keeps streaming
+        self.assertEqual(brain.handoffs.streamed_answer(long + 'See [the guide'), long + 'See')   # may still be a tag until it closes as a link
+        self.assertEqual(brain.handoffs.streamed_answer(long + '[agent {"brief":"read [x](y)"}] after'), ANSWER)
 
     def test_plain_answer_streams_and_the_final_reply_replaces_it(self):
         reply, lines, shown = self.run_stream(message(ANSWER), ANSWER)
@@ -93,11 +97,11 @@ class StreamTests(unittest.TestCase):
     def test_multi_line_agent_handoff_never_prints_text_and_hands_off(self):
         marker = '[agent ' + json.dumps({'title': 'Research desks', 'brief': 'Compare standing desks under $600 across sources', 'context': ANSWER}, indent=2) + ']'
         ask = tempfile.mkdtemp(dir=self.root.name)
-        with patch.object(rabik, 'wait_commit', return_value=True):
+        with patch.object(brain.interaction, 'wait_commit', return_value=True):
             reply, lines, shown = self.run_stream(message(marker + '\n' + ANSWER), marker + '\n' + ANSWER, ask=ask)
         self.assertEqual(reply, ''); self.assertEqual(shown, [])
         self.assertEqual(sum(line.startswith('⤴ ') for line in lines), 1)
-        self.assertEqual(rabik.run.handoff['title'], 'Research desks')
+        self.assertEqual(brain.ask.run.handoff['title'], 'Research desks')
         self.assertFalse(any(line.startswith(('✓', '·')) for line in lines))
 
     def test_note_before_a_tool_never_shows_as_the_answer(self):
@@ -140,21 +144,21 @@ class StreamTests(unittest.TestCase):
         self.assertEqual(shown[-1], ANSWER)   # default: as they arrive
         for value, streams in (('stream', True), ('once', False)):
             with self.subTest(value=value):
-                Path(rabik.PREFS).write_text(json.dumps({'showAnswers': value}))
+                Path(brain.paths.PREFS).write_text(json.dumps({'showAnswers': value}))
                 reply, _, shown = self.run_stream(message(ANSWER), ANSWER)
                 self.assertEqual(bool(shown), streams); self.assertEqual(reply, ANSWER)   # all at once: only the final reply, with its classic fade
-        self.assertEqual(rabik.picks()['showAnswers'], ('Show answers', {'As they arrive': 'stream', 'All at once': 'once'}))
+        self.assertEqual(brain.interaction.picks()['showAnswers'], ('Show answers', {'As they arrive': 'stream', 'All at once': 'once'}))
         self.assertIn('"showAnswers": "stream"', (ROOT / 'Rabik.swift').read_text())
 
     def test_drawing_or_pointing_replies_do_not_stream(self):
-        rows = message('Drawing it', ('d1', f'{rabik.ME} --draw \'{{"steps":[]}}\'')) + [result('d1', 'Guide shown (step 1 of 1).')] + message(ANSWER)
+        rows = message('Drawing it', ('d1', f'{brain.paths.ME} --draw \'{{"steps":[]}}\'')) + [result('d1', 'Guide shown (step 1 of 1).')] + message(ANSWER)
         _, _, shown = self.run_stream(rows, ANSWER)
         self.assertEqual(shown, [])
 
     def test_main_asks_request_partial_messages_and_stay_strict(self):
-        with patch.object(rabik.shutil, 'which', return_value='/fixture/claude'), patch.object(rabik.subprocess, 'Popen') as popen, \
-             patch.object(rabik.atexit, 'register'), patch.object(rabik.signal, 'signal'):
-            rabik.start_claude().errors.close()
+        with patch.object(shutil, 'which', return_value='/fixture/claude'), patch.object(subprocess, 'Popen') as popen, \
+             patch.object(atexit, 'register'), patch.object(signal, 'signal'):
+            brain.clients.start_claude().errors.close()
         args = popen.call_args.args[0]
         for flag in ('--include-partial-messages', '--no-session-persistence', '--strict-mcp-config'): self.assertIn(flag, args)
 
@@ -235,7 +239,7 @@ check(thread.scrollTop===40,'the final reply does not jump to the bottom');
     @unittest.skipUnless(shutil.which('node'), 'Node runs the box handler')
     def test_a_long_streamed_answer_fades_in_reading_order_once(self):
         _, _, shown = self.run_stream(message(FRIDGE), FRIDGE)
-        with contextlib.redirect_stdout(io.StringIO()) as out: rabik.say('✓', FRIDGE)
+        with contextlib.redirect_stdout(io.StringIO()) as out: brain.protocol.say('✓', FRIDGE)
         lines = ['… ' + s for s in shown] + [out.getvalue().strip().replace('\u2028', '\n')]   # Swift unfolds the final reply's lines
         self.assertGreater(len(lines), 100)
         self.box('const lines=' + json.dumps(lines) + r''';
@@ -251,10 +255,10 @@ check(Math.max(...starts.flat())-now<=900,'a long backlog catches up instead of 
 
     def test_closed_output_pipe_cancels_without_a_traceback(self):
         with patch('builtins.print', side_effect=BrokenPipeError), patch('sys.stdout', io.StringIO()), \
-             patch.object(rabik, 'stop_workers', side_effect=SystemExit(0)) as stop:
+             patch.object(brain.clients, 'stop_workers', side_effect=SystemExit(0)) as stop:
             with self.assertRaises(SystemExit) as ended:
-                rabik.say('✓', 'Finished.')
-            rabik.sys.stdout.close()
+                brain.protocol.say('✓', 'Finished.')
+            sys.stdout.close()
         self.assertEqual(ended.exception.code, 0)
         stop.assert_called_once_with()
 
@@ -265,7 +269,7 @@ check(Math.max(...starts.flat())-now<=900,'a long backlog catches up instead of 
                 "1. Compression raises the pressure.\n2. Expansion drops it again.\n\n```\nstate: cooling\nfan: on\n```\n\n"
                 "| Part | Where |\n|---|---|\n| Coils | Back |\n| Fan | Inside |\n")
         _, _, shown = self.run_stream(message(text), text)
-        with contextlib.redirect_stdout(io.StringIO()) as out: rabik.say('✓', text)
+        with contextlib.redirect_stdout(io.StringIO()) as out: brain.protocol.say('✓', text)
         lines = ['… ' + s for s in shown] + [out.getvalue().strip().replace('\u2028', '\n')]
         self.box('const lines=' + json.dumps(lines) + r''';
 const unit=c=>c.className==='w'||c.namespaceURI||/\btex\b/.test(c.className);

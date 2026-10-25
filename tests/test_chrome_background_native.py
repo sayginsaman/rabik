@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
-import rabik
+import brain.macos, brain.paths, brain.web, brain.windows
 
 CHROME = Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 
@@ -41,15 +41,15 @@ class ChromeBackgroundTests(unittest.TestCase):
                         if 'not allowed' in probe.stderr or 'not authorized' in probe.stderr: self.skipTest(probe.stderr.strip())
                         time.sleep(.2)
                     else: self.fail('Scratch Chrome window not accessible: '+(probe.stderr if probe else '')+(root/'chrome.log').read_text()[-1000:])
-                    with patch.object(rabik,'preview_app'),patch.object(rabik,'free_focus'):
-                        screen=rabik.screens()[0][0]
-                        reply=rabik.place('Google Chrome','fullscreen',screen,marker)
+                    with patch.object(brain.macos,'preview_app'),patch.object(brain.macos,'free_focus'):
+                        screen=brain.macos.screens()[0][0]
+                        reply=brain.windows.place('Google Chrome','fullscreen',screen,marker)
                         self.assertNotIn('NOT DONE',reply);self.assertNotIn('could not check',reply)
-                        self.assertEqual(rabik.osa(selector),'true',reply)
+                        self.assertEqual(brain.macos.osa(selector),'true',reply)
                         # Use the actual screen name so the already-in-place path applies on the VM's virtual display.
-                        again=rabik.place('Google Chrome','fullscreen',screen,marker)
+                        again=brain.windows.place('Google Chrome','fullscreen',screen,marker)
                         self.assertIn('already full screen',again)
-                        self.assertEqual(rabik.osa(selector),'true',again)
+                        self.assertEqual(brain.macos.osa(selector),'true',again)
                 finally:
                     os.killpg(process.pid,signal.SIGTERM)
                     try: process.wait(timeout=5)
@@ -84,7 +84,7 @@ class ChromeBackgroundTests(unittest.TestCase):
                 if not ids: self.skipTest('Scratch Chrome did not expose its uniquely titled fixture')
                 window, tab = map(int,ids.split('\t'))
                 tell = f'tell application "Google Chrome" to execute (first tab of window id {window} whose id is {tab}) javascript '
-                webjs = Path(rabik.WEB_JS).read_text()
+                webjs = Path(brain.web.WEB_JS).read_text()
                 read = osa(tell + json.dumps(f'({webjs})("read", "", "")'))
                 self.assertIn(marker,read); self.assertIn('1 button: Change text',read)
                 (root / 'web.json').write_text(json.dumps({'app':'Google Chrome','window':window,'tab':tab}))
@@ -117,9 +117,9 @@ signal(SIGTERM) { _ in DispatchQueue.main.async { previous?.activate(); exit(0) 
                 self.assertEqual(front(),pid)
                 osa(tell + json.dumps('document.title'))
                 before = front(); self.assertNotEqual(before,process.pid)
-                with patch.object(rabik,'DIR',tmp), patch.dict(os.environ,{'RABIK_FRONT':'Google Chrome','RABIK_DIR':tmp},clear=False):
-                    self.assertIn('Filled',rabik.web('fill','2','Background name'))
-                    self.assertIn('Clicked 1',rabik.web('click','1'))
+                with patch.object(brain.paths,'DIR',tmp), patch.dict(os.environ,{'RABIK_FRONT':'Google Chrome','RABIK_DIR':tmp},clear=False):
+                    self.assertIn('Filled',brain.web.web('fill','2','Background name'))
+                    self.assertIn('Clicked 1',brain.web.web('click','1'))
                 self.assertEqual(front(),before,'JavaScript must leave the current foreground app focused')
                 result = osa(tell + json.dumps('document.getElementById("result").textContent + "/" + document.querySelector("input").value'))
                 self.assertEqual(result,'Clicked in background/Background name')

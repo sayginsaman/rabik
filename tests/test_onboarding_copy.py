@@ -55,8 +55,8 @@ for (const [label, keys] of Object.entries(want)) if (JSON.stringify(capsOf(labe
         self.assertIn('click it to open that window', self.page)   # the mini screen opens its window on click (README)
 
     def test_meeting_page_says_what_devin_and_pi_get(self):
-        brain = (ROOT / 'brain/meeting.py').read_text()
-        self.assertIn("if prefs.client() != 'claude':\n        raise RuntimeError(f'Meeting Copilot stays on this Mac", brain)   # no answers off Claude
+        meeting = (ROOT / 'brain/meeting.py').read_text()
+        self.assertIn("if prefs.client() != 'claude':\n        raise RuntimeError(f'Meeting Copilot stays on this Mac", meeting)   # no answers off Claude
         self.assertIn("$('mt-hint').textContent = other ? `With ${NAMES[provider]}, it saves the transcript on this Mac. Answers and recaps need Claude.`", self.page)
 
     def test_provider_row_names_no_client_before_the_check(self):

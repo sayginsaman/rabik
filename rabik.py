@@ -41,33 +41,23 @@ if __name__ == '__main__' and not sys.pycache_prefix:
 from importlib import import_module
 import brain
 
-# Compatibility facade. rabik.py was the whole brain, so tests and older callers use its flat names (rabik.pref,
-# patch.object(rabik, 'pref', ...)). Every name a brain module exports is also here, the same object, and a write to one
-# also goes to the module that owns it, so brain code calling that name sees the same patch. A global its module rebinds
-# at run time (_LIVE) is never copied: the facade reads and writes it in its owner.
+# Compatibility facade, for callers that know rabik.py as the whole brain: the eval harness (it runs against any checkout,
+# the old single-file ones too), scripts tests start in a subprocess (import rabik; rabik.show(...)) and the selftest below.
+# Every name a brain module exports is here too, the same object, and a write to one also goes to the module that owns it,
+# so brain code reading that name sees the same patch. Unit tests patch the owner itself (patch.object(brain.prefs, ...)).
 _MODULES = [import_module('brain.' + name) for name in (   # dependencies first
     'paths', 'wording', 'protocol', 'labels', 'storage', 'toolhelp', 'prefs', 'memory', 'situation', 'telemetry',
     'prompts', 'routine', 'support', 'turn', 'messages', 'macos', 'apps', 'watcher', 'interaction', 'windows', 'policy',
     'calendar', 'clients', 'hands', 'meeting', 'web', 'drawing', 'dictation', 'spotify', 'skills', 'handoffs', 'screen',
     'agents', 'ask', 'tips', 'instant', 'cli')]
-_LIVE = {'STOPPING': brain.turn, '_APPS_CACHE': brain.apps}
 _OWNERS = {name: module for module in _MODULES for name in module.__all__}
 globals().update((name, getattr(module, name)) for name, module in _OWNERS.items())
 
 
 class _Facade(types.ModuleType):
-    def __getattr__(self, name):   # only for names this module does not hold: the live ones
-        if name in _LIVE: return getattr(_LIVE[name], name)
-        raise AttributeError(f'module {self.__name__!r} has no attribute {name!r}')
-
     def __setattr__(self, name, value):
-        if name in _LIVE: return setattr(_LIVE[name], name, value)
         if name in _OWNERS: setattr(_OWNERS[name], name, value)
         super().__setattr__(name, value)
-
-    def __delattr__(self, name):   # unittest.mock deletes a name it read through __getattr__, then sets it back
-        if name in _LIVE: return delattr(_LIVE[name], name)
-        super().__delattr__(name)
 
 
 sys.modules[__name__].__class__ = _Facade

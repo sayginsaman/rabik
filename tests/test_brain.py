@@ -1,4 +1,4 @@
-"""brain/'s layering rules, which keep rabik.py's compatibility facade and every test patch working while code moves out."""
+"""brain/'s layering rules, and rabik.py's compatibility facade for callers that still know rabik.py as the whole brain."""
 import ast
 import graphlib
 import importlib
@@ -10,11 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import rabik
-import brain.paths
-import brain.prefs
-import brain.prompts
-import brain.apps
-import brain.turn
+import brain.hands, brain.paths, brain.prefs, brain.skills, brain.storage, brain.turn
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = sorted((ROOT / 'brain').glob('*.py'))
@@ -41,8 +37,8 @@ class BrainTests(unittest.TestCase):
                         self.assertEqual((path.name, node.module), ('prompts.py', 'brain.paths'))
 
     def test_brain_has_no_import_cycle(self):
-        # The layers depend one way (paths, then prefs and storage, ... meeting, then dictation): a cycle would not fail at
-        # import, it would hand one module the other half-built.
+        # The layers depend one way (paths, then prefs and storage, ... ask, then cli): a cycle would not fail at import,
+        # it would hand one module the other half-built.
         deps = {path.stem: {a.name for n in imports(path) if isinstance(n, ast.ImportFrom) and n.module == 'brain' for a in n.names}
                 for path in MODULES}
         list(graphlib.TopologicalSorter(deps).static_order())   # CycleError names the loop
@@ -56,12 +52,24 @@ class BrainTests(unittest.TestCase):
                     self.assertIs(getattr(rabik, name), getattr(module, name))
 
     def test_a_patch_on_the_facade_reaches_the_owner_and_is_undone(self):
+        # What the eval harness does, against this checkout or an old single-file one.
         original = brain.prefs.pref
         with patch.object(rabik, 'pref', side_effect=lambda key, default: 'pi' if key == 'client' else default):
             self.assertIsNot(brain.prefs.pref, original)
-            self.assertEqual(rabik.client(), 'pi')   # brain.prefs.client reads the patched pref
+            self.assertEqual(brain.prefs.client(), 'pi')   # brain.prefs.client reads the patched pref
         self.assertIs(brain.prefs.pref, original)
         self.assertIs(rabik.pref, original)
+
+    def test_unit_tests_patch_the_owner_not_the_facade(self):
+        # A unit test names the brain module that owns what it patches; the facade is for the eval harness, scripts tests
+        # start in a subprocess (import rabik; rabik.show(...)) and the selftest. test_feedback checks the facade's surface.
+        for path in sorted((ROOT / 'tests').glob('test_*.py')):
+            if path.name in ('test_brain.py', 'test_feedback.py'): continue
+            tree = ast.parse(path.read_text())
+            uses = [n.lineno for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id == 'rabik'] + \
+                   [n.lineno for n in ast.walk(tree) if isinstance(n, ast.Import) and any(a.name == 'rabik' for a in n.names)]
+            with self.subTest(path.name):
+                self.assertEqual(uses, [])
 
     def test_rabik_never_rebinds_a_moved_name_at_module_level(self):
         # `ME_FILE = …` in rabik.py's own code (the --selftest block) stores into rabik's namespace only: the facade sees
@@ -81,37 +89,32 @@ class BrainTests(unittest.TestCase):
         tree = ast.parse((ROOT / 'rabik.py').read_text())
         self.assertEqual([n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))], ['_Facade'])
 
-    def test_rebound_globals_are_read_live_through_the_facade(self):
-        # A `global X` that its module rebinds would go stale as a copy here: the facade reads and writes it in its owner.
+    def test_rebound_globals_stay_in_their_module(self):
+        # A `global X` its module rebinds at run time would go stale as a copy on the facade: it is not exported, and
+        # every reader (and every test patch) goes to its module.
         declared = {name: path.stem for path in MODULES for node in ast.walk(ast.parse(path.read_text()))
                     if isinstance(node, ast.Global) for name in node.names}
-        self.assertEqual({name: module.__name__.split('.')[-1] for name, module in rabik._LIVE.items()}, declared)
-        for name, module in rabik._LIVE.items():
-            self.assertNotIn(name, module.__all__)
-            self.assertNotIn(name, vars(rabik))
-        before = brain.apps._APPS_CACHE
-        with patch.object(rabik, '_APPS_CACHE', (0, {'Fixture'})):   # what test_universal does
-            self.assertEqual(brain.apps._APPS_CACHE, (0, {'Fixture'}))
-            self.assertEqual(rabik._APPS_CACHE, (0, {'Fixture'}))
-        self.assertIs(brain.apps._APPS_CACHE, before)
-        self.assertFalse(hasattr(rabik, 'no_such_name'))
+        self.assertTrue(declared)
+        for name, stem in declared.items():
+            with self.subTest(name):
+                self.assertNotIn(name, importlib.import_module('brain.' + stem).__all__)
+                self.assertFalse(hasattr(rabik, name))
 
-    def test_a_cancel_lives_in_turn_and_reaches_rabik(self):
-        # STOPPING is rebound when an ask is cancelled: rabik reads turn.STOPPING, and so does every brain module.
+    def test_a_cancel_reaches_every_module(self):
+        # STOPPING is rebound when an ask is cancelled; every module reads it as turn.STOPPING.
         with patch.object(brain.turn, 'STOPPING', True), self.assertRaises(InterruptedError):
-            self.assertTrue(rabik.STOPPING)
-            rabik.hands_call(['state'])
+            brain.hands.hands_call(['state'])
 
     def test_log_turn_still_falls_back_to_the_last_replay(self):
         # turn sits below skills: it reads the last replay's steps through the hook rabik.py sets
-        with patch.object(rabik, 'TURN', {}), patch.object(rabik.replay, 'ran', ['open -a Notes'], create=True), \
-                patch.object(rabik, 'append_log') as log:
-            rabik.log_turn('open notes', 'Done.', time.time())
+        with patch.object(brain.turn, 'TURN', {}), patch.object(brain.skills.replay, 'ran', ['open -a Notes'], create=True), \
+                patch.object(brain.storage, 'append_log') as log:
+            brain.turn.log_turn('open notes', 'Done.', time.time())
         self.assertEqual(log.call_args.args[0]['ran'], ['open -a Notes'])
 
     def test_the_helper_path_is_the_entry_script(self):
         self.assertEqual(brain.paths.ME, str(ROOT / 'rabik.py'))
-        self.assertIn(brain.paths.ME, rabik.PLACE)
+        self.assertIn(brain.paths.ME, brain.paths.PLACE)
 
 
 if __name__ == '__main__':

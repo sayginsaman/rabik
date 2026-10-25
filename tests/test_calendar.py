@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from tests import scratch_dir, run_swift
-import rabik
+import brain.calendar, brain.cli, brain.interaction, brain.macos, brain.paths, brain.policy, brain.prompts
 
 
 class CalendarTests(unittest.TestCase):
@@ -25,16 +25,16 @@ class CalendarTests(unittest.TestCase):
         def backend(data):
             self.calls.append(data)
             return {'events': self.events} if data['action'] == 'list' else {'saved': True}
-        self.backend = patch.object(rabik, 'calendar_backend', side_effect=backend)
+        self.backend = patch.object(brain.calendar, 'calendar_backend', side_effect=backend)
         self.backend.start(); self.addCleanup(self.backend.stop)
         self.data = dict(action='move', query='Dentist', **{'from': '2026-10-19T00:00:00-07:00', 'to': '2026-10-20T00:00:00-07:00'},
                          start='2026-10-19T16:00:00-07:00')
 
     def tool(self, **changes):
-        return rabik.calendar_tool([json.dumps({**self.data, **changes}, ensure_ascii=False)])
+        return brain.calendar.calendar_tool([json.dumps({**self.data, **changes}, ensure_ascii=False)])
 
     def test_move_keeps_duration_and_shows_old_new(self):
-        with patch.object(rabik, 'ask_user', return_value='y') as card:
+        with patch.object(brain.interaction, 'ask_user', return_value='y') as card:
             self.assertIn('saved', self.tool())
         self.assertEqual(self.calls[-1]['end'], '2026-10-19T17:30:00-07:00')
         self.assertEqual(self.calls[-1]['event'], self.event)
@@ -45,13 +45,13 @@ class CalendarTests(unittest.TestCase):
         self.assertIn('– 5:30 PM', card.call_args.args[0]['cmd'])   # same day: the date is not repeated
 
     def test_explicit_end(self):
-        with patch.object(rabik, 'ask_user', return_value='y'):
+        with patch.object(brain.interaction, 'ask_user', return_value='y'):
             self.tool(end='2026-10-19T18:00:00-07:00')
         self.assertEqual(self.calls[-1]['end'], '2026-10-19T18:00:00-07:00')
 
     def test_ambiguous_pick_before_confirmation(self):
         self.events.append({**self.event, 'id': 'two', 'calendar': 'Work'})
-        with patch.object(rabik, 'ask_user', side_effect=['1', 'y']) as card:
+        with patch.object(brain.interaction, 'ask_user', side_effect=['1', 'y']) as card:
             self.tool()
         self.assertIn('pick', card.call_args_list[0].args[0])
         self.assertEqual(len(card.call_args_list[0].args[0]['options']), 2)
@@ -61,23 +61,23 @@ class CalendarTests(unittest.TestCase):
 
     def test_ambiguous_without_pick_never_writes(self):
         self.events.append({**self.event, 'id': 'two'})
-        with patch.object(rabik, 'ask_user', return_value=None):
+        with patch.object(brain.interaction, 'ask_user', return_value=None):
             self.assertIn('No event selected', self.tool(query=''))
         self.assertEqual(len(self.calls), 1)
 
     def test_delete_asks_before_write_even_safe_mode_off(self):
-        with patch.object(rabik, 'ask_user', return_value='n') as card:
+        with patch.object(brain.interaction, 'ask_user', return_value='n') as card:
             self.assertIn('No change', self.tool(action='delete'))
         self.assertEqual(len(self.calls), 1)
         self.assertIn('Dentist', card.call_args.args[0]['cmd'])
         self.assertIn('→ Deleted', card.call_args.args[0]['cmd'])
-        with patch.object(rabik, 'ask_user', return_value='y'):
+        with patch.object(brain.interaction, 'ask_user', return_value='y'):
             self.tool(action='delete')
         self.assertEqual(self.calls[-1]['action'], 'delete')
 
     def test_person_match_uses_attendees_not_just_title(self):
         self.event.update(title='Review', attendees=['Alex mailto:alex@example.test'])
-        with patch.object(rabik, 'ask_user', return_value='y') as card:
+        with patch.object(brain.interaction, 'ask_user', return_value='y') as card:
             self.assertIn('saved', self.tool(action='delete', query='Alex'))
         self.assertIn('Alex', card.call_args.args[0]['cmd'])
         self.assertEqual(self.calls[-1]['event']['title'], 'Review')
@@ -88,13 +88,13 @@ class CalendarTests(unittest.TestCase):
         self.assertEqual(len(self.calls), 1)
 
     def test_permission_uses_allow_chip(self):
-        with patch.object(rabik, 'calendar_backend', return_value={'need': 'calendar'}), \
-             patch.object(rabik, 'ask_user', return_value='y') as card:
+        with patch.object(brain.calendar, 'calendar_backend', return_value={'need': 'calendar'}), \
+             patch.object(brain.interaction, 'ask_user', return_value='y') as card:
             self.assertIn('Calendar is on', self.tool())
         self.assertEqual(card.call_args.args[0]['need'], 'calendar')
 
     def test_add_needs_no_extra_confirmation(self):
-        with patch.object(rabik, 'ask_user') as card:
+        with patch.object(brain.interaction, 'ask_user') as card:
             self.tool(action='add', title='Study', end='2026-10-19T17:00:00-07:00')
         card.assert_not_called()
         self.assertEqual(self.calls[0]['action'], 'add')
@@ -104,14 +104,14 @@ class CalendarTests(unittest.TestCase):
         for request, title in [('Mueve mi cita al viernes', 'Dentista'), ('把学习时间改到四点', '学习')]:
             os.environ['RABIK_REQUEST'] = request
             self.events = [{**self.event, 'title': title}]
-            with patch.object(rabik, 'ask_user', return_value='y'), \
+            with patch.object(brain.interaction, 'ask_user', return_value='y'), \
                  patch.object(sys, 'argv', ['rabik.py', '--calendar', json.dumps({**self.data, 'query': title}, ensure_ascii=False)]), \
                  patch('sys.stdout', new_callable=io.StringIO) as out:
-                rabik.main()
+                brain.cli.main()
             self.assertIn('saved', out.getvalue())
             self.assertEqual(self.calls[-1]['event']['title'], title)
-        self.assertIn('Calendar (any language)', rabik.SYSTEM)
-        self.assertIn('--calendar', rabik.system_prompt(rabik.ASK_FIRST))
+        self.assertIn('Calendar (any language)', brain.prompts.SYSTEM)
+        self.assertIn('--calendar', brain.prompts.system_prompt(brain.prompts.ASK_FIRST))
 
     def test_validation_and_read_only_prep(self):
         for changes in [dict(query=3), dict(start='tomorrow'), dict(end='2026-10-19T14:00:00-07:00'), dict(start='2026-10-19T16:00:00')]:
@@ -122,38 +122,38 @@ class CalendarTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_confirmation_cancel_and_readonly(self):
-        with patch.object(rabik, 'wait_commit', return_value=False):
+        with patch.object(brain.interaction, 'wait_commit', return_value=False):
             self.assertIn('cancelled', self.tool())
         self.assertEqual(self.calls, [])
         self.event['writable'] = False
-        with patch.object(rabik, 'ask_user') as card:
+        with patch.object(brain.interaction, 'ask_user') as card:
             self.assertIn('read-only', self.tool())
         card.assert_not_called()
 
     def test_help_and_backend_transport(self):
-        self.assertIn('preserves duration', rabik.calendar_tool(['--help']))
+        self.assertIn('preserves duration', brain.calendar.calendar_tool(['--help']))
         self.backend.stop()
-        with patch.object(rabik.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '{"events":[]}')) as run:
-            self.assertEqual(rabik.calendar_backend({'action': 'list'}), {'events': []})
-        self.assertEqual(run.call_args.args[0], [rabik.APP, '--calendar'])
+        with patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '{"events":[]}')) as run:
+            self.assertEqual(brain.calendar.calendar_backend({'action': 'list'}), {'events': []})
+        self.assertEqual(run.call_args.args[0], [brain.paths.APP, '--calendar'])
         self.assertEqual(json.loads(run.call_args.kwargs['input']), {'action': 'list'})
-        self.assertFalse(rabik.risky(shlex.quote(rabik.ME) + ' --calendar \'{"action":"delete"}\''))
+        self.assertFalse(brain.policy.risky(shlex.quote(brain.paths.ME) + ' --calendar \'{"action":"delete"}\''))
 
     def test_model_cannot_call_native_calendar_directly(self):
         event = {'tool_name': 'Bash', 'tool_input': {}}
         for tail in ('', ';', '&', "<<<'{}'"):
             with self.subTest(tail=tail):
-                event['tool_input']['command'] = rabik.APP + ' --calendar' + tail
+                event['tool_input']['command'] = brain.paths.APP + ' --calendar' + tail
                 with patch('sys.stdin', io.StringIO(json.dumps(event))), patch('sys.stdout', new_callable=io.StringIO) as out:
-                    rabik.gate()
+                    brain.policy.gate()
                 self.assertTrue(out.getvalue(), 'Native calendar request bypassed the gate')
                 result = json.loads(out.getvalue())['hookSpecificOutput']
                 self.assertEqual(result['permissionDecision'], 'deny')
                 self.assertIn('--calendar', result['permissionDecisionReason'])
-        event['tool_input']['command'] = rabik.ME + ' --calendar \'{"action":"add","title":"Rabik"}\''
+        event['tool_input']['command'] = brain.paths.ME + ' --calendar \'{"action":"add","title":"Rabik"}\''
         with patch('sys.stdin', io.StringIO(json.dumps(event))), patch('sys.stdout', new_callable=io.StringIO) as out, \
-             patch.object(rabik, 'preview_commands'):
-            rabik.gate()
+             patch.object(brain.macos, 'preview_commands'):
+            brain.policy.gate()
         self.assertEqual(out.getvalue(), '')
 
 
