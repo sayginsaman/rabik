@@ -52,6 +52,8 @@ final class MeetingStub {var running=false;func open(){};func acceptAgent(_ row:
 let meeting=MeetingStub()
 final class OnboardingStub{var allowed:[String]=[];func allow(_ need:String,app:String){allowed.append(need)}}   // setup asks: what Allow opened
 let onboarding=OnboardingStub()
+final class RecapStub{func catchUp(){}}   // the routine queue's "recap": not an agent, not in this check
+let dailyRecap=RecapStub()
 enum Onboarding{static var on=false;static func granted(_ need:String,app:String)->Bool{on}}
 final class EngineStub{var isRunning=false}
 final class AppStub{

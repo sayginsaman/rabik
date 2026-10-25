@@ -45,6 +45,8 @@ final class SettingsStub {
  func meetings(_ data: [String: Any], _ done: (([String: Any]) -> Void)? = nil) { done?([:]) }
 }
 let settings = SettingsStub()
+final class RecapStub { func add(_ source: String, _ keys: [String], _ reply: @escaping ([String: Any]) -> Void) {} }   // Add to Reminders: not in this check
+let dailyRecap = RecapStub()
 func callAppsOnMic() -> Set<String> { ["Zoom"] }
 func py(_ args: [String]) -> Process {
  let p = Process(); p.executableURL = URL(fileURLWithPath: CommandLine.arguments[2])
