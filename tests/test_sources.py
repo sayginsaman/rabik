@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class SourcesTests(unittest.TestCase):
     def setUp(self):
         self.root = scratch_dir(self)
+        own = patch.object(brain.memory, 'ME_FILE', str(self.root / 'me.json')); own.start(); self.addCleanup(own.stop)   # About you, this test's own
         self.ask = self.root / 'ask'; self.ask.mkdir()
 
     def in_ask(self, box=True):

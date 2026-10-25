@@ -22,6 +22,7 @@ def call(name, **args):
 class McpTests(unittest.TestCase):
     def setUp(self):
         self.root = scratch_dir(self)
+        own = patch.object(brain.memory, 'ME_FILE', str(self.root / 'me.json')); own.start(); self.addCleanup(own.stop)   # About you, this test's own
         folder = self.root / 'meetings' / 'm1'; folder.mkdir(parents=True)
         (folder / 'metadata.json').write_text(json.dumps({'title': 'Pricing review', 'started': 1792929600, 'app': 'Zoom'}))
         events = [{'kind': 'transcript', 'text': 'The secret budget is 18,000.', 'seconds': 5, 'speaker': 'Sam Lee'},

@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class PeopleTests(unittest.TestCase):
     def setUp(self):
         self.root = scratch_dir(self)
+        own = patch.object(brain.memory, 'ME_FILE', str(self.root / 'me.json')); own.start(); self.addCleanup(own.stop)   # About you, this test's own
         def meeting(ident, title, started, people=(), speakers=()):
             folder = self.root / 'meetings' / ident; folder.mkdir(parents=True)
             (folder / 'metadata.json').write_text(json.dumps({'title': title, 'started': started, 'app': 'Zoom', 'people': list(people)}))
