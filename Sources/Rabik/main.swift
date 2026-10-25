@@ -191,7 +191,7 @@ func telemetry(_ args: [String]) {
 func detectLocalServers(_ done: @escaping ([[String: Any]]) -> Void) {
     DispatchQueue.global().async {
         let p = py(["--local-servers"]), out = Pipe(); p.standardOutput = out
-        try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+        let data = runToEnd(p, out)
         let found = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] ?? []
         DispatchQueue.main.async { done(found) }
     }
@@ -201,6 +201,13 @@ func detectLocalServers(_ done: @escaping ([[String: Any]]) -> Void) {
 func callJS(_ web: WKWebView?, _ fn: String, _ args: [Any]) {
     guard JSONSerialization.isValidJSONObject(args), let d = try? JSONSerialization.data(withJSONObject: args), let j = String(data: d, encoding: .utf8) else { return }
     web?.evaluateJavaScript("\(fn)(...\(j))")
+}
+
+// Run a helper to its end and return what it wrote. It reads first: a helper blocked on a full pipe never exits, so
+// waiting before reading hung Settings once (--state outgrew the pipe).
+func runToEnd(_ p: Process, _ out: Pipe) -> Data {
+    try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+    return data
 }
 
 // Load ui/<name> with orbs.js inlined at its /*ORBS*/ marker and ui/logo.png (base64) at its /*LOGO*/ marker.

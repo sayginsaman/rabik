@@ -24,7 +24,7 @@ enum Updater {
         p.executableURL = URL(fileURLWithPath: "/bin/zsh"); p.arguments = ["-c", script, src]; p.standardOutput = o; p.standardError = o
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"; env["RABIK_NO_RESTART"] = "1"; p.environment = env
-        try? p.run(); let data = o.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()   // read first: a full pipe never lets the script exit
+        let data = runToEnd(p, o)
         return (p.terminationStatus, String(data: data, encoding: .utf8) ?? "")
     }
     static let version: String = {

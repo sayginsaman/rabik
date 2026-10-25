@@ -34,7 +34,7 @@ final class RoutineWake {
         draining = true; pending = false
         DispatchQueue.global().async { [weak self] in
             let p = py(["--routine-pop"]), out = Pipe(); p.standardOutput = out
-            try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+            let data = runToEnd(p, out)
             let ids = (try? JSONSerialization.jsonObject(with:data)) as? [String] ?? []
             DispatchQueue.main.async {
                 guard let self else { return }

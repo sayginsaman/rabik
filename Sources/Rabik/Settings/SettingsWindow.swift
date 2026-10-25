@@ -87,7 +87,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
             let p = py(["--state"]), out = Pipe(); p.standardOutput = out
             // Read before waiting: the state (50 recent answers, rules, shortcuts) outgrows the pipe, and a helper blocked
             // on a full pipe never exits, so waiting first hung Settings and left the helper running.
-            try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+            let data = runToEnd(p, out)
             let s = String(data: data, encoding: .utf8) ?? ""
             guard s.hasPrefix("{") else { return }
             DispatchQueue.main.async { self?.web?.evaluateJavaScript("st.state(\(s))") }
@@ -168,7 +168,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
     func importProfile() {
         DispatchQueue.global().async { [weak self] in
             let p = py(["--me", "import"]), out = Pipe(); p.standardOutput = out
-            try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+            let data = runToEnd(p, out)
             let result = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? ["errors": ["contacts", "mail"]]
             self?.send("profileImport", result)
             DispatchQueue.main.async { self?.refresh() }
@@ -306,7 +306,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
             let base = Prefs.str("apiBase"), key = Prefs.str("apiKey")
             DispatchQueue.global().async { [weak self] in
                 let p = py(["--models"], ["RABIK_PROBE_BASE":base, "RABIK_PROBE_KEY":key]), out = Pipe(); p.standardOutput = out
-                try? p.run(); let d = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+                let d = runToEnd(p, out)
                 self?.send("models", ["base":base, "key":key, "list":(try? JSONSerialization.jsonObject(with: d)) as? [String] ?? []])
             }
         case "localServers": detectLocalServers { [weak self] found in self?.send("local", found) }

@@ -453,7 +453,7 @@ final class App: NSObject, WKScriptMessageHandler {
                 let base = Prefs.str("apiBase"), key = Prefs.str("apiKey")
                 DispatchQueue.global().async { [weak self] in
                     let p = py(["--models"], ["RABIK_PROBE_BASE":base, "RABIK_PROBE_KEY":key]), out = Pipe(); p.standardOutput = out
-                    try? p.run(); let d = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+                    let d = runToEnd(p, out)
                     let list = (try? JSONSerialization.jsonObject(with: d)) as? [String] ?? []
                     DispatchQueue.main.async { if base == Prefs.str("apiBase"), key == Prefs.str("apiKey"), !list.isEmpty { self?.serverModels = list; self?.js("models", self?.modelChoices() ?? [:]) } }
                 }

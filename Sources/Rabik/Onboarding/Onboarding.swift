@@ -75,7 +75,7 @@ final class Onboarding: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     static func plan(_ done: @escaping ([String: Any]) -> Void) {
         DispatchQueue.global().async {
             let p = py(["--check"]), out = Pipe(); p.standardOutput = out
-            try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()   // read first: a full pipe never lets the helper exit
+            let data = runToEnd(p, out)
             let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             DispatchQueue.main.async { done(j ?? ["ok": false, "need": "install", "text": "Could not run Rabik’s helper (python3 missing?)."]) }
         }
@@ -191,7 +191,7 @@ final class Onboarding: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     static func connectors(_ done: @escaping ([String: Any]) -> Void) {
         DispatchQueue.global().async {
             let p = py(["--connectors"]), out = Pipe(); p.standardOutput = out
-            try? p.run(); let data = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()   // read first: a full pipe never lets the helper exit
+            let data = runToEnd(p, out)
             let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             DispatchQueue.main.async { done(j ?? ["connected": [], "signin": []]) }
         }
@@ -224,7 +224,7 @@ final class Onboarding: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         if b["do"] == "probe", let base = b["base"] {   // a server typed in the sheet, not saved yet: its models
             return DispatchQueue.global().async { [weak self] in
                 let p = py(["--models"], ["RABIK_PROBE_BASE": base, "RABIK_PROBE_KEY": (b["key"] ?? "").isEmpty && base == Prefs.str("apiBase") ? Prefs.str("apiKey") : b["key"] ?? ""]), out = Pipe(); p.standardOutput = out
-                try? p.run(); let d = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+                let d = runToEnd(p, out)
                 let list = (try? JSONSerialization.jsonObject(with: d)) as? [String] ?? []
                 DispatchQueue.main.async { self?.call("ob.models", list) }
             }
