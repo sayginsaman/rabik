@@ -81,6 +81,16 @@ Bu build hakkında:
 - [ ] Görüşme bitince "Share recap…" → Paylaş menüsü açılır; Notes'a gönderince başlık, özet ve maddeler gelir, transkript gelmez. Settings → Meetings'teki "Share…" de aynısını yapar.
 - [ ] "Remind me before calls"u aç → linkli bir takvim görüşmesinden yaklaşık iki dakika önce küçük bir kart çıkar. Kapalıyken çıkmaz.
 
+## 9b. Ses, hafıza, kişiler, hedefler, MCP
+- [ ] Settings → General → "Read answers aloud"u aç, uzun bir soru sor → cevap akarken ilk cümleler okunmaya başlar. Voice'tan Premium/Enhanced bir ses seç (yoksa ipucu, Spoken Content'ten indirmeyi söyler). Türkçe bir cevap Türkçe sesle okunur.
+- [ ] Rabik konuşurken konuşmaya başla → yaklaşık yarım saniyede susar (hoparlörden de denenmeli; kendi sesiyle susmamalı). "Stop when I talk" kapalıyken susmaz.
+- [ ] "Dünkü toplantıda ne konuştuk?" → cevabın altında toplantı çipi çıkar; tıklayınca Settings → Meetings'te o toplantı açılır.
+- [ ] Settings → Memory → Activity history'yi aç, birkaç dakika bir Figma/Safari sayfasında çalış → "az önce baktığım sayfayı aç" çalışır ve kaynak çipi çıkar. Gizli pencere ve şifre yöneticisi kaydedilmez; "Clear…" hepsini siler.
+- [ ] Settings → People'da toplantılardaki kişiler görünür; birine tıklayınca toplantıları ve bilinenler çıkar; "Hide from People" listeden çıkarır. "Sam'le en son ne zaman konuştum?" kişi çipiyle cevaplanır.
+- [ ] "Hedefim: beta'yı cuma çıkarmak" de → Settings → General → Goals'ta görünür; akşam özetinde günün katkısı varsa "Goals" satırı çıkar; "beta hedefini tamamladım" işaretler.
+- [ ] Notion'u (veya Slack'i) aç; bağlayıcısı bağlı değilse kutuda bir kez öneri kartı çıkar. Not now bir hafta, Don't ask again kalıcı susturur. Toplantıdayken çıkmaz.
+- [ ] Settings → Account & Access → "Add to Claude Code" → düğme "Added" olur; Claude Code'da `/mcp` listesinde rabik görünür ve "Rabik'te hedeflerim neler?" çalışır. "Copy for Claude Desktop" yapılandırmayı kopyalar.
+
 ## 10. Settings ve modlar
 - [ ] Spotlight'tan "Rabik" → Settings açılır; açık/koyu görünüme uyar.
 - [ ] Kutu varsayılan olarak ekranın üst ortasında açılır.

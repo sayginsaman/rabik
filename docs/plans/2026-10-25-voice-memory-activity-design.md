@@ -1,6 +1,6 @@
 # Doğal ses, sözü kesme, kaynaklı cevaplar, etkinlik geçmişi, kişiler, hedefler, bağlayıcı önerisi ve MCP — tasarım
 
-Tarih: 2026-10-25 · Durum: onaylandı, uygulanıyor · Esin: Omi ve HeyClicky karşılaştırma tablosundaki 10, 11, 12, 13, 15, 16, 17, 18 numaralı maddeler
+Tarih: 2026-10-25 · Durum: uygulandı (ffcca0e … 42bd670); ses, sözü kesme, etkinlik kaydı ve Claude Code'daki MCP gerçek kullanımda doğrulanacak · Esin: Omi ve HeyClicky karşılaştırma tablosundaki 10, 11, 12, 13, 15, 16, 17, 18 numaralı maddeler
 
 ## Amaç
 
@@ -59,7 +59,7 @@ Başarı ölçütleri:
 
 ## 13. Etkinlik geçmişi
 
-- Ayar: `activity`, varsayılan kapalı (Settings → Privacy). `activityExclude`: kullanıcının eklediği uygulama paket kimlikleri.
+- Ayar: `activity`, varsayılan kapalı (Settings → Memory; Settings'te ayrı bir Privacy sayfası yok). `activityExclude`: kullanıcının eklediği uygulama paket kimlikleri.
 - **Swift `Activity`:**
   - Öne gelen uygulama değişince ve açıkken 10 saniyede bir, öndeki pencereyi erişilebilirlik API'siyle okur:
     - başlık (`AXTitle`),
@@ -105,7 +105,7 @@ Başarı ölçütleri:
 
 ## 15. Bağlayıcı önerisi
 
-- Ayar: `connectorOffers`, varsayılan açık.
+- Ayar: `connectorOffers`, varsayılan açık (Settings → Account & Access → Offer connectors).
 - Uygulama → bağlayıcı eşlemesi: Notion, Slack, Linear, Figma, Asana, Jira/Confluence (Atlassian), ClickUp, Monday. Eşleşme bağlayıcı adının içinde geçen kelimeyle yapılır.
 - Eşleşen uygulama öne gelince, bağlayıcı `connected` listesinde değilse ve o uygulama susturulmamışsa kutunun köşesinde küçük bir kart çıkar. Bağlayıcı listesi en fazla 6 saatte bir okunur. Kart, örneğin "Rabik ve ajanların Notion'u okuyabilsin mi? Sayfalarını ve veritabanlarını arar, okur." der.
 - Kartın düğmeleri:
@@ -129,8 +129,8 @@ Başarı ölçütleri:
   - "AI meeting summaries" kapalıyken `read_meeting` döküm vermez, yalnızca başlık ve yerel özet verir.
   - Etkinlik geçmişi kapalıyken `search_activity` "off" der.
   - Hassas (`sensitive`) hafıza bilgileri maskelenir.
-- Settings → Agents:
-  - **Add Rabik to Claude Code** düğmesi `claude mcp add --scope user rabik -- /usr/bin/python3 <rabik.py> --mcp` çalıştırır.
+- Settings → Account & Access (bağlayıcıların yanında):
+  - **Add to Claude Code** düğmesi `claude mcp add --scope user rabik -- /usr/bin/python3 <rabik.py> --mcp` çalıştırır.
   - Claude Desktop için yapılandırma parçası kopyalanabilir olarak gösterilir.
 
 ## Hata durumları

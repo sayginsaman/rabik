@@ -194,6 +194,22 @@ Every evening (21:00 unless you pick another time in Settings → General → Da
 
 A recap costs one Haiku call, and a day with nothing in it costs nothing. With AI meeting summaries off, your meetings never go to the AI for it; their own action items still show. Recaps stay on your Mac for a month.
 
+**Goals.** Say "my goal is to ship the beta by Friday" (or "hedefim: …"), or add one in Settings → General → Goals; up to five at a time. The recap's same AI call adds a line when your day moved a goal forward, and only for goals you have. "I finished the beta goal" ticks it off.
+
+## Memory, people and where things were
+
+**Sources.** When an answer comes from Rabik's own records (a saved meeting, a fact in About you, a page from Activity history, a person), chips under it show which, and a click opens that record. Only records Rabik actually read become chips.
+
+**Activity history** (Settings → Memory, off until you turn it on) notes the window in front: its app, title, and the document's file or the browser's page address. Then "open the Figma file I had yesterday" or "what was that pricing page on Tuesday?" works, and the daily recap lists where your time went. It takes no screenshots. Windows under 10 seconds, private and incognito windows, Tor, password managers, apps on your Don't record list, and time while the Mac is locked or idle are never written. It stays on your Mac for 30 days; Clear history deletes it.
+
+**People** (Settings → People) lists who you met in saved meetings (their calendar names and emails, and speaker names) and the People facts in About you, one person however they were spelled. Ask "when did I last talk to Sam?" Hide keeps someone off the list. Nothing new is stored.
+
+**Spoken answers.** With Read answers aloud on, Rabik reads each sentence as the answer streams. Automatic uses the Siri voice; Voice picks one of your Mac's Premium or Enhanced voices, and an answer in another language uses the best voice installed for it. With Stop when I talk on, the mic listens only while Rabik speaks, with Apple's echo cancellation, and your voice stops it. Nothing is recorded.
+
+**Connector offers.** Open Notion, Slack, Linear, Figma, Asana or ClickUp while its Claude connector isn't connected, and the box offers it once, saying what Rabik would read: Connect, Not now (a week) or Don't ask again. It never shows during a call, an ask or dictation. Turn it off in Settings → Account & Access.
+
+**Rabik in Claude Code.** Settings → Account & Access → Add to Claude Code runs `claude mcp add` so Claude Code can read Rabik's memory, meetings, people, goals, recaps and Activity history through a read-only MCP server (`rabik.py --mcp`). Copy for Claude Desktop copies the same config to paste into Claude Desktop. With AI meeting summaries off, meetings give their recap but never the transcript.
+
 ## Routines
 
 Say "every weekday at 8, summarize my calendar" or "every 30 minutes, check my inbox". Rabik saves a routine and macOS wakes it on time, so it costs nothing while it waits. Each run starts a background agent on Cheapest unless you chose another mode, and you get a notification with the result. Runs are skipped while Rabik is paused, and a restart never repeats one. See and remove routines in Settings → General → Scheduled routines, or ask Rabik to remove one. Like other agents, routines need Claude Code.
