@@ -285,7 +285,6 @@ func borrowPasteboard(_ text: String, _ pb: NSPasteboard = .general) -> (() -> V
 // final class PassView lives in MiniScreen/MiniScreen.swift
 // final class MiniScreen lives in MiniScreen/MiniScreen.swift
 
-// final class Speaker lives in Overlay/Speaker.swift
 // final class App lives in Overlay/App.swift
 
 // final class ShelfPanel lives in Overlay/Panels.swift
@@ -298,8 +297,6 @@ func borrowPasteboard(_ text: String, _ pb: NSPasteboard = .general) -> (() -> V
 // final class Onboarding lives in Onboarding/Onboarding.swift
 
 // final class Recap lives in App/Recap.swift
-// final class Activity lives in App/Activity.swift
-// final class ConnectorOffer lives in App/ConnectorOffer.swift
 
 // `Rabik --look <screen #> <out.jpg> [window id]` (rabik.py --look): the screen without Rabik's own box on it, 1280 px wide.
 // With a window id, that window's own capture is painted where it sits, so it shows (and its picture spots click) even when covered or not key.
@@ -788,3 +785,8 @@ NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
 }
 NSApplication.shared.setActivationPolicy(.accessory)
 NSApplication.shared.run()
+
+// Newer types, after everything older checks slice by name:
+// final class Speaker lives in Overlay/Speaker.swift
+// final class Activity lives in App/Activity.swift
+// final class ConnectorOffer lives in App/ConnectorOffer.swift

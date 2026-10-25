@@ -40,7 +40,7 @@ class MeetingShareTests(unittest.TestCase):
         self.assertIn("post({do:'share',text:shareRecap", panel)
 
     def test_rabik_hands_a_send_to_an_agent_with_the_recap(self):
-        self.assertIn("to send one's recap (Slack, Notion, email), hand off with that recap.", brain.prompts.SYSTEM)
+        self.assertIn("(send a recap to Slack/email: hand off)", brain.prompts.SYSTEM)
 
 
 if __name__ == '__main__':
