@@ -18,10 +18,11 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
     var feedbackJob = 0, feedbackURL: URL?
 
     var tab = "", timer: Timer?   // tab: shown once the page loads
-    var revealing: [String: Any]?   // a memory item to show once the page loads
+    var pending: [(String, Any)] = []   // page calls waiting for it to load: a memory item, a meeting or a person to show
 
-    func reveal(_ item: [String: Any]) {
-        if win == nil { revealing = item; open(tab: "memory") } else { open(tab: "memory"); send("reveal", item) }
+    func reveal(_ item: [String: Any]) { open(tab: "memory", then: "reveal", item) }
+    func open(tab t: String, then call: String, _ value: Any) {   // a tab, then one thing on it (a source chip's meeting or person)
+        if win == nil { pending.append((call, value)); open(tab: t) } else { open(tab: t); send(call, value) }
     }
 
     func open(tab t: String = "") {
@@ -62,7 +63,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         decisionHandler(LocalPageOnly.allows(a) ? .allow : .cancel)   // its own page, nothing else (LocalPageOnly)
     }
 
-    func webView(_ v: WKWebView, didFinish n: WKNavigation!) { push(); refresh(); DispatchQueue.global().async { [weak self] in self?.send("perms", Onboarding.perms()) }; if !tab.isEmpty { js("st.tab('\(tab)')"); tab = "" }; if let r = revealing { send("reveal", r); revealing = nil } }
+    func webView(_ v: WKWebView, didFinish n: WKNavigation!) { push(); refresh(); DispatchQueue.global().async { [weak self] in self?.send("perms", Onboarding.perms()) }; if !tab.isEmpty { js("st.tab('\(tab)')"); tab = "" }; for (call, value) in pending { send(call, value) }; pending = [] }
 
     func send(_ call: String, _ v: Any) {
         DispatchQueue.main.async { [weak self] in callJS(self?.web, "st." + call, [v]) }

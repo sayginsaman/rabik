@@ -251,6 +251,12 @@
 
   /* memory receipt: one quiet row under an answer that remembered or forgot something. Click: it opens in place; click an item: Settings → Memory there */
   .mem { margin-top: 12px; animation: in .35s var(--ease) .15s both; }
+  .srcs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; animation: in .35s var(--ease) .2s both; }
+  .src { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; height: 22px; padding: 0 9px; border: 0; border-radius: 11px; cursor: pointer;
+    font: 500 11.5px -apple-system, system-ui, sans-serif; color: var(--fg2); background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.1); transition: color .2s, background .2s; }
+  .src span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .src svg { width: 10px; height: 10px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .src:is(:hover,.hot) { color: #f5f5f7; background: rgba(255,255,255,.11); }
   .mem-h { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0; border: 0; cursor: pointer;
     font: 500 12px -apple-system, system-ui, sans-serif; color: var(--fg2); background: none; transition: color .2s; }
   .mem-h:is(:hover,.hot), .mem.open .mem-h { color: #f5f5f7; }
@@ -579,6 +585,21 @@
       follow(420);   // the box grows and shrinks with it, frame by frame
     };
     const a = part('a'); a ? a.after(d) : turn().append(d); fit();
+  };
+  // ⌖ [{kind, id, label}]: what the answer read from Rabik's own records (brain/sources.py); a chip opens it
+  const SOURCE_ICONS = { meeting: '<path d="M2 3.5h8v6H2zM4 2v2.5M8 2v2.5M2 6h8"/>', day: '<circle cx="6" cy="6" r="4"/><path d="M6 3.8V6l1.5 1"/>',
+    activity: '<path d="M5 7l2-2M4.2 5.6L3 6.8a1.6 1.6 0 0 0 2.2 2.2l1.2-1.2M7.8 6.4L9 5.2A1.6 1.6 0 0 0 6.8 3L5.6 4.2"/>', person: '<circle cx="6" cy="4.3" r="2"/><path d="M2.5 10a3.5 3.5 0 0 1 7 0"/>',
+    fact: '<path d="M3 2.5h6v7.5L6 8.3 3 10z"/>' };
+  const SOURCE_NAMES = { meeting: 'Meeting', day: 'Daily recap', activity: 'Page or file', person: 'Person', fact: 'About you' };
+  const sourceChips = rows => {
+    rows = rows.filter(r => SOURCE_ICONS[r.kind] && r.label); if (!rows.length) return;
+    const d = el('div', 'srcs'); d.setAttribute('role', 'group'); d.setAttribute('aria-label', 'Sources');
+    for (const r of rows) {
+      const b = el('button', 'src'); b.dataset.kind = r.kind; b.innerHTML = `<svg viewBox="0 0 12 12">${SOURCE_ICONS[r.kind]}</svg><span></span>`;
+      b.querySelector('span').textContent = r.label; b.setAttribute('aria-label', `${SOURCE_NAMES[r.kind]}: ${r.label}. Open`);
+      b.onclick = e => { e.stopPropagation(); post({ source: r }); }; d.append(b);
+    }
+    const after = turn().querySelector('.mem') || part('a'); after ? after.after(d) : turn().append(d); fit();
   };
   const settle = () => turn()?.querySelectorAll('.step.live').forEach(e => { e.classList.remove('live'); e.classList.add('done'); });
   const unstream = () => $('thread').querySelectorAll('.a.streaming').forEach(a => { a.classList.remove('streaming'); a.replaceChildren(); });   // the answer so far was a note, or a later attempt follows
@@ -984,6 +1005,7 @@
           clock.append(b);
         }
       } else if (tag === '✎' && turn()) { try { receipt(JSON.parse(s)); } catch {}
+      } else if (tag === '⌖' && turn()) { try { sourceChips(JSON.parse(s)); } catch {}
       } else if (tag === 'i' && turn()) {
         const learned = s.startsWith('Learned: '), d = document.createElement('div');   // "Learned" when it saved a rule, else "Tip"
         d.className = 'tip' + (learned ? ' learned' : ''); d.dataset.k = learned ? 'Learned' : 'Tip'; d.textContent = learned ? s.slice(9) : s;

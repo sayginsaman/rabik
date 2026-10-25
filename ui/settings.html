@@ -1011,6 +1011,7 @@
     flush() { return flush(false); },   // the window is closing: Rabik.app runs the waiting deletion
     tab(name) { openSection(name); },
     reveal(item) { want = item; reveal(); },
+    showMeeting(id) { expectedMeeting = id; post({do: 'meetingOpen', id}); },   // a source chip under an answer
     apps(list) {
       if (asking) return;
       if (!pick) pick = new Set(list.filter(a => a.suggested && a.status === 'new').map(a => a.id));

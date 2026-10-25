@@ -9,7 +9,7 @@ import tempfile
 import threading
 import time
 from functools import wraps
-from brain import environ, paths, storage, wording
+from brain import environ, paths, sources, storage, wording
 
 __all__ = ['ME_FILE', 'CATEGORIES', 'SOURCES', 'SENSITIVE', 'category', '_profile_date', '_mask', '_fact', '_PROFILE_MUTEX',
            '_PROFILE_STATE', '_profile_locked', '_save_profile', '_normalize_profile', 'me', 'profile_name',
@@ -455,6 +455,8 @@ def memory_find(query=''):
              (matches(f['category'].replace('_', ' ') + ' ' + CATEGORIES[f['category']]) or
               matches(f['kind']) or matches(f['value']))]
     rules = [rule for rule in memory_rules() if matches(rule)]
+    if words:   # an answer that used them shows them as chips (sources), each opening Settings → Memory at it
+        for f in facts[:4]: sources.source_note('fact', f['id'], f"{CATEGORIES[f['category']]} · {f['value']}", c=f['category'], t=f['value'])
     lines = []
     for key in CATEGORIES:
         found = [f for f in facts if f['category'] == key]

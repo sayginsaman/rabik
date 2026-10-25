@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from brain import (
     agents, apps, ask, calendar, clients, dictation, drawing, environ, hands, instant, interaction, macos, meeting, memory,
-    paths, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, spotify, storage, support, telemetry, tips,
+    paths, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, sources, spotify, storage, support, telemetry, tips,
     toolhelp, turn, watcher, web, windows, wording)
 
 __all__ = ['INNER', 'BUDGET', 'main']
@@ -578,6 +578,7 @@ def main():
     receipt = memory.memory_receipt(remembered)   # remembered or forgot something: one row under the answer that opens Settings → Memory there
     if receipt and environ.in_box():
         print('✎ ' + json.dumps(receipt, ensure_ascii=False), flush=True)
+    if attempt.ok: sources.source_report()   # the meetings, facts, pages or people this answer read, as chips
     # "When I say focus mode, …" saved: a green Learned pill
     said = shortcut or learned_say   # a new shortcut, named or learned from these words
     tips.tip(reply, f'Learned: Say “{said}” any time.' if said else 'Learned: Procedure saved for next time.' if workflow else taught[1].strip() if taught else '',

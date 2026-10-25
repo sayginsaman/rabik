@@ -159,6 +159,24 @@ final class App: NSObject, WKScriptMessageHandler {
             try? p.run(); voice = p
         }
     }
+    // A source chip under an answer (brain/sources.py): the meeting, day, page or file, person or fact the answer read.
+    func openSource(_ s: [String: Any]) {
+        let id = s["id"] as? String ?? ""
+        switch s["kind"] as? String {
+        case "meeting": Rabik.settings.open(tab: "meetings", then: "showMeeting", id)
+        case "day": dailyRecap.open(id)
+        case "person": Rabik.settings.open(tab: "people", then: "showPerson", id)
+        case "fact": Rabik.settings.reveal(["c": s["c"] as? String ?? "", "t": s["t"] as? String ?? ""])
+        case "activity":
+            if let url = URL(string: id), ["http", "https"].contains(url.scheme?.lowercased() ?? "") { NSWorkspace.shared.open(url) }
+            else if id.hasPrefix("/"), FileManager.default.fileExists(atPath: id) {
+                let file = URL(fileURLWithPath: id)   // a document opens; an app or a program only shows in Finder
+                if file.pathExtension == "app" || FileManager.default.isExecutableFile(atPath: id) { NSWorkspace.shared.activateFileViewerSelecting([file]) }
+                else { NSWorkspace.shared.open(file) }
+            }
+        default: break
+        }
+    }
     func linger(_ s: Double) -> Double { s * (["short": 0.5, "long": 2][Prefs.str("linger")] ?? 1) }
     func clearPointContext() {
         if let path = pointContext?["image"] as? String { try? FileManager.default.removeItem(atPath:path) }
@@ -478,6 +496,7 @@ final class App: NSObject, WKScriptMessageHandler {
             if b["off"] as? String == "tips" { Rabik.settings.apply("tips", false); Rabik.settings.push() }   // a tip's own "Turn off"; never safe mode
             if let v = b["improve"] as? Bool { Rabik.settings.apply("improve", v); Rabik.settings.push() }
             if let item = b["memory"] as? [String: Any] { Rabik.settings.reveal(item) }   // a receipt's item: Settings → Memory, at that item
+            if let source = b["source"] as? [String: Any] { openSource(source) }
             if let ok = b["allow"] as? Bool, !askFile.isEmpty { allow(ok) }
             return
         }

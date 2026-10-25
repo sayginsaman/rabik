@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime
-from brain import clients, memory, paths, prefs, prompts, turn, wording
+from brain import clients, memory, paths, prefs, prompts, sources, turn, wording
 
 __all__ = ['MEETING_BRIEF_LIMIT', 'MEETING_STYLE_LIMIT', 'MEETING_PROMPT_LIMIT', 'MEETING_CONNECTOR_TOOLS', 'meeting_parse',
            'meeting_prompt', 'meeting_process', 'meeting_payload', 'meeting_call', 'meeting_live', 'meeting_local_brief',
@@ -427,6 +427,7 @@ def meeting_history(words):
     stop = set('what did do we i you me my our in the a an on about from of to s meeting meetings call calls decide decided decision decisions happened tell said was last'.split())
     query = ' '.join(w for w in re.findall(r'[\w-]+', words.casefold()) if w not in stop)
     matches = meeting_list(query)[:4]
+    for m in matches: sources.source_note('meeting', m['id'], m['title'] + ' · ' + datetime.fromtimestamp(m['started']).strftime('%b %d'))
     return '\n\n'.join(meeting_markdown(meeting_read(m['id'])) for m in matches)[:40000] or 'No saved meeting matches.'
 
 
