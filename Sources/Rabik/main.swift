@@ -298,6 +298,7 @@ func borrowPasteboard(_ text: String, _ pb: NSPasteboard = .general) -> (() -> V
 // final class Onboarding lives in Onboarding/Onboarding.swift
 
 // final class Recap lives in App/Recap.swift
+// final class Activity lives in App/Activity.swift
 
 // `Rabik --look <screen #> <out.jpg> [window id]` (rabik.py --look): the screen without Rabik's own box on it, 1280 px wide.
 // With a window id, that window's own capture is painted where it sits, so it shows (and its picture spots click) even when covered or not key.
@@ -668,6 +669,8 @@ let dailyRecap = Recap()
 let routineWake = RoutineWake()
 dailyRecap.catchUp()
 MeetingSpeech.load { settings.send("meetingLanguages", MeetingSpeech.languages) }   // Settings → Meetings → Language
+let activity = Activity()   // Settings → Memory → Activity history
+activity.sync()
 let onboarding = Onboarding()
 if !UserDefaults.standard.bool(forKey: "onboarded") { DispatchQueue.main.async { onboarding.open() } }
 else { Onboarding.plan { c in if c["ok"] as? Bool != true { onboarding.open() } } }   // set up once, but Claude signed out since

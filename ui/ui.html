@@ -788,7 +788,7 @@
       for(const t of rows){const li=document.createElement('li');li.textContent=t;ul.append(li);}body.append(h,ul);};
     list('Today',r.highlights);list('Decisions',r.decisions);
     if(r.actions?.length){const h=document.createElement('h4');h.textContent='To do';const box=document.createElement('div');box.className='todos';body.append(h,box);}
-    list('Tomorrow',r.tomorrow);
+    list('Most time on',r.focus||[]);list('Tomorrow',r.tomorrow);
     if(r.note){const n=document.createElement('p');n.className='note';n.textContent=r.note;body.append(n);}
     const actions=d.querySelector('.agent-actions');
     const later=keyButton('Later','esc');later.dataset.esc='';later.onclick=()=>{d.remove();post({recapLater:true});fit();};actions.append(later);

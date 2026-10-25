@@ -13,7 +13,7 @@ import threading
 import time
 from pathlib import Path
 from brain import (
-    agents, apps, ask, calendar, clients, dictation, drawing, environ, hands, instant, interaction, macos, meeting, memory,
+    activity, agents, apps, ask, calendar, clients, dictation, drawing, environ, hands, instant, interaction, macos, meeting, memory,
     paths, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, sources, spotify, storage, support, telemetry, tips,
     toolhelp, turn, watcher, web, windows, wording)
 
@@ -59,6 +59,8 @@ def main():
         return agents.agents_service()
     if args == ['--feedback']:
         return print(json.dumps(support.feedback(json.load(sys.stdin))))
+    if args[:1] == ['--activity']:
+        return print(activity.activity_search(' '.join(args[1:])))
     if args[:1] == ['--meeting-history']:
         return print(meeting.meeting_history(' '.join(args[1:])))
     if args == ['--meetings']:

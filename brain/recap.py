@@ -8,7 +8,7 @@ import re
 import subprocess
 import time
 from datetime import date, datetime, timedelta
-from brain import agents, calendar, meeting, paths, prefs, routine, storage, wording
+from brain import activity, agents, calendar, meeting, paths, prefs, routine, storage, wording
 
 __all__ = ['RECAP_SYSTEM', 'RECAP_DATE_CUE', 'recap_path', 'recap_day', 'recap_tomorrow', 'recap_inputs', 'recap_local',
            'recap_check', 'recap_read', 'recap_make', 'recap_due', 'recap_items', 'recap_remind', 'recap_command']
@@ -123,8 +123,10 @@ def recap_make(day=None, force=False, evening=False):
         fingerprint = json.dumps([len(inputs['asks']), inputs['asks'][-1:], [a['id'] for a in inputs['agents']],
                                   [[m['id'], len(m['summary']), len(m['actions'])] for m in inputs['meetings']], inputs['tomorrow']])
         old = recap_read(day)
+        focus = activity.activity_day(day)   # where the day went: from Activity history, never the AI
         if old and old.get('fingerprint') == fingerprint and not force:
-            if evening and not old.get('evening'): old['evening'] = True; storage.private_json(recap_path(day), old)
+            if (evening and not old.get('evening')) or old.get('focus', []) != focus:
+                old.update(evening=old.get('evening') or evening, focus=focus); storage.private_json(recap_path(day), old)
             return old
         recap, source, note = recap_local(inputs), 'local', ''
         if prefs.client() == 'claude':
@@ -143,7 +145,7 @@ def recap_make(day=None, force=False, evening=False):
         for action in recap['actions']:
             action.update(key=wording.casekey(action['text']), source=titles.get(action['from'], ''), added=added.get(wording.casekey(action['text']), ''))
         result = {'day': day, 'made': time.time(), 'source': source, 'note': note, 'fingerprint': fingerprint,
-                  'evening': evening or bool((old or {}).get('evening')), **recap}
+                  'evening': evening or bool((old or {}).get('evening')), **recap, 'focus': focus}
         storage.private_json(recap_path(day), result)
         for name in os.listdir(folder):   # a month of recaps, no more
             if re.fullmatch(r'\d{4}-\d{2}-\d{2}\.json', name) and name[:10] < (date.fromisoformat(day) - timedelta(days=30)).isoformat():

@@ -86,6 +86,7 @@
   p.lede { color: var(--fg2); margin: 0 0 22px; line-height: 1.45; }
   h3 { font: 700 13px/16px system-ui; color: var(--fg); margin: 26px 2px 8px; }   /* macOS Headline */
 
+  .chip { font: 500 11px -apple-system, system-ui; color: var(--fg); background: var(--ctl); border: 0; border-radius: 9px; padding: 2px 8px; margin: 2px 4px 0 0; box-shadow: inset 0 0 0 .5px var(--line); cursor: pointer; }
   #recapat { font: 13px -apple-system, system-ui; color: var(--fg); background: var(--ctl); border: 0; border-radius: 6px; padding: 3px 6px; box-shadow: inset 0 0 0 .5px var(--line), 0 1px 1px rgba(0,0,0,.04); }
   .remindbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin: 8px 2px 0; } .remindbar span { color: var(--fg3); font-size: 11.5px; }
   .row.todo { cursor: pointer; } .row.todo:has(input:disabled) { cursor: default; }
@@ -422,6 +423,12 @@
     <h3>Rules</h3>
     <div class="group" id="rules" data-category="rules"></div>
     <p class="lede" style="margin:9px 2px 0;font-size:11.5px">Say “remember…” or add one here.</p>
+    <h3>Activity history</h3>
+    <div class="group">
+      <div class="row"><div class="t"><b>Activity history</b><span>Pages, files and windows you look at, for “where was that?”. <i class="info" title="Read from the window in front: its app, title, file or page address. No screenshots. Private windows, Tor and password managers are skipped. On this Mac, 30 days.">i</i></span></div><label class="sw"><input type="checkbox" data-k="activity"></label></div>
+      <div class="row"><div class="t"><b>Don’t record</b><span id="activityexclude">No apps.</span></div><button class="btn" id="activityadd">Add App…</button></div>
+      <div class="row"><div class="t"><b>Clear history</b><span>Deletes everything noted so far.</span></div><button class="btn" id="activityclear">Clear…</button></div>
+    </div>
     <h3>Saved commands and procedures</h3>
     <div class="group" id="skills"></div>
   </section>
@@ -668,6 +675,15 @@
   $('reminderslist').onchange = e => set('remindersList', e.target.value);
   $('meetinglanguage').onchange = e => set('meetingLanguage', e.target.value);
   $('voice').onchange = e => set('voice', e.target.value);
+  $('activityadd').onclick = () => post({do: 'activityExcludeAdd'});
+  $('activityclear').onclick = () => post({do: 'activityClear'});
+  const paintActivity = () => {   // Don't record: each app a chip whose × takes it off the list
+    const list = Array.isArray(P.activityExclude) ? P.activityExclude : [], box = $('activityexclude');
+    box.replaceChildren(...list.map(a => { const c = document.createElement('button'); c.className = 'chip'; c.textContent = a.name + ' ×'; c.setAttribute('aria-label', `Record ${a.name} again`);
+      c.onclick = () => set('activityExclude', list.filter(x => x.id !== a.id)); return c; }));
+    if (!list.length) box.textContent = 'No apps.';
+    for (const id of ['activityadd', 'activityclear']) $(id).closest('.row').classList.toggle('dim', !P.activity);
+    $('activityadd').disabled = !P.activity; };
   let voices = [];   // the Mac's natural voices (Premium, Enhanced), from Rabik.app
   const paintVoices = () => { const s = $('voice'); s.replaceChildren(new Option('Automatic (Siri)', ''), ...voices.map(v => new Option(v.name, v.id)));
     if (P.voice && !voices.some(v => v.id === P.voice)) s.append(new Option('Chosen voice', P.voice)); s.value = P.voice || '';
@@ -714,7 +730,7 @@
       s.value = s.dataset.k === 'microphone' && ![...s.options].some(o => o.value === value) ? 'automatic' : value;
     });
     document.querySelectorAll('input[type=range]').forEach(r => r.value = P[r.dataset.k]);
-    $('recapat').value = P.recapAt || '21:00'; paintMeetingLanguages(); paintVoices();
+    $('recapat').value = P.recapAt || '21:00'; paintMeetingLanguages(); paintVoices(); paintActivity();
     const lists = $('reminderslist'), chosen = P.remindersList || '';
     lists.replaceChildren(new Option('Default list', ''), ...reminderLists.map(l => new Option(l.title + (l.isDefault ? ' (default)' : ''), l.id)));
     if (chosen && !reminderLists.some(l => l.id === chosen)) lists.append(new Option('Your chosen list', chosen));   // not readable now: keep it, never reset

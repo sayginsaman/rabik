@@ -239,6 +239,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         if k == "speechModel" { app.prepareSpeech() }
         if k == "boxPosition" { app.placeBox() }
         if k == "recap" || k == "recapAt" { dailyRecap.sync() }
+        if k == "activity" { activity.sync() }
         if k == "improve" { Prefs.set("improveAsked", true) }   // any answer, here or in setup or the card, is the answer
         if k == "speak" { if v as? Bool == true { siriVoice() } else { app.shush() } }
         if k == "hideWhenSharing" { NSApp.windows.forEach(applySharing) }
@@ -279,6 +280,15 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         case "set":
             guard let k = b["k"] as? String, let v = b["v"] else { return }
             apply(k, v)
+        case "activityClear":
+            guard confirm("Clear activity history?", "Every page, file and window Rabik noted on this Mac is deleted.", "Clear") else { return }
+            activity.clear(); send("notice", ["text": "Activity history cleared."])
+        case "activityExcludeAdd":   // Don't record: an app picked in /Applications
+            let panel = NSOpenPanel(); panel.directoryURL = URL(fileURLWithPath: "/Applications"); panel.allowedContentTypes = [.applicationBundle]; panel.prompt = "Don’t Record"
+            guard panel.runModal() == .OK, let url = panel.url, let id = Bundle(url: url)?.bundleIdentifier else { return }
+            var list = Prefs.d["activityExclude"] as? [[String: String]] ?? []
+            if !list.contains(where: { $0["id"] == id }) { list.append(["id": id, "name": FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")]) }
+            apply("activityExclude", list); push()
         case "dictationWord":
             if let word = b["word"] as? String, DictationData.word(word, replacing: b["old"] as? String) { send("dictation", DictationData.state()) }
             else { send("notice", ["text": "Couldn’t save that word. Use 1–80 characters, up to 500 words and 4,000 characters total."]) }
