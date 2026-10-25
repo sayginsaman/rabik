@@ -43,7 +43,7 @@ console.log(JSON.stringify(Object.fromEntries(process.argv.slice(3).map(l => [l,
         box, agents, meeting = ((root / 'ui' / f).read_text() for f in ('ui.html', 'agents.html', 'meeting.html'))
         self.assertIn('setState(E.stepOrb(s))', box)
         self.assertIn("setState('composing'); reveal(a", box)   # an answer arriving is being written
-        self.assertIn("setState('connecting'); pill('finishing'", box)
+        self.assertIn("setState('composing'); pill('finishing'", box)   # dictation's cleanup writes the words again
         self.assertIn("r.status==='running'?E.stepOrb(r.step)", agents)
         for state in ('listening', 'solving', 'composing', 'searching', 'connecting', 'breathing'):
             with self.subTest(meeting=state): self.assertIn(f"orbWanted='{state}'", meeting)

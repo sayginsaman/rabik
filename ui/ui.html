@@ -925,7 +925,7 @@
     },
     finishing(label) {   // dictation released: the wave goes and the pill folds into the working orb
       listening = false; boost = 1; $('orb').style.transform = ''; document.body.classList.remove('locked', 'hearing');
-      setState('connecting'); pill('finishing', label);   // the words are being finalized and handed over
+      setState('composing'); pill('finishing', label);   // the dictated words are being cleaned up: written again
     },
     dictated({ text, ok, words, history }) {   // landed (no text): a green check; otherwise one short line (ok: with a check); words: unsaved, so they can be copied; history: saved there
       listening = false; boost = 1; $('orb').style.transform = ''; document.body.classList.remove('locked', 'hearing');

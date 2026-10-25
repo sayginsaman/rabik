@@ -591,7 +591,7 @@ const $ = id => id === 'dn' ? dn : { style: {} }, setState = s => states.push(s)
 const fail = m => { console.error(m); process.exit(1); }, state = () => ['finishing', 'done', 'said'].filter(c => classes.has(c)).join();
 classes.add('dictate', 'hearing', 'locked');
 ui.finishing('Cleaning up…');
-if (state() !== 'finishing' || classes.has('hearing') || classes.has('locked') || states.at(-1) !== 'solving' || dn.textContent !== 'Cleaning up…' || !fits) fail('release did not fold into the working orb: ' + state());
+if (state() !== 'finishing' || classes.has('hearing') || classes.has('locked') || states.at(-1) !== 'composing' || dn.textContent !== 'Cleaning up…' || !fits) fail('release did not fold into the working orb: ' + state());
 ui.dictated({ text: '', ok: true });
 if (state() !== 'done' || states.at(-1) !== 'breathing' || dn.textContent !== 'Inserted') fail('landing did not end on the check: ' + state());
 ui.dictated({ text: 'Nothing selected to insert — saved to History.', ok: false });
