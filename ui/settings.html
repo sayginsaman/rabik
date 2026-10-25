@@ -54,13 +54,22 @@
   .me { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; }
   .me img { width: 38px; height: 38px; }
   .me b { display: block; font: 600 14px system-ui; } .me span { color: var(--fg3); font-size: 11px; }
-  nav button { all: unset; flex-shrink: 0; display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 8px; border-radius: 7px;
+  nav button { all: unset; flex-shrink: 0; display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 8px; border-radius: 8px;
     font-size: 13px; color: var(--fg); transition: background .15s; }
   nav button:hover { background: var(--sel); }
   nav button.on { background: var(--accent); color: #fff; }
   nav button:focus-visible { outline: 2px solid rgba(10,132,255,.5); }
-  .ni { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex: none; }
-  .ni svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  /* icon tiles, as in System Settings: a white filled glyph on the page's colour, lit from above. Its inline color is the tile's own,
+     for the strokes that cut into a glyph (.c, .cf). Selected, a light ring keeps a blue tile apart from the blue row. */
+  .ni { position: relative; width: 20px; height: 20px; border-radius: 5.5px; display: grid; place-items: center; flex: none;
+    box-shadow: inset 0 0 0 .5px rgba(0,0,0,.14), 0 .5px 1px rgba(0,0,0,.12); }
+  .ni::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(rgba(255,255,255,.26), rgba(255,255,255,0) 55%); }
+  nav button.on .ni { box-shadow: inset 0 0 0 .5px rgba(0,0,0,.14), 0 0 0 1px rgba(255,255,255,.55); }
+  .ni svg { position: relative; width: 14px; height: 14px; fill: #fff; stroke: none; }
+  .ni svg .s { fill: none; stroke: #fff; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+  .ni svg .c { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .ni svg .cf { fill: currentColor; }
+  .ni svg .j { stroke: #fff; stroke-width: 1.2; stroke-linejoin: round; }   /* a filled shape with softened corners */
   nav .spacer { flex: 1; }
   #feedbacknav { color: #0066cc; } @media (prefers-color-scheme: dark) { #feedbacknav { color: var(--accent); } } #feedbacknav.on { color: #fff; } #feedbacknav .out { width: 13px; height: 13px; margin-left: -4px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }   /* reads as a link: easy to miss as plain text */
   #dictationnav { margin-bottom: 10px; } #agentsnav .count { margin-left: auto; } #agentsnav.on .count { color: rgba(255,255,255,.8); }
@@ -71,11 +80,11 @@
   section { display: none; max-width: 600px; margin: 0 auto; }
   section.on { display: block; animation: rise .35s var(--out); }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
-  h1 { font: 700 24px/1.15 system-ui; letter-spacing: -.02em; margin: 0 0 4px; }
+  h1 { font: 700 22px/26px system-ui; letter-spacing: -.012em; margin: 0 0 4px; }   /* macOS Title 1 */
   h1:has(> .ni) { display: flex; align-items: center; gap: 11px; margin-bottom: 8px; }   /* the page's sidebar icon, larger, beside its title */
-  h1 .ni { width: 32px; height: 32px; border-radius: 8px; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.08); } h1 .ni svg { width: 19px; height: 19px; }
+  h1 .ni { width: 30px; height: 30px; border-radius: 7.5px; } h1 .ni svg { width: 20px; height: 20px; }
   p.lede { color: var(--fg2); margin: 0 0 22px; line-height: 1.45; }
-  h3 { font: 600 13px system-ui; letter-spacing: -.005em; color: var(--fg); margin: 30px 2px 9px; }
+  h3 { font: 700 13px/16px system-ui; color: var(--fg); margin: 26px 2px 8px; }   /* macOS Headline */
 
   .group { background: var(--card); border-radius: 11px; box-shadow: inset 0 0 0 .5px var(--line), 0 1px 2px rgba(0,0,0,.04); }
   div.group { overflow: hidden; }   /* a hovered first or last row keeps the card's round corners */
@@ -85,9 +94,10 @@
   .row.now { background: rgba(10,132,255,.1); } .row.now .btn { pointer-events: none; opacity: .5; }
   .row { transition: opacity .2s var(--ease), background-color .15s var(--ease); } .row.dim { opacity: .45; }
   .row:has(> .x):hover { background: var(--hover); }   /* list items with actions */
-  .row + .row { box-shadow: inset 0 .5px 0 var(--line); }
-  .row .t { flex: 1; min-width: 0; } .row .t b { display: block; font-weight: 500; }
-  .row .t span { display: block; color: var(--fg3); font-size: 11.5px; margin-top: 2px; line-height: 1.35; }
+  .row + .row { background-image: linear-gradient(var(--line), var(--line)); background-position: 14px 0; background-size: calc(100% - 14px) .5px;
+    background-repeat: no-repeat; }   /* separators start at the text, as in System Settings; only the image, so a row's own colour stays */
+  .row .t { flex: 1; min-width: 0; } .row .t b { display: block; font-weight: 400; line-height: 16px; }   /* macOS Body */
+  .row .t span { display: block; color: var(--fg3); font-size: 11px; margin-top: 2px; line-height: 14px; }   /* macOS Subheadline */
   .info { display: inline-grid; place-items: center; width: 11px; height: 11px; margin-left: 2px; vertical-align: -1px; border-radius: 50%;
     box-shadow: inset 0 0 0 1px currentColor; font: 600 8px/1 -apple-system, system-ui; font-style: normal; cursor: help; }   /* the rare detail, on hover */
 
@@ -277,15 +287,15 @@
 
 <nav>
   <div class="me"><img id="icon" alt=""><div><b>Rabik</b><span>Just ask.</span></div></div>
-  <button id="agentsnav" aria-label="Open Agents"><i class="ni" style="background:#30b0c7"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="13" height="12" rx="2.5"/><path d="M8 4.5h9.5A2.5 2.5 0 0 1 20 7v9"/></svg></i>Agents<span class="count" id="agentcount"></span></button>
-  <button data-s="dictation" id="dictationnav"><i class="ni" style="background:#ff375f"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11v1a6 6 0 0 0 12 0v-1M12 18v3M8 21h8"/></svg></i>Dictation</button>
-  <button data-s="general" class="on" aria-current="page"><i class="ni" style="background:#8e8e93"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></i>General</button>
-  <button data-s="brain"><i class="ni" style="background:#d97757"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/></svg></i>Intelligence</button>
-  <button data-s="memory"><i class="ni" style="background:#ff9f0a"><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z"/></svg></i>Memory</button>
-  <button data-s="meetings"><i class="ni" style="background:#5e5ce6"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 14h3M8 17h7"/></svg></i>Meetings</button>
-  <button data-s="usage"><i class="ni" style="background:#30d158"><svg viewBox="0 0 24 24"><path d="M5 19V11M12 19V5M19 19v-6"/></svg></i>Usage</button>
-  <button data-s="account"><i class="ni" style="background:#0a84ff"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></i>Account &amp; Access</button>
-  <button data-s="about"><i class="ni" style="background:#bf5af2"><svg viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4M5 19h14"/></svg></i>About &amp; Updates</button>
+  <button id="agentsnav" aria-label="Open Agents"><i class="ni" style="background:#30b0c7;color:#30b0c7"><svg viewBox="0 0 24 24"><path class="s" d="M9 5h7.5A3.5 3.5 0 0 1 20 8.5V16"/><rect x="4" y="8.5" width="12" height="11.5" rx="3"/></svg></i>Agents<span class="count" id="agentcount"></span></button>
+  <button data-s="dictation" id="dictationnav"><i class="ni" style="background:#ff375f;color:#ff375f"><svg viewBox="0 0 24 24"><rect x="8.5" y="2.5" width="7" height="12.5" rx="3.5"/><path class="s" d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18.5v3"/></svg></i>Dictation</button>
+  <button data-s="general" class="on" aria-current="page"><i class="ni" style="background:#8e8e93;color:#8e8e93"><svg viewBox="0 0 24 24"><path d="M10.58 4.53 L10.80 1.87 L13.20 1.87 L13.42 4.53 L16.27 5.71 L18.31 3.99 L20.01 5.69 L18.29 7.73 L19.47 10.58 L22.13 10.80 L22.13 13.20 L19.47 13.42 L18.29 16.27 L20.01 18.31 L18.31 20.01 L16.27 18.29 L13.42 19.47 L13.20 22.13 L10.80 22.13 L10.58 19.47 L7.73 18.29 L5.69 20.01 L3.99 18.31 L5.71 16.27 L4.53 13.42 L1.87 13.20 L1.87 10.80 L4.53 10.58 L5.71 7.73 L3.99 5.69 L5.69 3.99 L7.73 5.71Z"/><circle class="cf" cx="12" cy="12" r="3.3"/></svg></i>General</button>
+  <button data-s="brain"><i class="ni" style="background:#d97757;color:#d97757"><svg viewBox="0 0 24 24"><path d="M10.5 4.5 Q12.03 11.47 19.0 13 Q12.03 14.53 10.5 21.5 Q8.97 14.53 2.0 13 Q8.97 11.47 10.5 4.5Z"/><path d="M18.5 2.0 Q19.13 4.87 22.0 5.5 Q19.13 6.13 18.5 9.0 Q17.87 6.13 15.0 5.5 Q17.87 4.87 18.5 2.0Z"/></svg></i>Intelligence</button>
+  <button data-s="memory"><i class="ni" style="background:#ff9f0a;color:#ff9f0a"><svg viewBox="0 0 24 24"><path class="j" d="M7 3.5h10a1.5 1.5 0 0 1 1.5 1.5v15.5l-6.5-4.3-6.5 4.3V5A1.5 1.5 0 0 1 7 3.5z"/></svg></i>Memory</button>
+  <button data-s="meetings"><i class="ni" style="background:#5e5ce6;color:#5e5ce6"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="13" height="12" rx="3"/><path class="j" d="M17 10.3l3.6-2.4c.6-.4 1.4 0 1.4.8v6.6c0 .8-.8 1.2-1.4.8L17 13.7z"/></svg></i>Meetings</button>
+  <button data-s="usage"><i class="ni" style="background:#30d158;color:#30d158"><svg viewBox="0 0 24 24"><rect x="3.5" y="12" width="4.6" height="8.5" rx="1.6"/><rect x="9.7" y="4" width="4.6" height="16.5" rx="1.6"/><rect x="15.9" y="8.5" width="4.6" height="12" rx="1.6"/></svg></i>Usage</button>
+  <button data-s="account"><i class="ni" style="background:#0a84ff;color:#0a84ff"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.2"/><path d="M3.8 20.6c.4-4.3 3.9-6.9 8.2-6.9s7.8 2.6 8.2 6.9z"/></svg></i>Account &amp; Access</button>
+  <button data-s="about"><i class="ni" style="background:#bf5af2;color:#bf5af2"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path class="c" d="M12 7v9M8.3 12.4 12 16.1l3.7-3.7"/></svg></i>About &amp; Updates</button>
   <div class="spacer"></div>
   <button data-s="feedback" id="feedbacknav">Report feedback<svg class="out" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></button>
   <div class="ver" id="ver"></div>
@@ -414,7 +424,7 @@
 
   <section id="apps">
     <button class="btn" id="appsback" onclick="st.tab('account')">← Account &amp; Access</button>
-    <h1><i class="ni" style="background:#ff453a" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg></i>Apps</h1>
+    <h1><i class="ni" style="background:#ff453a;color:#ff453a" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg></i>Apps</h1>
     <p class="lede">Tick the apps Rabik can control. Allow them now so it won’t stop to ask.</p>
     <div class="appbar"><div class="seg" id="appview" role="group" aria-label="App list"><button data-v="key" class="on" aria-pressed="true">Key Apps</button><button data-v="all" aria-pressed="false">All Apps</button></div>
       <input id="appq" class="search" placeholder="Search all apps" aria-label="Search all apps"><button class="btn blue" id="allow" disabled>Allow</button></div>
