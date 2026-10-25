@@ -107,6 +107,13 @@
   .seg button.on { background: var(--on); box-shadow: 0 1px 3px rgba(0,0,0,.15), inset 0 0 0 .5px var(--line); }
   .seg button:focus-visible { outline: 2px solid rgba(10,132,255,.5); }
   .seg button:disabled { opacity: .4; pointer-events: none; }
+  /* Box position: a small display with the six places the box can open, under a menu bar; the chosen one is filled */
+  .seg[data-k=boxPosition] { display: grid; grid-template-columns: repeat(3, 26px); grid-template-rows: repeat(2, 15px); justify-content: space-between; align-content: space-between;
+    position: relative; width: 116px; height: 74px; padding: 12px 9px 9px; box-sizing: border-box; border-radius: 10px; background: var(--well); box-shadow: inset 0 0 0 1px var(--line); }
+  .seg[data-k=boxPosition]::before { content: ''; position: absolute; inset: 0 0 auto; height: 5px; border-radius: 10px 10px 0 0; background: var(--track); }
+  .seg[data-k=boxPosition] button { padding: 0; border-radius: 4px; text-indent: 100%; white-space: nowrap; overflow: hidden; cursor: pointer;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 20%, transparent); transition: background .2s, box-shadow .2s; }
+  .seg[data-k=boxPosition] button.on { background: var(--accent); box-shadow: 0 1px 4px rgba(10,132,255,.4); }
   .shortcut + .group { margin-top: 12px; }
 
   select { font: 13px system-ui; color: var(--fg); background: var(--ctl); border: 0; border-radius: 6px; padding: 3px 6px;
@@ -323,6 +330,10 @@
     <div class="group">
       <div class="row"><div class="t"><b>Shortcut opens</b></div><div class="seg" data-k="input"><button data-v="voice">Voice</button><button data-v="type">Typing</button></div></div>
       <div class="row"><div class="t"><b id="talklabel">Shortcut behavior</b><span id="talkhint">Esc cancels.</span></div><div class="seg" data-k="talkMode" role="group" aria-labelledby="talklabel"><button data-v="hold">Hold to talk</button><button data-v="toggle">Press to toggle</button></div></div>
+    </div>
+    <h3>Box</h3>
+    <div class="group">
+      <div class="row"><div class="t"><b>Box position</b><span>Where the box opens, on the screen with your pointer.</span></div><div class="seg" data-k="boxPosition"><button data-v="top-left">Top left</button><button data-v="top-center">Top center</button><button data-v="top-right">Top right</button><button data-v="bottom-left">Bottom left</button><button data-v="bottom-center">Bottom center</button><button data-v="bottom-right">Bottom right</button></div></div>
     </div>
     <h3>Voice</h3>
     <div class="group">
@@ -620,6 +631,7 @@
 
   document.querySelectorAll('.seg[data-k],input[data-k],select[data-k]').forEach(e=>{if(e.matches('.seg'))e.setAttribute('role','group');if(!e.hasAttribute('aria-label')&&!e.hasAttribute('aria-labelledby'))e.setAttribute('aria-label',e.closest('.row')?.querySelector('.t b')?.textContent||e.dataset.k)});
   document.querySelectorAll('.info').forEach(i => { i.tabIndex = 0; i.setAttribute('role', 'img'); i.setAttribute('aria-label', i.title); });
+  document.querySelectorAll('[data-k=boxPosition] button').forEach(b => b.title = b.textContent);   // its spots show their names on hover
 
   document.querySelector('[data-k="microphone"]').onchange = e => set('microphone', e.target.value);
   document.querySelectorAll('.seg[data-k]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => set(g.dataset.k, b.dataset.v)));

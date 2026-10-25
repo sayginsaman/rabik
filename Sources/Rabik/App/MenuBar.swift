@@ -31,11 +31,28 @@ final class MenuBar: NSObject, NSMenuDelegate {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     override init() {
         super.init()
-        item.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Rabik")
+        item.button?.image = MenuBar.logo
         let m = NSMenu(); m.delegate = self; item.menu = m
         item.isVisible = Prefs.bool("menuIcon")
         paint()
     }
+    // The Rabik face (docs/rabik-logo.png) as a template: eyes and smile cut out, so the menu bar tints it for light, dark and paused.
+    static let logo: NSImage = {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { r in
+            let s = r.insetBy(dx: 1.5, dy: 1.5), w = s.width, h = s.height
+            NSColor.black.setFill(); NSBezierPath(roundedRect: s, xRadius: w * 0.3, yRadius: h * 0.3).fill()
+            NSGraphicsContext.current?.compositingOperation = .destinationOut
+            for x in [0.31, 0.69] {
+                NSBezierPath(roundedRect: NSRect(x: s.minX + w * (x - 0.055), y: s.minY + h * 0.45, width: w * 0.11, height: h * 0.21), xRadius: w * 0.055, yRadius: w * 0.055).fill()
+            }
+            let smile = NSBezierPath()
+            smile.appendArc(withCenter: NSPoint(x: s.midX, y: s.minY + h * 0.47), radius: w * 0.12, startAngle: 222, endAngle: 318)
+            smile.lineWidth = w * 0.085; smile.lineCapStyle = .round; smile.stroke()
+            return true
+        }
+        image.isTemplate = true; image.accessibilityDescription = "Rabik"
+        return image
+    }()
     func paint() { item.button?.appearsDisabled = Prefs.bool("paused"); item.button?.title = meeting.running ? " ·" : ""; item.length = meeting.running ? 38 : NSStatusItem.squareLength }
     func menuNeedsUpdate(_ m: NSMenu) {
         m.removeAllItems()

@@ -76,6 +76,20 @@ class SettingsPageTests(unittest.TestCase):
         self.assertTrue(all(re.search(r'<i class="info" title="[^"]+">i</i></span>', m) for m in re.findall(r'<span>[^<]*<i class="info".*?</span>', page)))
         self.assertIn('Risky actions need approval. Commands write only to a scratch folder.', page)
 
+    def test_box_position_is_a_small_screen_with_six_spots(self):
+        out = self.page("""st.load({prefs: {hotkeyLabel: '⌃⌥Space', boxPosition: 'top-center'}}); await tick(20);
+            const g = document.querySelector('[data-k=boxPosition]'), o = g.getBoundingClientRect();
+            const on = [...g.querySelectorAll('button.on')].map(b => b.dataset.v);
+            const spots = [...g.querySelectorAll('button')].map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.x - o.x), Math.round(r.y - o.y)]; });
+            const titles = [...g.querySelectorAll('button')].map(b => b.title);
+            g.querySelector('[data-v=bottom-left]').click();
+            return {on, spots, titles, label: g.getAttribute('aria-label')};""")
+        self.assertEqual(out['result']['on'], ['top-center'])
+        self.assertEqual(out['result']['spots'], [[9, 12], [45, 12], [81, 12], [9, 50], [45, 50], [81, 50]])   # three across, top and bottom
+        self.assertEqual(out['result']['titles'][:2], ['Top left', 'Top center'])
+        self.assertEqual(out['result']['label'], 'Box position')
+        self.assertIn({'do': 'set', 'k': 'boxPosition', 'v': 'bottom-left'}, out['posts'])
+
     def test_notice_shows_and_its_action_runs_once(self):
         out = self.page('''st.notice({text: 'Couldn’t save that change, so the old setting is back.'});
             const shown = !$('notice').hidden && $('noticebtn').hidden;

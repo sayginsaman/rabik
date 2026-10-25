@@ -316,7 +316,7 @@ print("hidden rewrite target kept")
 
     def test_visible_box_follows_the_pointer_display_without_interrupting_interaction(self):
         follow = self.swift[self.swift.index("    func followPointerScreen()"):self.swift.index("    func pointElement(")]
-        self.assertIn("panel.isVisible, !dragging, !hovering, let f = pointerFollow(panel.frame)", follow)
+        self.assertIn("panel.isVisible, !dragging, !hovering, var f = pointerFollow(panel.frame)", follow)
         self.assertNotIn("composing", follow)   # the typing box follows too
         self.assertIn("frame(f)", follow)
         show = self.swift[self.swift.index("    func show()"):self.swift.index("    func hide(")]

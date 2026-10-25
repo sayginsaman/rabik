@@ -66,6 +66,10 @@ Bu build hakkında:
 
 ## 10. Settings ve modlar
 - [ ] Spotlight'tan "Rabik" → Settings açılır; açık/koyu görünüme uyar.
+- [ ] Kutu varsayılan olarak ekranın üst ortasında açılır.
+- [ ] Settings → General → Box position'da başka bir yere tıkla → kutu bir anlığına orada görünür; kısayolla açınca da orada açılır. Alt konumlarda kutu yukarı doğru büyür.
+- [ ] "Kutuyu sağ alta al" de → ayar değişir.
+- [ ] Menü çubuğunda Rabik'in yüzü görünür; açık ve koyu menü çubuğunda okunur, Rabik duraklatılınca soluklaşır.
 - [ ] Safe mode notu: "Risky actions need approval. Commands write only to a scratch folder."
 - [ ] Safe mode'u kapat (Full access): kutuda "Full access" etiketi çıkar; etikete tıklayınca Safe mode geri açılır.
 - [ ] Full access'te dördüncü bölümdeki taşıma isteği kart çıkmadan çalışır (`rm` yine engellidir, dosyalar çöpe gider).

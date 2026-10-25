@@ -16,7 +16,7 @@ def native_fixture(body, real_mini=False):
     """The real agent panels with stubbed app, prefs and worker, then a fixture `body`."""
     source=native_source()
     panels=source[source.index('// MARK: - Agent panels'):source.index('// First-run window')].replace('NSWorkspace.shared.accessibilityDisplayShouldReduceMotion','fixtureReduced')
-    show=source[source.index('    func show()',source.index('final class App')):source.index('    func hide(after',source.index('final class App'))]
+    show=source[source.index('    var boxSpot: String {',source.index('final class App')):source.index('    func hide(after',source.index('final class App'))]
     lease=source[source.index('    static func screenLease()'):source.index('    static func fingerprint',source.index('    static func screenLease()'))]
     defaults=source[source.index('    func defaultKey('):source.index('    func gone()',source.index('    func defaultKey('))]
     keys=source[source.index('var specs = [EventTypeSpec'):source.index('var ref: EventHotKeyRef?',source.index('var specs = [EventTypeSpec'))]

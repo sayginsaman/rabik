@@ -233,6 +233,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
             }
         }
         if k == "speechModel" { app.prepareSpeech() }
+        if k == "boxPosition" { app.placeBox() }
         if k == "improve" { Prefs.set("improveAsked", true) }   // any answer, here or in setup or the card, is the answer
         if k == "speak" { if v as? Bool == true { siriVoice() } else { app.shush() } }
         if k == "hideWhenSharing" { NSApp.windows.forEach(applySharing) }

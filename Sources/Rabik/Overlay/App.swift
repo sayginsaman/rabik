@@ -60,7 +60,7 @@ final class App: NSObject, WKScriptMessageHandler {
     var fastProc: Process?, consumedText = "", liveRevised = false, targetScreen = ""
     var ahead = "", aheadItem: DispatchWorkItem?   // words the AI already started on while the user was still holding the keys
     var stops = 0   // each key release; tells a late "words landed" from a current one
-    var dragging = false, fromTop = false   // moving or resizing the box; fromTop: dragging the top edge, so the bottom stays put
+    var dragging = false, fromTop = false, fromBottom = false   // moving or resizing the box; dragging the top edge keeps the bottom put, and the other way round
     var followTimer: Timer?
     var began = Date()   // when recording began, for the recording limit
     var composing = false, compH: CGFloat = 0, clickTalk = false, quiet: DispatchWorkItem?   // typing box focused / its height from the bottom; mic button = talk without keys
@@ -186,8 +186,14 @@ final class App: NSObject, WKScriptMessageHandler {
         NSAnimationContext.runAnimationGroup({ $0.duration = 0.3; $0.timingFunction = CAMediaTimingFunction(name:.easeInEaseOut); panel.animator().setFrame(f, display:true) },
                                              completionHandler: { [weak self] in guard let self else { return }; if !dragging { frame(panel.frame) }; done?() })   // keeps it on a display and updates its height limit
     }
+    func placeBox() {   // a new Box position: an open box glides there (unless the user placed it); a closed one shows it for a moment
+        guard panel.isVisible else { show(); hide(after: 1.5); return }
+        guard !stuck, !dragging else { return }
+        var f = panel.frame; f.origin = boxOrigin(f.size, in: panel.screen?.visibleFrame ?? mouseScreen.visibleFrame); glide(f)
+    }
     func followPointerScreen() {   // the box, typing box, answer and dictation pill alike
-        guard panel.isVisible, !dragging, !hovering, let f = pointerFollow(panel.frame) else { return }
+        guard panel.isVisible, !dragging, !hovering, var f = pointerFollow(panel.frame) else { return }
+        if !stuck && boxSpot.hasSuffix("center") { f.origin.x = mouseScreen.visibleFrame.midX - f.width / 2 }   // a centred box stays centred on a wider or narrower display
         boxHome = nil; frame(f)
     }
     func startFollowingPointerScreen() {
@@ -316,7 +322,7 @@ final class App: NSObject, WKScriptMessageHandler {
             case .leftMouseDown:
                 guard e.window == panel else { return e }
                 let p = e.locationInWindow
-                if let ed = edges(p), !(overX(p) && !ed.r && !ed.t) { sizing = (NSEvent.mouseLocation, panel.frame, ed); fromTop = ed.t; pinned = true; dragging = true }
+                if let ed = edges(p), !(overX(p) && !ed.r && !ed.t) { sizing = (NSEvent.mouseLocation, panel.frame, ed); fromTop = ed.t; fromBottom = ed.b; pinned = true; dragging = true }
                 else if overX(p) { close(clear: true) }
                 else if p.y < compH { if !panel.isKeyWindow && replacement == nil { selection = TextSelection.capture() }; pinned = true; panel.makeKey(); panel.makeFirstResponder(web); return e }   // the typing box: a normal click; a waiting Insert/Replace keeps its target
                 else { if !pillOn { pinned = true }; grab = (NSEvent.mouseLocation, panel.frame.origin); moved = false; dragging = true }   // the pill is not a box to keep
@@ -335,7 +341,7 @@ final class App: NSObject, WKScriptMessageHandler {
                 var f = panel.frame; f.origin = NSPoint(x: g.origin.x + m.x - g.mouse.x, y: g.origin.y + m.y - g.mouse.y); frame(f)
             default:
                 dragging = false
-                if sizing != nil { sizing = nil; js("resizeDone"); DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.fromTop = false }; Prefs.set("boxH", Prefs.num("boxH")); return nil }   // saves both
+                if sizing != nil { sizing = nil; js("resizeDone"); DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.fromTop = false; self?.fromBottom = false }; Prefs.set("boxH", Prefs.num("boxH")); return nil }   // saves both
                 guard grab != nil else { return e }
                 grab = nil
                 if !moved {   // a click, not a drag: the page decides (answer = copy, anywhere else = type)
@@ -473,10 +479,10 @@ final class App: NSObject, WKScriptMessageHandler {
         let size = ((m.body as? [NSNumber]) ?? [m.body as? NSNumber].compactMap { $0 }).map { CGFloat($0.doubleValue) }
         guard let h = size.last, h > 0 else { return }
         var f = panel.frame
-        if !fromTop { f.origin.y = f.maxY - h }   // grows down from the top, unless the user is dragging the top edge
+        if fromBottom || !fromTop && !boxAtBottom { f.origin.y = f.maxY - h }   // grows away from its edge (Box position); a dragged edge moves, the other stays
         f.size.height = h
         let pillWidth = size.count == 2 && pillOn ? size[0] : nil   // a late one from before pill(false) must not shrink the box
-        if let w = pillWidth, w > 0 { if Prefs.str("corner") == "top-right" { f.origin.x = f.maxX - w }; f.size.width = w }
+        if let w = pillWidth, w > 0 { f = boxWidth(f, w) }
         guard f != panel.frame else { return }
         if pillWidth != nil && panel.isVisible && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {   // the pill morphs between its states
             NSAnimationContext.runAnimationGroup({ $0.duration = 0.22; $0.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut); frame(f, animate: true) },
@@ -506,6 +512,22 @@ final class App: NSObject, WKScriptMessageHandler {
         let pick = Prefs.str("apiModel").isEmpty ? serverModels.first ?? "" : Prefs.str("apiModel")
         return ["list": serverModels.isEmpty ? [pick].filter { !$0.isEmpty } : serverModels, "pick": pick]
     }
+    // Settings → General → Box position: where on the pointer's display the box opens. It grows away from that edge,
+    // and a new width (the dictation pill, the saved size) keeps its side, or its middle, where it was.
+    var boxSpot: String {
+        let spot = Prefs.str("boxPosition")
+        return ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"].contains(spot) ? spot : "top-center"
+    }
+    var boxAtBottom: Bool { boxSpot.hasPrefix("bottom") }
+    func boxOrigin(_ size: NSSize, in vf: NSRect) -> NSPoint {
+        let x = boxSpot.hasSuffix("left") ? vf.minX + 14 : boxSpot.hasSuffix("right") ? vf.maxX - size.width - 14 : vf.midX - size.width / 2
+        return NSPoint(x: x, y: boxAtBottom ? vf.minY + 10 : vf.maxY - size.height - 10)
+    }
+    func boxWidth(_ f: NSRect, _ w: CGFloat) -> NSRect {
+        var g = f; g.size.width = w
+        g.origin.x = boxSpot.hasSuffix("left") ? f.minX : boxSpot.hasSuffix("right") ? f.maxX - w : f.midX - w / 2
+        return g
+    }
     func show() {
         gen += 1; js("visible", true); js("mode", Prefs.bool("safe")); js("models", modelChoices())
         startFollowingPointerScreen()
@@ -514,9 +536,7 @@ final class App: NSObject, WKScriptMessageHandler {
             return
         }
         defer { if drawing.active { avoidDrawing() } }
-        let vf = mouseScreen.visibleFrame   // open where the user is looking: the cursor's screen
-        let x = Prefs.str("corner") == "top-right" ? vf.maxX - panel.frame.width - 14 : vf.minX + 14
-        panel.setFrameOrigin(NSPoint(x: x, y: vf.maxY - panel.frame.height - 10))
+        panel.setFrameOrigin(boxOrigin(panel.frame.size, in: mouseScreen.visibleFrame))   // open where the user is looking: the cursor's screen
         frame(panel.frame)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
@@ -538,6 +558,7 @@ final class App: NSObject, WKScriptMessageHandler {
                                                  completionHandler: { [self] in if g == gen { gone() } })
         }
     }
+
 
     func defaultKey(_ enabled: Bool) {
         defaultWanted = enabled
@@ -586,9 +607,9 @@ final class App: NSObject, WKScriptMessageHandler {
         guard !on || !panel.isVisible else { return }
         let w = CGFloat(on ? 36 : max(340, Prefs.num("boxW")))
         var f = panel.frame; guard f.width != w || on && f.height != w else { return }
-        if Prefs.str("corner") == "top-right" { f.origin.x = f.maxX - w }
-        if on { f.origin.y = f.maxY - w; f.size.height = w }
-        f.size.width = w; frame(f)
+        f = boxWidth(f, w)
+        if on { if !boxAtBottom { f.origin.y = f.maxY - w }; f.size.height = w }
+        frame(f)
     }
 
     func allow(_ ok: Bool) {
