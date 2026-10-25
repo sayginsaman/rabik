@@ -74,7 +74,7 @@ class SettingsPageTests(unittest.TestCase):
         self.assertGreater(len(lines), 40)
         self.assertEqual([t for t in lines if len(t.split()) > 14], [])   # rare detail goes in an info tip
         self.assertTrue(all(re.search(r'<i class="info" title="[^"]+">i</i></span>', m) for m in re.findall(r'<span>[^<]*<i class="info".*?</span>', page)))
-        self.assertIn('Risky actions need approval. Background agents use a scratch folder.', page)
+        self.assertIn('Risky actions need approval. Commands write only to a scratch folder.', page)
 
     def test_notice_shows_and_its_action_runs_once(self):
         out = self.page('''st.notice({text: 'Couldn’t save that change, so the old setting is back.'});

@@ -644,6 +644,7 @@ class AgentTests(unittest.TestCase):
             brain.clients.start_claude()
             args=popen.call_args.args[0];self.assertIn('--strict-mcp-config',args);self.assertIn('--no-session-persistence',args)
             self.assertEqual(popen.call_args.kwargs['env']['CLAUDE_CODE_MESSAGES_PROMPT_CACHE_TTL'],'5m')   # one-shot messages: 1.25x writes, not 2x
+            main=json.loads(args[args.index('--settings')+1])
             row=self.manager.new();row.update(session='saved-session',connectors=['mcp__fixture__inspect'])
             brain.clients.start_claude('opus',row)
             args=popen.call_args.args[0];options=popen.call_args.kwargs
@@ -657,6 +658,7 @@ class AgentTests(unittest.TestCase):
         self.assertNotIn('ANTHROPIC_API_KEY',options['env']);self.assertEqual(options['env']['CLAUDE_CODE_DISABLE_CLAUDE_MDS'],'1')
         self.assertEqual(options['env']['CLAUDE_CODE_MESSAGES_PROMPT_CACHE_TTL'],'5m')   # agent calls are 5 min apart or >1 h, never in between
         settings=json.loads(args[args.index('--settings')+1]);self.assertTrue(settings['sandbox']['enabled'])
+        self.assertEqual(settings['sandbox'],main['sandbox'])   # Safe mode: main asks get the agents' sandbox
         self.assertEqual(settings['hooks']['PreToolUse'][0]['matcher'],'.*');self.assertNotIn('disableAllHooks',settings)
         self.assertIn('Write,Edit',args[args.index('--tools')+1]);self.assertIn('mcp__fixture__inspect',args[args.index('--tools')+1])
         self.assertEqual(args[args.index('--permission-mode')+1],'dontAsk')

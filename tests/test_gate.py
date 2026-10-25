@@ -1,5 +1,6 @@
 """Safe mode's gate: anything that deletes, changes a file, runs its own code or changes the system asks first; Rabik's
-helpers, opening things and plain reads never do. Main asks run outside the sandbox, so this list is the only barrier."""
+helpers, opening things and plain reads never do. Main asks also run in Claude Code's sandbox: a plain command stays in it,
+and only a card the user allowed takes one out."""
 import io
 import json
 import os
@@ -10,7 +11,7 @@ import unittest
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
-import brain.interaction, brain.macos, brain.paths, brain.policy
+import brain.interaction, brain.macos, brain.paths, brain.policy, brain.prefs
 from tests import scratch_dir
 
 ME = shlex.quote(brain.paths.ME)
@@ -78,6 +79,32 @@ class GateTests(unittest.TestCase):
                 self.assertEqual(ask.call_args.args[0]['q'], 'Change a file?')
                 self.assertEqual(json.loads(out.getvalue())['hookSpecificOutput']['permissionDecision'], decision)
 
+
+    def test_main_ask_leaves_the_sandbox_only_through_a_card(self):
+        # No decision = Claude Code runs it in the sandbox. Asking to leave it, or a risky command, waits for the card;
+        # what the user allowed runs for real. Full access has no sandbox and no card for leaving it.
+        root = scratch_dir(self)
+        def gate(inp, answer='n', safe=True):
+            event = {'tool_name': 'Bash', 'tool_input': inp}
+            with patch.dict(os.environ, {'RABIK_ASK': str(root)}), patch.object(brain.interaction, 'wait_commit', return_value=True), \
+                 patch.object(brain.prefs, 'pref', side_effect=lambda k, d: safe if k == 'safe' else d), patch.object(brain.macos, 'preview_app'), \
+                 patch.object(brain.interaction, 'ask_user', return_value=answer) as ask, \
+                 patch('sys.stdin', io.StringIO(json.dumps(event))), patch('sys.stdout', new_callable=io.StringIO) as out:
+                brain.policy.gate()
+            return (json.loads(out.getvalue())['hookSpecificOutput'] if out.getvalue() else {}), ask
+        decision, ask = gate({'command': 'mkdir ~/Desktop/Reports'})
+        self.assertEqual(decision, {}); ask.assert_not_called()
+        for answer, verdict in (('n', 'deny'), ('y', 'allow')):
+            with self.subTest(answer=answer):
+                decision, ask = gate({'command': 'mkdir ~/Desktop/Reports', 'dangerouslyDisableSandbox': True}, answer)
+                self.assertEqual(ask.call_args.args[0]['q'], 'Run outside the safe folder?')
+                self.assertEqual(decision['permissionDecision'], verdict)
+        self.assertTrue(decision['updatedInput']['dangerouslyDisableSandbox'])
+        decision, ask = gate({'command': 'pbpaste > ~/Documents/thesis.docx'}, 'y')
+        self.assertEqual(ask.call_args.args[0]['q'], 'Change a file?')
+        self.assertTrue(decision['updatedInput']['dangerouslyDisableSandbox'])
+        decision, ask = gate({'command': 'mkdir ~/Desktop/Reports', 'dangerouslyDisableSandbox': True}, safe=False)
+        self.assertEqual(decision, {}); ask.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()

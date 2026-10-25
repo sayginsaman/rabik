@@ -208,7 +208,8 @@ precondition(try! String(contentsOfFile:path, encoding:.utf8) == "y")
         self.assertEqual(denied['permissionDecision'],'deny')
         self.assertIn('helper directly',denied['permissionDecisionReason'])
 
-    def test_main_asks_use_the_native_gate_without_telling_claude_it_is_sandboxed(self):
+    def test_main_asks_run_in_the_sandbox_only_in_safe_mode(self):
+        # Safe mode: Claude Code's sandbox as for agents, the gate on top; Rabik's helpers, open and osascript stay outside.
         previous = signal.getsignal(signal.SIGTERM)
         try:
             for safe in (True, False):
@@ -221,7 +222,16 @@ precondition(try! String(contentsOfFile:path, encoding:.utf8) == "y")
                 args = spawn.call_args.args[0]
                 settings = json.loads(args[args.index('--settings')+1])
                 self.assertIn('PreToolUse',settings['hooks'])
-                self.assertNotIn('sandbox',settings)
+                self.assertEqual(args[args.index('--permission-mode')+1],'bypassPermissions')
+                self.assertEqual(brain.prompts.SANDBOX in args[args.index('--system-prompt')+1], safe)
+                if safe:
+                    self.assertTrue(settings['sandbox']['enabled'])
+                    self.assertEqual(settings['sandbox']['excludedCommands'],brain.policy.SAFE_OUT)
+                    self.assertIn(os.path.join(brain.paths.DIR,'answers'),settings['sandbox']['filesystem']['denyWrite'])   # the Allow card's answer
+                    self.assertTrue(any(rule.startswith(brain.paths.ME) for rule in brain.policy.SAFE_OUT))
+                    self.assertTrue({'open *','osascript *'} <= set(brain.policy.SAFE_OUT))
+                else:
+                    self.assertNotIn('sandbox',settings)
                 process.errors.close()
             self.assertIn('App/site: always try; never blame sandbox/Terminal', brain.prompts.SYSTEM)
             self.assertIn('Name the denied Settings switch', brain.prompts.SYSTEM)

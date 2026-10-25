@@ -62,7 +62,7 @@ https://github.com/user-attachments/assets/26822ad2-6281-477d-b676-2f490a4a207b
 
 ## Safe by default
 
-Safe mode runs the AI's commands in Claude Code's sandbox, so they can only write to a scratch folder. Before anything deletes, sends, buys or changes a file, Rabik asks you first. <code>rm</code>, <code>sudo</code>, disk tools and shutdown are always blocked. Every exact command is in the ask log. Apple's on-device speech turns your voice into text, and audio never leaves your Mac.
+Safe mode runs the AI's commands in Claude Code's sandbox, so they can only write to a scratch folder; Rabik's own helpers, opening apps and sites, and plain reads run outside it. Before anything deletes, sends, buys, changes a file or leaves the sandbox, Rabik asks you first. <code>rm</code>, <code>sudo</code>, disk tools and shutdown are always blocked. Every exact command is in the ask log. Apple's on-device speech turns your voice into text, and audio never leaves your Mac.
 
 <details>
 <summary><b>How the shortcut and the box work</b></summary>

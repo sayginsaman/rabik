@@ -145,6 +145,7 @@ Her bulgu: önem · yer · kanıt · öneri. "Doğrulandı" = kod çalıştırı
 - İki ayrı kök neden: (a) deny-list mantığı doğası gereği eksik kalır (yorumda da "a deny list, not proof of safety" yazıyor, `1640`); (b) `QUIET` önekli parçalarda (`pbpaste`, `open `, `mdfind `, tüm helper'lar) `continue` ile **yönlendirme (`>`) kontrolü de atlanıyor** (`633-634`).
 - Neden önemli: Sistem prompt'u ekran/web/e-posta metnini "untrusted" diye işaretliyor ama prompt injection veya model hatası tek bir yanlış komutla kullanıcı dosyasını silebilir; kullanıcı README'deki "sandbox" vaadine güveniyor.
 - Öneri: (1) Ana istekleri de sandbox'ta çalıştırın; helper'lar için zaten `SAFE_OUT`/`excludedCommands` mekanizması var. (2) Kısa vadeli yama: yönlendirme kontrolünü `QUIET` atlamasından önce yapın; `action_kind()`'daki "yorumlayıcılar (python/perl/node/ruby/osascript) her zaman sorulur" kuralını (`4004`) `risky()`'ye de uygulayın. (3) Politika tek modülde, tek tablo-tabanlı test setiyle.
+- **Durum:** Faz 1 deny-list'i düzeltti (§9). Safe mode ana istekleri artık ajanlarla aynı Claude Code sandbox'ında çalışıyor (§9, "P1'in kalıcı çözümü").
 
 **P2 — Ölü Gumroad lisans kodu canlı istek yolunda** · 🟠 Orta · doğrulandı
 - `GUMROAD_PRODUCT = ''` (satış yok) ama `main()` her istekte `key\W+([\w-]{8,})` regex'ini çalıştırıyor (`7362`). "key bindings", "key shortcuts", "key: abcdefgh" eşleşiyor → `activate()` kelimeyi `api.gumroad.com`'a POST ediyor ve kullanıcıya "That key did not work. Copy it from your Gumroad receipt…" diyor.
@@ -501,11 +502,62 @@ Faz 2–5 Python, Faz 6 Swift üzerinde. Aynı dosyalara dokunmadıkları için 
 
 **SW-S1 ✅ (devamı)**: "çalıştır, sonuna kadar oku, bekle" artık tek bir yardımcıda, `runToEnd(p, out)` (main.swift); 10 çağrı yeri ona geçti, sıra kuralı tek yerde yazılı. Pipe sırası testi değişmeden geçiyor.
 
+**P1'in kalıcı çözümü ✅ Safe mode'da ana istekler de sandbox'ta** (Faz 7'den sonra, senin kararınla):
+- **Ne değişti:** `clients.start_claude()` Safe mode'da ana isteğe de ajanlarınkiyle aynı `sandbox` ayarını veriyor. Bu, birebir aynı sözlük: `enabled`, `autoAllowBashIfSandboxed`, `allowUnsandboxedCommands`, `excludedCommands: SAFE_OUT`, ayrıca `agent-gates` için okuma ve yazma, `answers` için yazma yasağı.
+  - İzin modu hâlâ `bypassPermissions`. Ajanların "her eylem onaylanır" kuralı ana isteğe gelmedi.
+  - Çalışma klasörü hâlâ `$TMPDIR`; ask klasörü onun içinde (`paths.request_file` yorumu bunu zaten varsayıyordu). Sandbox oraya ve Claude'un kendi `/tmp/claude`'una yazabiliyor; `~/.config/rabik`'e yazamıyor.
+  - Full access değişmedi: sandbox yok.
+- **Gate:** Kart çıkarmayan düz bir komut artık sandbox'ta çalışıyor.
+  - Ana istekte kartta İzin ver denen komut eskisi gibi gerçekten çalışıyor, yani sandbox dışında (`updatedInput.dangerouslyDisableSandbox`). Ajanın onaylanan komutu ise model istemedikçe içeride kalıyor.
+  - Model sandbox'tan kendisi çıkmak isterse "Run outside the safe folder?" kartı çıkıyor. Bu kural önceden de vardı; artık ana istekte de bir anlamı var.
+- **Prompt:** Sandbox açıkken Claude Code'un Bash aracı modele iki şey söylüyor (CLI 2.1.310'un içindeki metinde görüldü): engellenen komutu `dangerouslyDisableSandbox: true` ile hemen yeniden dene; kullanıcıya `/sandbox` komutundan bahset.
+  - Rabik'te `/sandbox` yok. Bu yüzden yalnızca Claude + Safe mode prompt'una tek bir satır eklendi (`prompts.SANDBOX`, 111 karakter; bütçe 9.152 → 9.263 / 10.000).
+  - Devin ve Pi'nin prompt'u değişmedi; onlarda Claude sandbox'ı yok.
+- **Arayüz:** Settings notu "Background agents use a scratch folder" yerine artık "Commands write only to a scratch folder" diyor. README'nin "Safe by default" paragrafı, helper'ların sandbox dışında çalıştığını ve sandbox'tan çıkmanın sorulduğunu söylüyor.
+
+Yan etkiler (yalnızca Safe mode'da):
+
+| Ne | Önce | Şimdi |
+|---|---|---|
+| Rabik helper'ları, `open`, `osascript`, `mdfind`, `curl`, `pbpaste`, `head`/`tail`/`grep`/`sort`/`wc`/`echo`/`sleep`/`date` ve yalnızca bunlardan oluşan zincirler | Sandbox'sız | Değişmedi: `SAFE_OUT` sayesinde sandbox dışında |
+| Riskli komutlar (silme, taşıma, dosya değiştirme, script, gönderme…) | Kart, sonra sandbox'sız | Aynı |
+| Kart çıkarmayan ama `$TMPDIR` dışına yazan komutlar: `mkdir ~/Desktop/X`, `git commit`, `brew`/`pip`/`npm install`, `make`, listede olmayan bir komutla `/tmp`'ye yazmak (izin yalnızca `/tmp/claude` için) | Sorulmadan çalışıyordu | Sandbox'ta "Operation not permitted" alıyor. Model `dangerouslyDisableSandbox` ile yeniden deniyor ve "Run outside the safe folder?" kartı çıkıyor: bir onay ve bir model adımı fazla |
+| Listede olmayan komutların ağa çıkması: `brew`, `git clone`/`pull`, `pip`, `ping`, `dig`, `ssh`, Python ile istek | Serbest | Sandbox izinli olmayan hostlara bağlanmıyor; aynı kart yoluna düşüyor |
+| Listede olmayan bir komutla zincirlenen helper (`cd /tmp; <helper> --hands …`) | Sandbox'sız | Zincirin tamamı sandbox'ta; helper `~/.config/rabik`'e yazamıyor. `cd <klasör> && <okuma helper'ı>` (`--window`, `--read`, `--search`, `--look` …) gate'in güvenilir okuma kuralıyla yine dışarıda çalışıyor |
+| Kart sayısı | — | Dosya ya da ağ işi olan isteklerde artabilir; Safe mode'un amacı da bu |
+| Gecikme | — | Sandbox'ın ağ proxy'si Claude açılırken başlıyor (istekten önceki ısınmada). Sandbox'taki her komut `sandbox-exec` ile sarılıyor. Ölçülmedi |
+| Sandbox başlayamazsa | — | `ask.run()`'da hazır bir mesaj vardı, şimdi ilk kez işe yarıyor: "Claude's sandbox could not start… turn off Safe mode" |
+
+Bilinçli olarak yapılmayanlar:
+- Ajanların "her eylem onaylanır" kuralı ana isteğe taşınmadı; taşınsaydı her `ls` için kart çıkardı.
+- `SAFE_OUT`'a `cd`, `pbcopy`, `say`, `screencapture` eklenmedi. Aynı liste ajanları da etkiliyor; bu araçların sandbox'ta takılıp takılmadığı da gerçek Claude ile görülmeden bilinemiyor.
+- Çalışma klasörü ask klasörüne daraltılmadı. Ask klasörü süreç bitince siliniyor; modelin oluşturduğu bir dosya (grafik, PDF) Preview'da açıkken silinirdi.
+
+Testler:
+- `test_hands.test_main_asks_run_in_the_sandbox_only_in_safe_mode` (`…without_telling_claude_it_is_sandboxed`'ın yerine): Safe mode'da ana istek `sandbox` ayarını, `SAFE_OUT`'u, `answers` yazma yasağını ve `SANDBOX` prompt satırını alıyor; izin modu `bypassPermissions` kalıyor. Full access'te bunların hiçbiri yok.
+- `test_agents.test_normal_flags_remain_strict_and_agent_persists`: ana isteğin sandbox ayarı ajanınkiyle birebir aynı.
+- `test_gate.test_main_ask_leaves_the_sandbox_only_through_a_card`:
+  - Düz komuta karar verilmiyor ve kart çıkmıyor; komut sandbox'ta çalışıyor.
+  - Sandbox'tan çıkmak isteyen komut "Run outside the safe folder?" kartını açıyor: hayır → deny, evet → allow + `dangerouslyDisableSandbox`.
+  - İzin verilen riskli komut sandbox dışında çalışıyor.
+  - Full access'te çıkış için kart yok.
+- Üç prompt bütçe testi `SANDBOX` satırını da sayıyor. Settings sayfası testi yeni notu bekliyor.
+- Eski davranışa (ana istekte sandbox yok) geri dönülünce yeni testlerden ikisi düşüyor; testler davranışı yakalıyor.
+- Tam paket Python 3.14'te ve Apple 3.9'da (boşluklu yol) geçti (OK, 154 yalnızca VM'de koşan atlama). Selftest geçti ve profile yazmadı.
+
+Bu Mac'te doğrulanamayanlar: Testlerin koruması gerçek `claude`'u durduruyor; gerçek bir istek de hesabından ücretli çalışır. Gerçek kullanımda ya da VM'de bakılacaklar:
+1. "Spotify'ı aç", "Chrome'u sağ ekrana al", bir siteyi açmak kart çıkmadan çalışıyor mu?
+2. "Masaüstündeki PDF'leri bir klasöre taşı": `mv` için "Delete something?" kartı çıkıyor mu, onaydan sonra dosyalar gerçekten taşınıyor mu? `mkdir` ayrı bir adım olursa ikinci kartı ("Run outside the safe folder?") veriyor mu?
+3. `--hands` ile tıklama ve yazma, `--look` ile ekran resmi helper sandbox dışında çalışırken bozulmadan çalışıyor mu?
+4. Listede olmayan macOS araçları (`pbcopy`, `say`, `screencapture`, `shortcuts run`) sandbox'ta çalışıyor mu?
+5. Sandbox'taki bir komut başarısız olunca model `/sandbox` demeden yeniden deniyor mu? Kullanıcı "hayır" deyince "yapılmadı" diyor mu?
+6. İlk yanıt süresi önceki sürümle aynı istekte karşılaştırıldığında değişti mi?
+
 **Açık kalanlar** (kod dışı ya da senin kararını bekleyen):
 
 | Konu | Neden açık | Kimde |
 |---|---|---|
-| P1'in kalıcı çözümü: ana istekleri Claude Code sandbox'ında çalıştırmak | Gated helper'ların uygulama ve site açabilmesi için sandbox dışında çalışıyorlar; sandbox içinde neyin bozulacağı ürün kararı | Sen |
+| Sandbox'taki ana isteklerin gerçek kullanımda denenmesi | Yukarıdaki 6 madde: gerçek Claude ile, VM'de ya da günlük kullanımda | Sen |
 | Login item (SMAppService) | `.dmg` kurulumunda Rabik açılışta başlamıyor (LaunchAgent'ı yalnızca `build.sh` kuruyor); kullanıcıya sormadan login item eklemek UX kararı | Sen |
 | python3 / Command Line Tools bağımlılığı | Yeni bir Mac'te `python3` CLT ister; Python'u pakete gömmek boyut ve imza kararı | Sen |
 | Güncelleyici (Sparkle) | İmza anahtarı ve appcast barındırma gerekiyor | Sen |

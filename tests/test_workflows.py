@@ -227,7 +227,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('jazz', brain.skills.workflows('create calendar event'))
         with patch.dict(os.environ, {'RABIK_LIVE': '1'}):
             self.assertIsNone(brain.instant.fast('remember how to create calendar event').reply)
-        full = brain.prompts.SYSTEM + brain.prompts.ASK_ME + brain.prompts.POINTER + brain.prompts.LEARN_ME + brain.prompts.TEACH + brain.prompts.ASK_FIRST + brain.prompts.WORKFLOW
+        full = brain.prompts.SYSTEM + brain.prompts.ASK_ME + brain.prompts.POINTER + brain.prompts.LEARN_ME + brain.prompts.TEACH + brain.prompts.ASK_FIRST + brain.prompts.SANDBOX + brain.prompts.WORKFLOW
         self.assertLessEqual(tests.prompt_chars(full), 10000)
 
     def test_interrupted_shortcut_save_preserves_private_previous_file(self):

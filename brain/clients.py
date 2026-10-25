@@ -235,7 +235,8 @@ def start_claude(model=None, agent=None):
     settings = {}
     ask = agent['directory'] if agent else environ.ask_dir() or tempfile.mkdtemp(prefix='rabik-ask-')   # keep helpers and focus restoration on the same ask
     if not agent: atexit.register(shutil.rmtree, ask, True)
-    if agent and prefs.pref('safe', True):
+    if prefs.pref('safe', True):   # main asks and agents alike; what SAFE_OUT lists and what a card allows run outside
+        system += prompts.SANDBOX
         settings['sandbox'] = {'enabled': True, 'autoAllowBashIfSandboxed': True, 'allowUnsandboxedCommands': True, 'excludedCommands': policy.SAFE_OUT}
         settings['sandbox']['filesystem'] = {'denyRead': [os.path.join(paths.DIR, 'agent-gates')], 'denyWrite': [os.path.join(paths.DIR, 'agent-gates'), os.path.join(paths.DIR, 'answers')]}
     if agent and agent.get('connectors'):

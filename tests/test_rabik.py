@@ -1812,7 +1812,7 @@ class WatchAndBudgetTests(unittest.TestCase):
 
     def test_prompt_stays_under_budget(self):
         # Every ask pays for this prompt. Raising the cap is a decision: check `rabik.py --budget` first.
-        full = brain.prompts.SYSTEM + brain.prompts.ASK_ME + brain.prompts.POINTER + brain.prompts.LEARN_ME + brain.prompts.TEACH + brain.prompts.ASK_FIRST + brain.prompts.WORKFLOW
+        full = brain.prompts.SYSTEM + brain.prompts.ASK_ME + brain.prompts.POINTER + brain.prompts.LEARN_ME + brain.prompts.TEACH + brain.prompts.ASK_FIRST + brain.prompts.SANDBOX + brain.prompts.WORKFLOW
         self.assertIn('Stable facts: answer only if sure.', full)
         self.assertIn('Use relevant window text', full)
         self.assertLessEqual(len(brain.prompts.MODEL_OFFER), 211)

@@ -349,6 +349,6 @@ class UniversalTests(unittest.TestCase):
         self.assertNotIn('pages needed to reach the controls index', brain.prompts.SYSTEM)
         self.assertIn('do not search for another copy', brain.prompts.SYSTEM)
         self.assertNotIn('on Amazon', brain.prompts.SYSTEM)
-        full = brain.prompts.SYSTEM + brain.prompts.ASK_ME + brain.prompts.POINTER + brain.prompts.LEARN_ME + brain.prompts.TEACH + brain.prompts.ASK_FIRST + brain.prompts.WORKFLOW
+        full = brain.prompts.SYSTEM + brain.prompts.ASK_ME + brain.prompts.POINTER + brain.prompts.LEARN_ME + brain.prompts.TEACH + brain.prompts.ASK_FIRST + brain.prompts.SANDBOX + brain.prompts.WORKFLOW
         self.assertLessEqual(tests.prompt_chars(full), 10000)
         print(f'UNIVERSAL PROMPT CHARS (installed): {tests.prompt_chars(full)}; TEXT PAGE CHARS: {brain.screen.TEXT_PAGE}', flush=True)

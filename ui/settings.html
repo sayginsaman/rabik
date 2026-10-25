@@ -419,7 +419,7 @@
     </div>
     <h3>Safety</h3>
     <div class="group">
-      <div class="row"><div class="t"><b>Safe mode</b><span id="safenote">Risky actions need approval. Background agents use a scratch folder.</span></div><label class="sw"><input type="checkbox" data-k="safe"></label></div>
+      <div class="row"><div class="t"><b>Safe mode</b><span id="safenote">Risky actions need approval. Commands write only to a scratch folder.</span></div><label class="sw"><input type="checkbox" data-k="safe"></label></div>
     </div>
     <h3>Privacy</h3>
     <div class="group">
@@ -673,7 +673,7 @@
     $('planname').textContent = devin ? 'Devin' : pi ? 'Pi' : 'Claude';
     $('safenote').textContent = devin ? 'Every Devin command waits for approval. File-edit, MCP and subagent tools stay off.'
       : pi ? 'Every Pi command waits for approval. File-edit and MCP tools stay off.'
-      : 'Risky actions need approval. Background agents use a scratch folder.';
+      : 'Risky actions need approval. Commands write only to a scratch folder.';
     $('meetingDemo').hidden = $('meetingPrepOpen').hidden = !P.meeting; $('meetingOn').hidden = !!P.meeting;   // off: one way to turn it on, not two dead buttons
   }
 

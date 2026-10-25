@@ -25,8 +25,8 @@ DENIED = ('rm', 'rmdir', 'sudo', 'dd', 'diskutil', 'shutdown', 'reboot', 'halt',
 DENY = [f'Bash({c}:*)' for c in DENIED]
 
 
-# Safe mode (Settings, on by default): the gate checks every command; background agents also use Claude Code's sandbox.
-# Main asks do not advertise that sandbox to the model: their gated helpers must open apps and sites normally.
+# Safe mode (Settings, on by default): the gate checks every command, and main asks and background agents run in Claude Code's
+# sandbox, which writes only to their working folder. These run outside it, so Rabik's helpers open apps and sites normally.
 # A chain runs outside only if every part is listed, so harmless read-only tools are too ("…; curl wttr.in", "| head").
 SAFE_OUT = [f'{c} *' for c in ('osascript', 'open', 'mdfind', 'curl', 'head', 'tail', 'grep', 'sort', 'wc', 'echo', 'sleep', 'date', paths.ME)] + ['pbpaste', 'date'] + [f'orca terminal {c} *' for c in ('list', 'read', 'send')]
 
@@ -223,7 +223,8 @@ def search_first(ask):
 
 def gate():
     """AI client's PreToolUse hook: native hands cannot bypass their wrapper; in safe mode a risky command waits for the user's Allow (60 s, then no).
-    Allowed = it runs for real, outside the sandbox. The AI asking to leave the sandbox by itself asks too."""
+    A main ask's command the user allowed runs for real, outside the sandbox; an agent's stays in unless it asked to leave.
+    The AI asking to leave the sandbox by itself asks too."""
     external = environ.client_override() in ('devin', 'pi')
     try:
         event = json.load(sys.stdin)

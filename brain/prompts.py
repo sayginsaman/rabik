@@ -5,7 +5,7 @@ from brain.paths import (
     ABOUT, DRAW, FORGET, FRONT, HANDS, HISTORY, LOOK, ME, PICK, PLACE, PLAY, QUEUE, READ, REMEMBER, ROUTINE, SEARCH, SET, SHOW,
     TYPE, WATCH, WEB, WINDOW)
 
-__all__ = ['SYSTEM', 'NEVER', 'ASK_FIRST', 'LEARN_ME', 'WORKFLOW', 'TEACH', 'ASK_ME', 'POINTER', 'DRAW_HELP', 'DRAWING', 'MODEL_OFFER',
+__all__ = ['SYSTEM', 'NEVER', 'ASK_FIRST', 'SANDBOX', 'LEARN_ME', 'WORKFLOW', 'TEACH', 'ASK_ME', 'POINTER', 'DRAW_HELP', 'DRAWING', 'MODEL_OFFER',
            'AGENT_HANDOFF', 'AGENT_SYSTEM', 'MEETING_SYSTEM', 'DICTATE_SYSTEM', 'CALENDAR_HELP', 'system_prompt']
 
 
@@ -53,6 +53,10 @@ NEVER = ('Full access: delete, send, post or buy when the user clearly asks; jus
 # safe mode: the user gets an Allow card first, so the AI may do what was clearly asked
 ASK_FIRST = ('Delete, send, post or buy only when the user clearly asks; the user sees an Allow card first, so just run it, '
              'never ask in words. Files: trash "<path>", never rm. If the user says no, stop and say it was not done.')
+
+
+# safe mode with Claude: its commands run in Claude Code's sandbox, whose own advice ("use /sandbox") is not Rabik's
+SANDBOX = '\nA command the sandbox blocks: rerun it with dangerouslyDisableSandbox, which asks too; never mention /sandbox.'
 
 
 LEARN_ME = f"""
