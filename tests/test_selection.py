@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 import unittest
 
-from tests import run_swift
+from tests import native_source, run_swift
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == 'darwin', 'macOS Swift regression')
 class SelectionTests(unittest.TestCase):
     def test_paste_rechecks_target_cancellation_and_clipboard_ownership(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         apply = source[source.index('    func apply(_ draft:'):source.index('    func replace(_ draft:')]
         borrow = source[source.index('func borrowPasteboard'):source.index('struct TextSelection {')]
         swift = '''import Foundation
@@ -147,7 +147,7 @@ print("paste safety ok")
         self.assertIn('paste safety ok', run_swift(self, swift))
 
     def test_typing_capture_accepts_empty_fields_but_never_secure_fields(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         capture = source[source.index('    static func capture('):source.index('    static func selectedRange(')]
         pastable = source[source.index('    var pastable: Bool'):source.index('    func apply(')]
         typing_guard = next(line for line in source.splitlines() if 'guard let selected = TextSelection.capture(enabled: true' in line)
@@ -225,7 +225,7 @@ print("typing capture ok")
         self.assertIn('typing capture ok', run_swift(self, swift))
 
     def test_capture_is_async_and_cancelled_or_stale_results_are_ignored(self):
-        source = (ROOT / 'Rabik.swift').read_text().split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
+        source = native_source().split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
         capture = source[source.index('    func captureSelection()'):source.index('    func captureDictationSelection(')]
         finish = source[source.index('    func finish()'):source.index('        aheadItem?.cancel()', source.index('    func finish()'))] + '        finished += 1\n    }\n'
         swift = '''import Foundation

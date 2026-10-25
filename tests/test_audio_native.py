@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 import unittest
 
-from tests import run_swift
+from tests import native_source, run_swift
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == "darwin", "macOS Swift audio regression")
 class AudioNativeTests(unittest.TestCase):
     def test_siri_voice_retries_until_the_voice_test_succeeds(self):
-        source = (ROOT / "Rabik.swift").read_text()
+        source = native_source()
         voice = source[source.index("var siriVoiceTrying"):source.index("// The talk shortcut")]
         before_test = voice[:voice.index("DispatchQueue.global().async")]
         self.assertNotIn('set(true, forKey: "siriVoice")', before_test)
@@ -20,7 +20,7 @@ class AudioNativeTests(unittest.TestCase):
         self.assertIn("siriVoice()", deliver)
 
     def test_device_choice_falls_back_without_opening_bluetooth(self):
-        source = (ROOT / "Rabik.swift").read_text()
+        source = native_source()
         policy = source[source.index("struct MicrophoneDevice"):source.index("func listenMic()")]
         run_swift(self, 
             """import Foundation
@@ -49,7 +49,7 @@ print("microphone policy ok")
         self.assertIn("microphoneID: demo ? nil : listenMic()?.uid", source)
 
     def test_quiet_audio_restores_release_and_cancel(self):
-        source = (ROOT / "Rabik.swift").read_text()
+        source = native_source()
         model = source[source.index("struct AudioVolumeSnapshot"):source.index("struct CoreAudioVolume")]
         quiet = source[source.index("final class AudioQuiet"):source.index("enum AudioRecovery")]
         run_swift(self, 

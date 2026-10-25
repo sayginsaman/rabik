@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import unittest
+from tests import native_source
 
 
 @unittest.skipUnless(shutil.which('node'), 'Node is optional for UI syntax checks')
@@ -42,7 +43,7 @@ if(!old.removed||button.disabled||button.textContent!=='Try again'||sent.id!=='q
 
     def test_dictation_pill_shows_the_wave_not_the_words(self):
         source = (Path(__file__).resolve().parents[1] / 'ui' / 'ui.html').read_text()
-        native = (Path(__file__).resolve().parents[1] / 'Rabik.swift').read_text()
+        native = native_source()
         self.assertIn('<span id="dictwave" role="img" aria-label="Listening"></span>', source)
         helper = source[source.index('  const dictateMode ='):source.index('\n  };', source.index('  const dictateMode =')) + 5]
         dictate = source[source.index('    dictate(on) {'):source.index('    locked(on) {')]
@@ -110,7 +111,7 @@ expect(md('snake_case_name and _em_'),'<p>snake_case_name and <em>em</em></p>','
     def test_worker_start_failure_has_persistent_recovery_actions(self):
         root = Path(__file__).resolve().parents[1]
         page = (root / 'ui' / 'ui.html').read_text()
-        native = (root / 'Rabik.swift').read_text()
+        native = native_source()
         self.assertIn('Rabik’s helper couldn’t start', page)
         self.assertIn("post({workerRetry:true})", page)
         self.assertIn("post({setup:true})", page)
@@ -123,7 +124,7 @@ expect(md('snake_case_name and _em_'),'<p>snake_case_name and <em>em</em></p>','
     def test_paused_shortcut_offers_rate_limited_resume(self):
         root = Path(__file__).resolve().parents[1]
         page = (root / 'ui' / 'ui.html').read_text()
-        native = (root / 'Rabik.swift').read_text()
+        native = native_source()
         self.assertIn("post({resume:true})", page)
         self.assertIn("Date().timeIntervalSince(pausedNotice) > 4", native)
         resume = native[native.index('if b["resume"] != nil {'):native.index('if b["replace"] != nil, !busy')]

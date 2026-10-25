@@ -7,6 +7,7 @@ import sys
 import tempfile
 import time
 import unittest
+from tests import native_files
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -27,7 +28,7 @@ class PlatformPreferencesTests(unittest.TestCase):
                 '<key>CFBundleExecutable</key><string>Fixture</string>'
                 '<key>CFBundlePackageType</key><string>APPL</string></dict></plist>'
             )
-            compiled = subprocess.run(["swiftc", "-O", "-module-name", "Rabik", str(ROOT / "Rabik.swift"), "-o", str(binary)], capture_output=True, text=True)
+            compiled = subprocess.run(["swiftc", "-O", "-module-name", "Rabik", *native_files(), "-o", str(binary)], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             state = root / "hands.json"
             env = {**os.environ, "RABIK_DIR": str(root), "RABIK_HANDS_STATE": str(state), "RABIK_HANDS_TIMING": "1"}

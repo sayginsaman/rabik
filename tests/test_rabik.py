@@ -23,7 +23,7 @@ import brain.agents, brain.ask, brain.cli, brain.clients, brain.drawing, brain.h
 import brain.interaction, brain.labels, brain.macos, brain.memory, brain.paths, brain.policy, brain.prefs, brain.prompts
 import brain.protocol, brain.screen, brain.situation, brain.skills, brain.storage, brain.telemetry, brain.tips, brain.toolhelp
 import brain.turn, brain.watcher, brain.web, brain.windows
-from tests import scratch_dir
+from tests import native_source, scratch_dir
 
 
 def python_fixture_cli():
@@ -1105,7 +1105,7 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
                 self.assertEqual(brain.policy.risky(command), '')
 
     def test_raw_system_events_clicks_and_keys_ask_like_hands(self):
-        swift = (Path(brain.paths.ME).parent / 'Rabik.swift').read_text()
+        swift = native_source()
         self.assertEqual(re.search(r'static let riskyPattern = #"(.*?)"#', swift)[1], brain.policy.RISKY_LABEL)
         se = 'osascript -e \'tell application "System Events" to '
         for command in [se + 'tell process "Safari" to click button "Submit" of window 1\'', se + 'click at {245, 341}\'',
@@ -1821,7 +1821,7 @@ class WatchAndBudgetTests(unittest.TestCase):
 
 class BoxLookTests(unittest.TestCase):
     """Formatted answers reach the box intact; the box closes like Spotlight; read-aloud says words, not marks."""
-    SOURCE = (Path(__file__).resolve().parents[1] / 'Rabik.swift').read_text()
+    SOURCE = native_source()
 
     def test_answer_lines_travel_on_one_protocol_line(self):
         with patch('builtins.print') as out:

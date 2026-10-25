@@ -16,6 +16,7 @@ import signal
 import sys
 import threading
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
+from tests import native_source
 import brain.ask, brain.clients, brain.handoffs, brain.interaction, brain.macos, brain.paths, brain.protocol
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,7 +150,7 @@ class StreamTests(unittest.TestCase):
                 reply, _, shown = self.run_stream(message(ANSWER), ANSWER)
                 self.assertEqual(bool(shown), streams); self.assertEqual(reply, ANSWER)   # all at once: only the final reply, with its classic fade
         self.assertEqual(brain.interaction.picks()['showAnswers'], ('Show answers', {'As they arrive': 'stream', 'All at once': 'once'}))
-        self.assertIn('"showAnswers": "stream"', (ROOT / 'Rabik.swift').read_text())
+        self.assertIn('"showAnswers": "stream"', native_source())
 
     def test_drawing_or_pointing_replies_do_not_stream(self):
         rows = message('Drawing it', ('d1', f'{brain.paths.ME} --draw \'{{"steps":[]}}\'')) + [result('d1', 'Guide shown (step 1 of 1).')] + message(ANSWER)

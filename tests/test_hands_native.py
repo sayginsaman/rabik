@@ -9,6 +9,7 @@ import signal
 import tempfile
 import time
 import unittest
+from tests import native_args, native_source, native_types
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,7 +24,7 @@ class NativeHandsTests(unittest.TestCase):
         cls.binary = cls.root / 'Rabik'
         cls.env = {**os.environ, 'RABIK_DIR': str(cls.root), 'RABIK_RESOURCES_DIR': str(ROOT),
                    'RABIK_AX_ONLY': '1', 'RABIK_HANDS_TIMING':'1', 'RABIK_HANDS_STATE': str(cls.root / 'hands.json')}
-        compiled = subprocess.run(['swiftc', '-O', str(ROOT / 'Rabik.swift'), '-o', str(cls.binary)], capture_output=True, text=True)
+        compiled = subprocess.run(['swiftc', '-O', *native_args(), '-o', str(cls.binary)], capture_output=True, text=True)
         if compiled.returncode:
             raise AssertionError(compiled.stderr)
         fixture = cls.root / 'HandsFixture.app/Contents/MacOS/fixture'
@@ -182,7 +183,7 @@ class NativeHandsTests(unittest.TestCase):
 
 
     def test_quartz_event_spies_post_to_the_app_without_moving_the_pointer(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         background = source[source.index('    static func mouse('):source.index('    static func screenLease(')] + source[source.index('    static func wheel('):source.index('    static func contentMoved(')]
         for forbidden in ('CGWarpMouseCursorPosition', 'post(tap', 'activate', 'screenLease', 'restoreFocus'):
             self.assertNotIn(forbidden, background)
@@ -313,8 +314,8 @@ print("hands Quartz spies ok")
         self.assertEqual(len(clicks), 1, clicks); self.assertTrue(clicks[0]['active'], clicks)
 
     def test_ax_algorithms_with_in_memory_window(self):
-        source = (ROOT / 'Rabik.swift').read_text()
-        section = source[source.index('enum Hands {'):source.index('// MARK: - End Hands')]
+        section = native_types()['Hands']   # Hands/Hands.swift
+        section = section[section.index('enum Hands {'):]
         header = section[:section.index('    static func attribute(')]
         header = header.replace('AXUIElement','TestElement')
         header = header.replace('ProcessInfo.processInfo.environment', '["RABIK_DIR":CommandLine.arguments[1], "RABIK_AX_ONLY":"1"]')

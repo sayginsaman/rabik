@@ -5,14 +5,14 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from tests import run_swift
+from tests import native_source, run_swift
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class DictationDataTests(unittest.TestCase):
     def test_private_bounded_history_stats_and_dictionary(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         store = source[source.index('enum DictationData {'):source.index('enum Prefs {')]
         swift = r'''import AppKit
 struct Prefs {
@@ -62,7 +62,7 @@ print("private dictation data ok")
         self.assertIn('private dictation data ok', run_swift(self, swift))
 
     def test_corrections_are_single_words_and_reject_rewrites(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         store = source[source.index('enum DictationData {'):source.index('enum Prefs {')]
         swift = r'''import AppKit
 struct Prefs {
@@ -107,7 +107,7 @@ print("correction bounds ok")
         self.assertIn('correction bounds ok', run_swift(self, swift))
 
     def test_learned_fix_swaps_the_heard_word_until_forgotten(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         store = source[source.index('enum DictationData {'):source.index('enum Prefs {')]
         swift = r'''import AppKit
 struct Prefs {
@@ -167,7 +167,7 @@ print("learned fixes ok")
         self.assertEqual((brain.wording.dictate_sound('Saarth'), brain.wording.dictate_sound('start to'), brain.wording.dictate_sound('André')), ('srt', 'strt', 'amtr'))   # same as DictationData.sound
 
     def test_correction_window_is_scoped_and_secure_before_read(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         monitor = source[source.index('    func prepareDictation('):source.index('    func stopDictationCleanup(')]
         for guard in ['addingTimeInterval(20)', 'dictateID == id', '!engine.isRunning', '!busy',
                       'frontmostApplication == target.app', 'CFEqual(focused, target.focus)',

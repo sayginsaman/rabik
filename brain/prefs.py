@@ -1,4 +1,4 @@
-"""Settings (settings.json, shared with Rabik.swift) and the AI client and model they choose."""
+"""Settings (settings.json, shared with Rabik.app) and the AI client and model they choose."""
 import json
 import os
 import subprocess

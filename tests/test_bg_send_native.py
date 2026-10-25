@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
+from tests import native_args
 import brain.agents, brain.paths, brain.policy, brain.prefs
 
 
@@ -28,7 +29,7 @@ class BackgroundSendNativeTests(unittest.TestCase):
         cls.addClassCleanup(cls.temp.cleanup)
         cls.root = Path(cls.temp.name)
         cls.binary = cls.root / "Rabik"
-        build = subprocess.run(["swiftc", "-O", str(ROOT / "Rabik.swift"), "-o", str(cls.binary)], capture_output=True, text=True)
+        build = subprocess.run(["swiftc", "-O", *native_args(), "-o", str(cls.binary)], capture_output=True, text=True)
         if build.returncode:
             raise AssertionError(build.stderr)
         fixture_binary = cls.root / "background-send-fixture"

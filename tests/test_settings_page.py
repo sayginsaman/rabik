@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = r'''import Cocoa
@@ -139,7 +140,7 @@ class SettingsPageTests(unittest.TestCase):
 
     def test_retired_settings_are_hidden_and_keep_saved_values(self):
         sys.path.insert(0, str(ROOT)); import tests, brain.interaction
-        source, page = (ROOT / 'Rabik.swift').read_text(), (ROOT / 'ui/settings.html').read_text()
+        source, page = native_source(), (ROOT / 'ui/settings.html').read_text()
         retired = re.findall(r'"(\w+)"', source[source.index('static let retiredKeys'):source.index(']', source.index('static let retiredKeys'))])
         self.assertIn('workIn', retired)
         defaults = source[source.index('static let defaults'):source.index('static let retiredKeys')]

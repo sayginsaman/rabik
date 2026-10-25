@@ -203,8 +203,8 @@ If you say yes to **Help improve Rabik** (asked once, off until you do), a task 
 
 ## Files
 
-- `Rabik.swift`: the app (hotkey, speech, overlay, onboarding window)
-- `rabik.py`: the brain's entry script; the AI, its tool hook and Rabik.swift call it, so its path never changes
+- `Sources/Rabik/`: the app (hotkey, speech, overlay, onboarding window), one Swift module: `main.swift` starts it, each area has its folder
+- `rabik.py`: the brain's entry script; the AI, its tool hook and Rabik.app call it, so its path never changes
 - `brain/`: the brain itself, one module per job, lowest layer first: paths, settings and storage; the safety gate (`policy.py`); the Mac, apps, windows, hands, screen and web; skills, instant commands and the AI clients; agents; the ask (`ask.py`) and the command line (`cli.py`)
 - `ui/ui.html`, `ui/onboarding.html`, `ui/settings.html`: the overlay, the welcome flow, and Settings
 - `ui/AppIcon.icns`: the app icon

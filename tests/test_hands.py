@@ -16,6 +16,7 @@ import unittest.mock
 from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
+from tests import native_source
 import brain.agents, brain.ask, brain.cli, brain.clients, brain.hands, brain.instant, brain.interaction, brain.labels
 import brain.macos, brain.memory, brain.paths, brain.policy, brain.prefs, brain.prompts, brain.protocol, brain.screen
 import brain.situation, brain.skills, brain.storage, brain.telemetry, brain.tips, brain.turn
@@ -79,7 +80,7 @@ class HandsTests(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == 'darwin' and shutil.which('swiftc'), 'macOS Swift permission bridge')
     def test_main_permission_allow_waits_for_grant_and_stops_on_cancel(self):
-        source = Path(brain.paths.ME).with_name('Rabik.swift').read_text()
+        source = native_source()
         method = source[source.index('    func allow(_ ok: Bool)'):source.index('    // Esc: stop listening')]
         swift = '''import Foundation
 enum Prefs { static func set(_ k:String,_ v:Bool) {} }
@@ -269,7 +270,7 @@ precondition(try! String(contentsOfFile:path, encoding:.utf8) == "y")
 
     @unittest.skipUnless(sys.platform == 'darwin' and shutil.which('swiftc'), 'macOS Swift matcher')
     def test_background_command_key_runs_its_exact_menu_item(self):
-        source = (Path(__file__).resolve().parents[1] / 'Rabik.swift').read_text()
+        source = native_source()
         press = source[source.index('            case "press":'):source.index('            case "drag":')]
         self.assertLess(press.index('menuShortcut('), press.index('sendKeys('))   # the menu item, else today's keys
         route = source[source.index('    static func menuShortcut('):source.index('    static func sendKeys(')]
@@ -291,7 +292,7 @@ print("menu shortcuts ok")
 
     @unittest.skipUnless(sys.platform == 'darwin' and shutil.which('swiftc'), 'macOS Swift key route')
     def test_only_plain_keys_into_background_web_content_are_authenticated(self):
-        source = (Path(__file__).resolve().parents[1] / 'Rabik.swift').read_text()
+        source = native_source()
         post = source[source.index('    static func postKey('):source.index('    static func deliver(')]
         self.assertIn('guard web,', post); self.assertIn('else { return e.postToPid(pid) }', post)   # anything unproven keeps today's post
         keys = source[source.index('    static func sendKeys('):source.index('    static let skyLight')].replace('CGEventSource(', 'EventSource(').replace('CGEvent(', 'Event(')

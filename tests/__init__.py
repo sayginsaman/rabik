@@ -57,6 +57,52 @@ def prompt_chars(text):
     return len(text.replace(shlex.quote(brain.paths.ME), INSTALLED_HELPER).replace(brain.paths.ME, INSTALLED_HELPER))
 
 
+def native_files():
+    """The app's Swift sources (Sources/Rabik), main.swift first: the files build.sh compiles."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1] / 'Sources' / 'Rabik'
+    return [str(root / 'main.swift')] + sorted(str(p) for p in root.glob('*/*.swift'))
+
+
+def native_args():
+    """swiftc arguments for the whole app: its module name (the code says Rabik.settings) and every source file."""
+    return ['-module-name', 'Rabik', *native_files()]
+
+
+def native_types():
+    """{type name: its source, with the comments above it}, from every area file in Sources/Rabik."""
+    import re
+    from pathlib import Path
+    decl = re.compile(r'^(?:(?:final|public|private|fileprivate|open|indirect)\s+|@\w+(?:\([^)]*\))?\s+)*(?:class|struct|enum|protocol)\s+(\w+)')
+    types = {}
+    for f in native_files()[1:]:
+        lines, open_string, n = Path(f).read_text().split('\n'), [], False
+        for line in lines:
+            open_string.append(n); n ^= line.count('"""') % 2 == 1
+        i = 0
+        while i < len(lines):
+            m = None if open_string[i] else decl.match(lines[i])
+            if not m: i += 1; continue
+            start, end = i, i
+            while start > 0 and lines[start - 1].startswith('//') and not open_string[start - 1]: start -= 1
+            if not (lines[i].count('{') and lines[i].count('{') == lines[i].count('}')):
+                end = i + 1
+                while not (lines[end].startswith('}') and not open_string[end]): end += 1
+            types[m[1]] = '\n'.join(lines[start:end + 1]); i = end + 1
+    return types
+
+
+def native_source():
+    """The app's Swift source as one text, in the order it had as one file: main.swift with each type put back where its
+    `// <kind> <Name> lives in <file>` line stands. Checks slice it by what comes after what."""
+    import re
+    from pathlib import Path
+    types = native_types()
+    main = Path(native_files()[0]).read_text()
+    text = re.sub(r'^// (?:final )?(?:class|struct|enum|protocol) (\w+) lives in \S+\.swift$', lambda m: types.pop(m[1]), main, flags=re.M)
+    return text + ''.join('\n' + body + '\n' for body in types.values())   # a type no pointer names yet still counts
+
+
 def run_swift(test, source, timeout=10):
     """Compile Swift source to a temp binary, run it, assert both succeed; returns its stdout."""
     import subprocess, sys

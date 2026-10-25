@@ -6,13 +6,13 @@ import sys
 import tempfile
 import unittest
 
-from tests import run_swift
+from tests import native_source, run_swift
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def harness(root):
-    source = (ROOT / 'Rabik.swift').read_text()
+    source = native_source()
     methods = source[source.index('    func cancelFast()'):source.index('    func stop()', source.index('    func cancelFast()'))]
     key = source[source.index('func transcriptKey('):source.index('final class SpeechInputs')]
     worker = root / 'worker.py'
@@ -133,7 +133,7 @@ if CommandLine.arguments.contains("--benchmark") {
 @unittest.skipUnless(sys.platform == 'darwin', 'macOS Swift worker regression')
 class NativeTests(unittest.TestCase):
     def test_memory_receipts_fall_through_when_drawing_parser_rejects_them(self):
-        source = (ROOT/'Rabik.swift').read_text()
+        source = native_source()
         branch = source.split('                    if line.hasPrefix("✎ ") {', 1)[1].split('                    if line.hasPrefix("@ ")', 1)[0]
         out = run_swift(self, '''import Cocoa
 final class Prefs { static func bool(_ key: String) -> Bool { true } }
@@ -160,14 +160,14 @@ Harness().feed(["✎ {\\"remembered\\":[\\"Use concise answers\\"]}", "✎ {\\"s
         self.assertEqual(out.splitlines(), ['✎ {"remembered":["Use concise answers"]}', 'guide', 'true'])
 
     def test_page_calls_skip_values_json_cannot_hold(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         bridge = source[source.index('// Call a page function'):source.index('// Load ui/')]
         out = run_swift(self, 'import Foundation\nclass WKWebView { func evaluateJavaScript(_ s: String) { print(s) } }\n' + bridge +
                         'let w = WKWebView()\ncallJS(w, "ui.a", [])\ncallJS(w, "ui.b", ["x/y"])\ncallJS(w, "ui.c", [NSValue(range: NSRange(location: 0, length: 1))])\n')
         self.assertEqual(out.splitlines(), ['ui.a(...[])', 'ui.b(...["x\\/y"])'])
 
     def test_voice_focus_becomes_the_background_guard_target(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         start = source.index('    static func focusGuardActive')
         policy = source[start:source.index('    let recent', start)]
         start = source.index('    static var workInFront:')
@@ -252,7 +252,7 @@ precondition(MiniScreen.restored == nil && h.userApp == temporary, "front mode p
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_focus_guard_covers_main_asks_and_fast_work(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         policy = source[source.index('    static func focusGuardActive'):source.index('    let recent', source.index('    static func focusGuardActive'))]
         swift = '''import Foundation
 final class Harness {
@@ -279,7 +279,7 @@ print("focus guard policy ok")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_typing_requires_a_zero_length_caret(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         caret = source[source.index('    var caret: Bool'):source.index('    static func selectedRange',source.index('    var caret: Bool'))]
         swift = '''import Foundation
 struct Harness { let text:String, range:CFRange?
@@ -299,7 +299,7 @@ print("caret safety ok")
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_typed_box_prewarms_but_confirmation_stays_at_submit(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         branch = source[source.index('if !replying && Prefs.str("input") == "type"'):source.index('\n        toggleTalk', source.index('if !replying && Prefs.str("input") == "type"'))]
         self.assertIn('unwarm(); warm = spawn()', branch)
         run = source[source.index('    func run(_ t: String'):source.index('\n    }\n}', source.index('    func run(_ t: String'))]
@@ -308,7 +308,7 @@ print("caret safety ok")
         self.assertLess(run.index('try "go".write(toFile: commit'), run.index('var data = try JSONSerialization.data(withJSONObject:request)'))
 
     def test_hidden_followups_keep_failed_and_successful_turns_for_five_minutes(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         start = source[source.index('    func start(dictate: Bool)'):source.index('    func heard(', source.index('    func start(dictate: Bool)'))]
         self.assertIn('Date().timeIntervalSince(lastDone) > 300', start)
         spawn = source.index('    func spawn()')
@@ -316,7 +316,7 @@ print("caret safety ok")
         self.assertLess(completion.index('self.lastDone = Date()'), completion.index('if !self.answer.isEmpty'))
 
     def test_final_words_after_live_action_preserve_raw_remainder(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         finish = source[source.index('    func finish()', source.index('    func typed(')):source.index('    // rabik.py --wait, started')]
         swift = '''import Foundation
 final class Engine { var isRunning = false }
@@ -361,7 +361,7 @@ print("confirmed remainder regressions ok")
             self.assertIn('confirmed remainder regressions ok', result.stdout)
 
     def test_replace_checks_original_text_range_and_app(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         method = source[source.index('    var value: String?'):source.index('// Sees the mouse')]
         # Reuse the production method with fake AX writes; never address a real app.
         swift = """import Foundation
@@ -403,7 +403,7 @@ print("selection regressions ok")
             self.assertIn('selection regressions ok', result.stdout)
 
     def test_meeting_size_stays_on_small_and_secondary_displays(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         size = source[source.index('    func size(_ h: Double'):source.index('    func compact(', source.index('    func size(_ h: Double'))]
         swift = """import Cocoa
 final class NSScreen {
@@ -452,7 +452,7 @@ print("meeting size ok")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_calendar_dismissal_and_updates_preserve_open_meeting(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         timer = source[source.index('    let g = meeting.generation', source.index('func checkCalendar()')):source.index('\n}', source.index('    let g = meeting.generation', source.index('func checkCalendar()')))]
         context = next(line for line in source.splitlines() if 'let context = [e.title' in line)
         idle = source[source.index('    static func restartWhenIdle()'):source.index('    static func schedule()')]
@@ -504,7 +504,7 @@ print("calendar/update safety ok")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_shortcut_states_and_recording_limit(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         self.assertIn('"input": "voice", "talkMode": "hold"',source)
         self.assertIn('if !dictating && held > 60', source)
         start=source[source.index('    func start()',source.index('final class App')):source.index('        quietAudio.begin',source.index('    func start()',source.index('final class App')))]

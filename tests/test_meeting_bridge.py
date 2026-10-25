@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -13,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == 'darwin', 'macOS native meeting bridge')
 class MeetingBridgeTests(unittest.TestCase):
     def test_prep_queue_edits_and_stop_with_fake_workers(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         classes = source[source.index('// Meeting audio'):source.index('// MARK: - Hands')]
         # Keep the actual start guards and state transition; replace hardware work with no-op capture.
         begin = classes.index('        let g = generation', classes.index('    func start(_ context: String)'))

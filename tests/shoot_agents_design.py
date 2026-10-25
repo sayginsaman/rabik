@@ -7,6 +7,7 @@ import time
 import unittest
 from pathlib import Path
 from tests.test_agents_native import ROOT, run_fixture
+from tests import native_source
 
 NOW = time.time()
 DOC = 'https://docs.google.com/document/d/1FixtureDocIdForDesignShots0000000/edit'
@@ -318,7 +319,7 @@ nsapp.run()'''
 
 # Show, don't tell: open a real privacy pane in the VM and point at Rabik's switch with the app's own code.
 def point_fixture():
-    source = (ROOT / 'Rabik.swift').read_text()
+    source = native_source()
     cut = lambda start, end: source[source.index(start):source.index(end, source.index(start))]
     return ('import Cocoa\n' + cut('func axAttribute(', '// AX has no public') + 'enum Hands {\n' + cut('    static func attribute(_ e: AXUIElement', '    static func array(') + '}\n'
             + cut('var ring: NSPanel?', 'func jsonString') + 'enum Onboarding {\n static let name = "Rabik"\n' + cut('    static func pointSwitch(', '    static func bundle(') + '}\n'

@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -11,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == 'darwin', 'macOS meeting components')
 class MeetingNativeTests(unittest.TestCase):
     def test_native_journal_append_and_private_atomic_export(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         archive = source[source.index('final class MeetingArchive'):source.index('final class MeetingAudio')]
         self.check_swift('''import Cocoa
 enum Prefs { static let root = NSTemporaryDirectory() + UUID().uuidString; static let path = root + "/settings.json" }
@@ -44,7 +45,7 @@ print("private append-only archive and atomic export")
 ''')
 
     def test_saved_frames_restore_clamp_and_fallback(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         geometry = source[source.index('enum MeetingFrame'):source.index('final class MeetingWebView')]
         self.check_swift('import Cocoa\n' + geometry + '''
 let primary = NSRect(x: 0, y: 28, width: 1440, height: 872), secondary = NSRect(x: -1000, y: 100, width: 1000, height: 700)
@@ -74,7 +75,7 @@ print("saved meeting frames restore and clamp")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_call_debounce_and_calendar_priority(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         mic = source[source.index('func checkMic()'):source.index('\nTimer.scheduledTimer', source.index('func checkMic()'))]
         calendar = source[source.index('func checkCalendar()'):source.index('\nfunc showNudge', source.index('func checkCalendar()'))]
         self.check_swift('''import Foundation
@@ -133,7 +134,7 @@ print("meeting detection/calendar ok")
 ''')
 
     def test_system_and_microphone_samples_use_separate_feeds(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         audio = source[source.index('final class MeetingAudio'):source.index('final class MeetingWebView')]
         # Exercise the delegate body without constructing a capture stream or asking for permissions.
         audio = audio.replace('func stream(_ stream: SCStream, didOutputSampleBuffer sample:', 'func samples(_ sample:')

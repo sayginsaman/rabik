@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -13,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == 'darwin', 'Swift preferences')
 class RoutingPreferencesTests(unittest.TestCase):
     def test_native_migration_matches_brain_and_persists_on_next_write(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         prefs = source[source.index('enum Prefs {'):source.index('\nfunc applySharing')]
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -36,7 +37,7 @@ class RoutingPreferencesTests(unittest.TestCase):
                     self.assertEqual(json.loads(state.read_text())['routing'], expected)
 
     def test_voice_setting_bridge_accepts_migrated_choices(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         prefs = source[source.index('enum Prefs {'):source.index('\nfunc applySharing')]
         start = source.index('                        if p.count == 3, Prefs.defaults[')
         bridge = source[start:source.index('\n                        continue', start)]

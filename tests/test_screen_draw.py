@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tests import prompt_chars, scratch_dir
+from tests import native_args, native_source, prompt_chars, scratch_dir
 import brain.drawing, brain.hands, brain.interaction, brain.macos, brain.paths, brain.prefs, brain.prompts, brain.protocol
 import brain.screen, brain.situation, brain.skills
 
@@ -244,7 +244,7 @@ class DrawingTests(unittest.TestCase):
             brain.drawing.drawing({'steps':[{'shapes':[{'kind':'pointer','at':[10,10]}]}]})
 
     def test_app_lifecycle_connects_to_clear(self):
-        source = (ROOT/'Rabik.swift').read_text()
+        source = native_source()
         app = source.split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
         section = lambda start, end: app.split(start,1)[1].split(end,1)[0]
         self.assertIn('drawing.clear()',section('func close(clear: Bool)','\n    }'))   # the box's ✕ takes the drawing with it
@@ -262,7 +262,7 @@ class DrawingTests(unittest.TestCase):
         self.assertNotIn('drawing.clear()',ask_finish)
 
     def test_follow_ups_keep_the_guide_display_and_voice_prewarms(self):
-        source = (ROOT/'Rabik.swift').read_text()
+        source = native_source()
         app = source.split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
         start = app.split('func start(dictate: Bool)',1)[1].split('func heard(',1)[0]
         typed = app.split('func typed(',1)[1].split('func finish()',1)[0]
@@ -274,7 +274,7 @@ class DrawingTests(unittest.TestCase):
         self.assertIn('if transcriptKey(response) == "next" { unwarm(); drawing.next()',finish)
 
     def test_guide_steps_callouts_and_voice_policy(self):
-        source = (ROOT/'Rabik.swift').read_text()
+        source = native_source()
         drawing = source.split('final class ScreenDrawing {',1)[1].split('// The box can take typing',1)[0]
         self.assertIn('r.steps[..<index].enumerated().map { view.render($0.element.shapes,animate:false,previous:nil,append:true,dim:true,step:$0.offset) }',drawing)
         for wiring in ('callout.onClose = { [weak self] in self?.clear() }','callout.onNext = { [weak self] in self?.next() }',
@@ -310,21 +310,21 @@ class DrawingTests(unittest.TestCase):
                     {'bounds':[0,0,1,1],'path':[[float('nan'),0]],'element':'x'}):
             with self.subTest(bad=bad):
                 self.assertEqual(brain.situation.point_context(bad),('',[]))
-        app = (ROOT/'Rabik.swift').read_text().split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
+        app = native_source().split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
         self.assertIn('if let point { request["point"] = point }',app)
         self.assertIn('if drawing.hasInput { drawing.clearInput(); return }',app)
         self.assertIn('if !dictate && !drawing.hasInput { drawing.clear() }',app)
         self.assertNotIn('if drawing.active { drawing.clear() }',app.split('func startPointing()',1)[1].split('func finishPointing()',1)[0])   # pointing keeps a guide up
 
     def test_point_controls_reach_the_app(self):
-        app = (ROOT/'Rabik.swift').read_text().split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
+        app = native_source().split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
         for wiring in ('drawing.inputMode ? finishPointing() : startPointing()', 'drawing.inputAway = { [weak self] in self?.finishPointing() }',
                        'if b["pointClear"] != nil { if drawing.hasInput { drawing.clearInput() } else { clearPointContext() } }', 'Prefs.set("pointCoached", true)',
                        'drawing.picked = { [weak self] r, words in self?.finishPoint([CGPoint(x:r.minX,y:r.minY),CGPoint(x:r.maxX,y:r.maxY)],mark:words) }',
                        '!Prefs.bool("pointCoached") { js("pointCoach") }'):
             self.assertIn(wiring,app)
         self.assertNotIn('pointDone',app)
-        begin = (ROOT/'Rabik.swift').read_text().split('func beginInput(',1)[1].split('func startInput(',1)[0]
+        begin = native_source().split('func beginInput(',1)[1].split('func startInput(',1)[0]
         self.assertIn('panel.level = NSWindow.Level(rawValue:NSWindow.Level.statusBar.rawValue - 1)',begin)   # Rabik's .statusBar panels stay above it, even after a click raises it
         finish = app.split('func finishPoint(',1)[1].split('func startPointing()',1)[0]
         self.assertLess(finish.index('removeItem(atPath:old)'),finish.index('pointContext = context'),'a redrawn mark must delete the last crop')
@@ -391,7 +391,7 @@ if (messages.slice(before).some(m => m.point) || els.status.textContent !== 'Fin
         self.assertEqual(result.returncode,0,result.stderr)
         listen = page[page.index('    listen(mode) {'):page.index('    level(v) {')]
         self.assertIn("!document.body.classList.contains('dictate') && markShot()",listen)   # the sent bubble shows the crop; dictation never does
-        run = (ROOT/'Rabik.swift').read_text().split('    func run(_ t: String',1)[1]
+        run = native_source().split('    func run(_ t: String',1)[1]
         self.assertLess(run.index('pointContext = nil'),run.index('drawing.clearInput()'))   # sending takes the mark off the screen but keeps its crop for the worker
 
 
@@ -544,13 +544,13 @@ window.orderOut(nil)
 @unittest.skipUnless(sys.platform == 'darwin','macOS native drawing fixture')
 class NativeDrawingTests(unittest.TestCase):
     def test_product_typechecks(self):
-        result = subprocess.run(['swiftc','-typecheck',str(ROOT/'Rabik.swift')],capture_output=True,text=True,timeout=90)
+        result = subprocess.run(['swiftc','-typecheck',*native_args()],capture_output=True,text=True,timeout=90)
         self.assertEqual(result.returncode,0,result.stderr)
 
     def test_native_drawings_and_fixture_screenshots(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            source = (ROOT/'Rabik.swift').read_text()
+            source = native_source()
             drawing = source[source.index('// Screen drawings use Quartz'):source.index('// The box can take typing')]
             (root/'main.swift').write_text(HARNESS.replace('__DRAWING__',drawing))
             result = subprocess.run(['swiftc',str(root/'main.swift'),'-o',str(root/'fixture')],capture_output=True,text=True)
@@ -567,7 +567,7 @@ class NativeDrawingTests(unittest.TestCase):
 class DrawingAnchorTests(unittest.TestCase):
     def test_ids_keep_identity_across_expected_value_changes(self):
         from tests import run_swift
-        source = (ROOT/'Rabik.swift').read_text()
+        source = native_source()
         method = source[source.index('    static func drawAnchor('):source.index('    static func point(_ text:')]
         harness = r'''import Cocoa
 typealias AXUIElement = Int
@@ -745,6 +745,6 @@ print("Guide geometry: rings outside targets, arrows and labels beside them, cal
 class GuideGeometryTests(unittest.TestCase):
     def test_marks_and_callouts_stay_clear_of_targets(self):
         from tests import run_swift
-        source = (ROOT/'Rabik.swift').read_text()
+        source = native_source()
         drawing = source[source.index('// Screen drawings use Quartz'):source.index('// The box can take typing')]
         self.assertIn('Guide geometry',run_swift(self,GEOMETRY.replace('__DRAWING__',drawing),timeout=20))

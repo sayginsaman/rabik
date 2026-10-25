@@ -9,7 +9,7 @@ import sys
 import unittest
 from unittest.mock import patch
 
-from tests import scratch_dir, run_swift
+from tests import native_source, run_swift, scratch_dir
 import brain.calendar, brain.cli, brain.interaction, brain.macos, brain.paths, brain.policy, brain.prompts
 
 
@@ -160,7 +160,7 @@ class CalendarTests(unittest.TestCase):
 @unittest.skipUnless(sys.platform == 'darwin', 'Swift calendar backend')
 class CalendarNativeTests(unittest.TestCase):
     def test_eventkit_logic_with_fake_store(self):
-        source = (Path(__file__).resolve().parents[1] / 'Rabik.swift').read_text()
+        source = native_source()
         tool = source[source.index('enum CalendarTool {'):source.index('\nfunc currentMeetingEvent(')]
         fake = r'''
 import Foundation

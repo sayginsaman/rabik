@@ -3,7 +3,7 @@
 <script type="module">
 const results=document.getElementById('results'), frame=document.getElementById('preview');
 try {
- const native=await (await fetch('../Rabik.swift')).text();
+ const native=await (await fetch('../Sources/Rabik/Overlay/App.swift')).text();
  const tint=+native.match(/blue:20\/255,alpha:([\d.]+)\)\.cgColor/)[1];
  // The box's glass with its tint, measured in the VM over white, mid grey and black (tests.shoot_boxlook test_measure_glass)
  const glass={0.9:{255:[49,49,53],128:[40,40,44],0:[30,30,34]},0.88:{255:[53,53,56],128:[41,42,46],0:[30,30,34]},0.85:{255:[57,59,61],128:[43,45,49],0:[30,31,34]},0.8:{255:[66,67,71],128:[49,50,53],0:[30,31,34]}}[tint];

@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -21,7 +22,7 @@ class MainThreadTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_permission_refresh_deduplicates_pending_probes(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         statuses = source[source.index('    static let probeLock'):source.index('    static func sync()')]
         self.swift('''import Foundation
 typealias OSStatus = Int32
@@ -52,7 +53,7 @@ precondition(Apps.statuses(["frozen"])["frozen"] == "allowed", "completed probe 
 ''')
 
     def test_activation_returns_without_waiting_and_times_out(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         activate = source[source.index('    static func activate(_ pid:'):source.index('    static var workInFront')]
         self.swift('''import Foundation
 final class NSRunningApplication {
@@ -82,7 +83,7 @@ precondition(!completed.terminated && completed.terminationHandler == nil, "comp
 ''')
 
     def test_mic_serializes_sessions_and_ignores_cancelled_starts(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         mic = source[source.index('final class Mic:'):source.index('    func captureOutput(', source.index('final class Mic:'))] + '}\n'
         self.swift('''import Foundation
 protocol AVCaptureAudioDataOutputSampleBufferDelegate {}
@@ -142,7 +143,7 @@ precondition(errors == 1)
         self.assertLess(start.index('if case .failure'), start.index('began = Date()'))
 
     def test_archive_serializes_batched_writes_off_main_and_reports_errors(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         archive = source[source.index('final class MeetingArchive'):source.index('final class MeetingAudio')]
         terminate = source[source.index('    func applicationShouldTerminate('):source.index('    func applicationShouldHandleReopen(')]
         self.swift('''import Foundation

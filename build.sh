@@ -22,12 +22,13 @@ STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 # A compiler error must leave the installed app and its resources alone.
 # xcrun picks the Xcode or Command Line Tools compiler with its macOS SDK, never another swiftc first on PATH.
+SWIFT=(Sources/Rabik/*.swift Sources/Rabik/*/*.swift)   # one module; main.swift holds the startup code
 if [ -n "$RELEASE" ]; then
-  for ARCH in arm64 x86_64; do xcrun swiftc -O -module-name Rabik -target "$ARCH-apple-macos26.0" Rabik.swift -o "$STAGE/Rabik-$ARCH"; done
+  for ARCH in arm64 x86_64; do xcrun swiftc -O -module-name Rabik -target "$ARCH-apple-macos26.0" "${SWIFT[@]}" -o "$STAGE/Rabik-$ARCH"; done
   lipo -create "$STAGE/Rabik-arm64" "$STAGE/Rabik-x86_64" -output "$STAGE/Rabik"
   APP=dist/Rabik.app; rm -rf "$APP"
 else
-  xcrun swiftc -O -module-name Rabik -target "$(uname -m)-apple-macos26.0" Rabik.swift -o "$STAGE/Rabik"
+  xcrun swiftc -O -module-name Rabik -target "$(uname -m)-apple-macos26.0" "${SWIFT[@]}" -o "$STAGE/Rabik"
   APP=~/Applications/Rabik.app   # in Applications so System Settings can list it for permissions
 fi
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/ui"

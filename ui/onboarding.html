@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<!-- Rabik first-run window. Rabik.swift loads this (ui/logo.png goes in place of the logo marker), calls ob.set({...}) every second
+<!-- Rabik first-run window. Rabik.app loads this (ui/logo.png goes in place of the logo marker), calls ob.set({...}) every second
      with which permissions are on, and gets {do:'grant', id} / {do:'done'} back. -->
 <style>
   :root {
@@ -589,7 +589,7 @@
   document.querySelectorAll('.seg[data-k]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => {
     prefs[g.dataset.k] = b.dataset.v; paintPrefs(); post({ do: 'set', k: g.dataset.k, v: b.dataset.v });
   }));
-  // Dictation's shortcut: Rabik.swift records the next keys (the same recorder as Settings) and answers with ob.rec / ob.taken / ob.recorded.
+  // Dictation's shortcut: Rabik.app records the next keys (the same recorder as Settings) and answers with ob.rec / ob.taken / ob.recorded.
   let recording = false, dcWarn = 0;
   const dcHint = () => prefs.dictateHotkeyLabel ? 'In any text field, your words land at the cursor.' : 'Click, then press the keys you want.';
   const dcKeys = (label, text) => {

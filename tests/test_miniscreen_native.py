@@ -11,6 +11,7 @@ import threading
 import time
 import statistics
 import unittest
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -150,7 +151,7 @@ class MiniScreenNativeTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory(); cls.addClassCleanup(cls.temp.cleanup)
         cls.root = Path(cls.temp.name); cls.binary = cls.root / 'Rabik'
         cls.env = {**os.environ, 'RABIK_DIR':str(cls.root), 'RABIK_RESOURCES_DIR':str(ROOT)}
-        swift = (ROOT / 'Rabik.swift').read_text()
+        swift = native_source()
         ax = swift[swift.index('func axAttribute('):swift.index('struct TextSelection')]
         mini = swift[swift.index('final class PassView:'):swift.index('final class App:')]
         source = cls.root / 'main.swift'; source.write_text(HARNESS.replace('__NATIVE__',ax + mini))
@@ -218,7 +219,7 @@ class MiniScreenNativeTests(unittest.TestCase):
         finally: server.shutdown(); server.server_close(); thread.join()
 
     def test_target_selection_and_minimized_fallback_with_fake_ax(self):
-        swift = (ROOT / 'Rabik.swift').read_text()
+        swift = native_source()
         mini = swift[swift.index('final class PassView:'):swift.index('final class App:')]
         stub = r'''
 import Cocoa

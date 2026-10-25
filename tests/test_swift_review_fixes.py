@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import unittest
 
-from tests import run_swift
+from tests import native_source, run_swift
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class SwiftReviewFixTests(unittest.TestCase):
     def setUp(self):
-        self.swift = (ROOT / "Rabik.swift").read_text()
+        self.swift = native_source()
         self.agents = (ROOT / "ui/agents.html").read_text()
         self.overlay = (ROOT / "ui/ui.html").read_text()
         self.settings = (ROOT / "ui/settings.html").read_text()
@@ -23,7 +23,7 @@ class SwiftReviewFixTests(unittest.TestCase):
         late = [i + 1 for i, line in enumerate(lines) if 'waitUntilExit()' in line
                 and 'readDataToEndOfFile()' not in line.split('waitUntilExit()')[0]
                 and any('readDataToEndOfFile()' in later for later in lines[i + 1:i + 3])]
-        self.assertEqual(late, [], 'read the pipe before waitUntilExit() at these Rabik.swift lines')
+        self.assertEqual(late, [], 'read the pipe before waitUntilExit() at these Swift lines')
 
     def test_settings_dictionary_is_locked_across_queues(self):
         # Settings and setup read prefs on a global queue every 1.5 s while main writes them: an unlocked Swift

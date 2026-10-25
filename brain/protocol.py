@@ -1,4 +1,4 @@
-"""The worker's stdout protocol to Rabik.swift: one line per message, tagged by its first character.
+"""The worker's stdout protocol to Rabik.app: one line per message, tagged by its first character.
 
   · note   ▸ step   ✓ answer   ! error/setup/feedback/improve   … streamed answer so far   i tip
   ? Allow card (tab-separated)   ◇ choices card   ⤴ hand-off   ⇢ move-to-agent control   ▣ work window

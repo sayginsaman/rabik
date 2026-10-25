@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -12,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == "darwin", "macOS Swift regression")
 class PrefsNativeTests(unittest.TestCase):
     def test_all_windows_follow_sharing_preference(self):
-        source = (ROOT / "Rabik.swift").read_text()
+        source = native_source()
         self.assertEqual(source.count(".sharingType ="), 1)
         prefs = source[source.index("enum Prefs"):source.index("func profileName(")]
         live = next(line for line in source.splitlines() if 'if k == "hideWhenSharing"' in line)
@@ -43,12 +44,12 @@ for enabled in [false, true, false] {
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_old_long_asks_choices_are_not_read(self):
-        source = (ROOT / "Rabik.swift").read_text()
+        source = native_source()
         self.assertNotIn('"longAsks"', source)
         self.assertNotIn('agentsAuto', source)
 
     def test_retired_settings_keep_saved_values_without_rewriting_disk(self):
-        source = (ROOT / "Rabik.swift").read_text()
+        source = native_source()
         prefs = source[source.index("enum Prefs"):source.index("func applySharing(")]
         swift = """import Foundation
 let controlKey = 1, optionKey = 2
@@ -79,7 +80,7 @@ if CommandLine.arguments.contains("--saved") {
             self.assertFalse((fresh / "settings.json").exists())
 
     def test_dictation_shortcut_defaults_to_fn_but_keeps_any_choice(self):
-        source = (ROOT / "Rabik.swift").read_text()
+        source = native_source()
         prefs = source[source.index("enum Prefs"):source.index("func applySharing(")]
         swift = """import Foundation
 let controlKey = 1, optionKey = 2
@@ -105,7 +106,7 @@ print(Prefs.str("dictateHotkeyLabel") + "|" + String(Int(Prefs.num("dictateHotke
                 self.assertEqual(result.stdout.strip(), want, before)
 
     def test_settings_are_private_and_usage_counts_final_rows(self):
-        source = (ROOT / "Rabik.swift").read_text()
+        source = native_source()
         prefs = source[source.index("enum Prefs"):source.index("func audioProp")]
         today = source[source.index("    func today()"):source.index("    @objc func toggleMeeting")]
         today = today.replace('NSString(string: "~/.config/rabik/log.jsonl").expandingTildeInPath',
@@ -142,7 +143,7 @@ precondition(usage == "Today: $0.03 · asks $0.01 · agents $0.02", "usage did n
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_unwritable_settings_keep_the_old_value(self):
-        source = (ROOT / "Rabik.swift").read_text()
+        source = native_source()
         prefs = source[source.index("enum Prefs"):source.index("func audioProp")]
         swift = """import Cocoa
 let controlKey = 1, optionKey = 2

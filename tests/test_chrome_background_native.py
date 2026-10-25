@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
+from tests import native_args
 import brain.macos, brain.paths, brain.web, brain.windows
 
 CHROME = Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
@@ -225,7 +226,7 @@ window.open('/other.html','other','left=10,top=60,width=490,height=460');</scrip
             threading.Thread(target=server.serve_forever, daemon=True).start()
             self.addCleanup(server.server_close); self.addCleanup(server.shutdown)
             binary = root / 'Rabik'
-            compiled = subprocess.run(['swiftc', str(root_dir / 'Rabik.swift'), '-o', str(binary)], capture_output=True, text=True)
+            compiled = subprocess.run(['swiftc', *native_args(), '-o', str(binary)], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             env = {**os.environ, 'RABIK_DIR':tmp, 'RABIK_RESOURCES_DIR':str(root_dir), 'RABIK_HANDS_STATE':str(root / 'hands.json')}
             env.pop('RABIK_AX_ONLY', None); env.pop('RABIK_HANDS_WINDOW', None)
@@ -350,7 +351,7 @@ const info=()=>say('/info',{{w:'full',x:screenX,y:screenY,bar:outerHeight-innerH
             (root / 'game.html').write_text(f'''<body style="margin:0"><canvas id=c width=440 height=300 style="display:block;background:#fff"></canvas><script>{say}const c=document.getElementById('c'),g=c.getContext('2d');
 for(const t of ['pointerdown','mousedown','click'])c.addEventListener(t,e=>{{say('/hit',[e.type,e.offsetX,e.offsetY,e.isTrusted]);if(t=='pointerdown'){{g.fillStyle='#000';g.fillRect(e.offsetX-20,e.offsetY-15,40,30)}}}});</script>''')
             binary = root / 'Rabik'
-            compiled = subprocess.run(['swiftc', str(root_dir / 'Rabik.swift'), '-o', str(binary)], capture_output=True, text=True)
+            compiled = subprocess.run(['swiftc', *native_args(), '-o', str(binary)], capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             env = {**os.environ, 'RABIK_DIR': tmp, 'RABIK_RESOURCES_DIR': str(root_dir), 'RABIK_HANDS_STATE': str(root / 'hands.json')}
             env.pop('RABIK_AX_ONLY', None); env.pop('RABIK_HANDS_WINDOW', None)

@@ -64,7 +64,7 @@ WRAPPERS = {'env': ('-u', '-S', '-P'), 'command': (), 'nohup': (), 'exec': ('-a'
             'time': (), 'nice': ('-n',), 'timeout': ('-s', '-k'), 'builtin': (), 'caffeinate': ('-t', '-w')}
 
 
-# Rabik.swift's riskyPattern: a raw System Events click asks for the same controls --hands does
+# Hands.riskyPattern (Sources/Rabik/Hands/Hands.swift): a raw System Events click asks for the same controls --hands does
 RISKY_LABEL = r"(?i)\b(buy|purchase|pay|payment|checkout|order|send|delete|remove|trash|submit|publish|post|sign.?out|log.?out|unsubscribe|subscribe|transfer|bid|erase|withdraw|donate|authorize|grant access|allow access|logout|book|reserve|merge|deploy|discard|wipe|format|apply(?! filters| changes| settings| coupon| code| promo| discount| theme| style| formatting)|confirm)\b"
 
 

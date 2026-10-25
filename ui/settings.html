@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<!-- Rabik settings. Rabik.swift calls st.load({prefs, state}) and gets {do:'set', k, v} and other actions back. -->
+<!-- Rabik settings. Rabik.app calls st.load({prefs, state}) and gets {do:'set', k, v} and other actions back. -->
 <style>
   :root {
     --fg: #1d1d1f; --fg2: #6e6e73; --fg3: #6e6e73; --card: #fff; --bg: #f5f5f7; --ctl: #fff; --well: rgba(0,0,0,.045); --line: rgba(0,0,0,.08);
@@ -587,7 +587,7 @@
   let connected = false;   // Enable All opens claude.ai's connectors page only when none is connected
   document.getElementById('enableAll').onclick = () => post({ do: 'enableAll', connected: String(connected) });
 
-  // Shortcut: Rabik.swift records the keys; the label is like "⌃⌥Space" (modifier symbols, then the key)
+  // Shortcut: Rabik.app records the keys; the label is like "⌃⌥Space" (modifier symbols, then the key)
   const capsOf = label => { const m = label.match(/^([⌃⌥⇧⌘]*)(.*)$/); return [...m[1]].concat(m[2] ? [m[2]] : []); };
   const showCaps = (label, hint) => $('caps').innerHTML = capsOf(label).map(c => `<i class="cap${c.length > 2 ? ' wide' : ''}">${c}</i>`).join('')
     + (hint ? `<span class="hint">${hint}</span>` : '');
@@ -799,7 +799,7 @@
     e.onkeydown = ev => { if (ev.key === 'Enter') e.blur(); }; });
   ['apiModel', 'agentApiModel'].forEach(k => $(k).onfocus = () => { if (P.apiBase) post({ do: 'models' }); });
 
-  // Apps: every installed app; suggested ones start ticked. Rabik.swift asks macOS about the ticked ones in one go.
+  // Apps: every installed app; suggested ones start ticked. Rabik.app asks macOS about the ticked ones in one go.
   let APPS = [], pick = null, asking = 0, total = 0, view = 'key';
   function appRow(a) {
     const end = a.status === 'allowed' ? '<span class="pill ok">Allowed</span>'
@@ -939,7 +939,7 @@
       document.querySelectorAll('[data-g]').forEach(b => { b.hidden = !!p[b.dataset.g]; b.previousElementSibling.hidden = !p[b.dataset.g]; });
     },
     notice(n) { showNotice(n.text); },
-    flush() { return flush(false); },   // the window is closing: Rabik.swift runs the waiting deletion
+    flush() { return flush(false); },   // the window is closing: Rabik.app runs the waiting deletion
     tab(name) { openSection(name); },
     reveal(item) { want = item; reveal(); },
     apps(list) {

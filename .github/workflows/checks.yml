@@ -16,7 +16,7 @@ jobs:
           - os: ubuntu-latest
             python: '3.13'
           - os: macos-26
-            python: system     # the python3 the app itself uses; the Swift tests compile and typecheck Rabik.swift
+            python: system     # the python3 the app itself uses; the Swift tests compile and typecheck Sources/Rabik
     steps:
       - name: Checkout
         # v4

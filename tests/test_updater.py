@@ -1,13 +1,14 @@
 import os, re, subprocess, sys, tempfile, unittest
 from pathlib import Path
+from tests import native_source
 
-SCRIPT = re.search(r'let r = sh\(#"""\n(.*?)"""#\)', (Path(__file__).parent.parent / 'Rabik.swift').read_text(), re.S).group(1)
+SCRIPT = re.search(r'let r = sh\(#"""\n(.*?)"""#\)', native_source(), re.S).group(1)
 
 
 @unittest.skipUnless(sys.platform == 'darwin', 'the app runs this updater with macOS /bin/zsh')
 class UpdaterTests(unittest.TestCase):
     def test_repeated_checks_do_not_start_overlapping_updates(self):
-        source = (Path(__file__).parent.parent / 'Rabik.swift').read_text()
+        source = native_source()
         updater = source.split('enum Updater {', 1)[1].split('// Opening Rabik again', 1)[0]
         self.assertIn('guard !checking else { done(); return }', updater)
         self.assertLess(updater.index('checking = true'), updater.index('status = "Checking…"'))

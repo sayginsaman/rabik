@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import unittest
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,7 +30,7 @@ const want = {'⌃⌥Space': ['⌃', '⌥', 'Space'], 'fn': ['fn'], 'fn⌃': ['f
 for (const [label, keys] of Object.entries(want)) if (JSON.stringify(capsOf(label)) !== JSON.stringify(keys)) { console.error(label, capsOf(label)); process.exit(1); }'''
         result = subprocess.run(['node', '-e', script], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        swift = (ROOT / 'Rabik.swift').read_text()
+        swift = native_source()
         self.assertIn('"hotkeyLabel": Prefs.str("hotkeyLabel")', swift)   # setup draws the keys the user set
         self.assertIn('call("ob.keys", shortcutModifierLabel(NSEvent.modifierFlags))', swift)   # any held modifier lights, not only ⌃⌥
         self.assertNotIn('id="t1"', self.page)
@@ -48,7 +49,7 @@ for (const [label, keys] of Object.entries(want)) if (JSON.stringify(capsOf(labe
 
     def test_safe_mode_line_shows_only_while_it_is_on(self):
         self.assertIn("$('safe-note').hidden = prefs.safe === false", self.page)
-        self.assertIn('"safe": Prefs.bool("safe")', (ROOT / 'Rabik.swift').read_text())
+        self.assertIn('"safe": Prefs.bool("safe")', native_source())
 
     def test_mini_screen_copy_matches_its_click(self):
         self.assertNotIn('ask to focus it', self.page)
@@ -65,14 +66,14 @@ for (const [label, keys] of Object.entries(want)) if (JSON.stringify(capsOf(labe
         self.assertIn("$('wk-brain').hidden = $('wk-plan').hidden = provider === 'server'", self.page)   # no plan to choose on a custom server
 
     def test_setup_checks_one_provider_process_at_a_time(self):
-        swift = (ROOT / 'Rabik.swift').read_text()
+        swift = native_source()
         check = swift.split('    func checkPlan() {', 1)[1].split('\n    }', 1)[0]
         self.assertIn('guard !checkingPlan else { return }', check)
         self.assertLess(check.index('checkingPlan = true'), check.index('Onboarding.plan'))
         self.assertIn('self?.checkingPlan = false', check)
 
     def test_voice_asks_use_the_mac_language(self):
-        swift = (ROOT / 'Rabik.swift').read_text()
+        swift = native_source()
         speech = swift.split('    func speechModule(dictate: Bool = false)', 1)[1].split('    func prepareSpeech()', 1)[0]
         self.assertNotIn('Locale.current', speech)   # SpeechTranscriber rejected the Mac's locale: every voice ask died in 1.5.0
         self.assertIn(': SpeechTranscriber(locale: locale, preset: .progressiveTranscription)', speech)

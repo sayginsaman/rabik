@@ -20,7 +20,7 @@ import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
 import brain.agents, brain.apps, brain.cli, brain.clients, brain.handoffs, brain.hands, brain.instant, brain.interaction
 import brain.macos, brain.paths, brain.policy, brain.prefs, brain.prompts, brain.protocol, brain.screen, brain.skills
 import brain.turn, brain.web, brain.windows
-from tests import scratch_dir
+from tests import native_source, scratch_dir
 
 
 class BackgroundTests(unittest.TestCase):
@@ -59,7 +59,7 @@ class BackgroundTests(unittest.TestCase):
         self.assertIn('System settings: shell, defaults or AppleScript first; else open the pane with --bg', brain.prompts.system_prompt(brain.prompts.ASK_FIRST))
         self.assertTrue(brain.hands.hands_valid(['click', 'Night Shift…', 'front']) and brain.hands.hands_valid(['click', 'Done', 'near', 'Sheet', 'double', 'front']))
         self.assertFalse(brain.hands.hands_valid(['click', 'Done', 'front', 'front']))
-        swift = Path(brain.paths.ME).with_name('Rabik.swift').read_text()
+        swift = native_source()
         # --front grants focus for the rest of the ask; a tool reply suggesting it made System Settings stay in front for "is Night Shift on?"
         self.assertNotIn('--front', swift); self.assertNotIn('Bring the window forward', swift)
         self.assertIn('case "front": guard !front', swift)

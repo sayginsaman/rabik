@@ -21,7 +21,7 @@ PLACE, LOOK, SEARCH, READ, SHOW, REMEMBER, FORGET, TYPE, PLAY, QUEUE, ABOUT, SHO
 DRAW = shlex.quote(ME) + " --draw"
 MEMORY, RECENT = os.path.join(DIR, 'memory.md'), os.path.join(DIR, 'recent.jsonl')
 PREFS = os.path.join(DIR, 'settings.json')   # written by the Settings window
-REPOSITORY = 'https://github.com/YOUR_GITHUB/rabik'   # feedback opens a new issue here; keep Rabik.swift's `repository` the same
+REPOSITORY = 'https://github.com/YOUR_GITHUB/rabik'   # feedback opens a new issue here; keep `repository` in Sources/Rabik/main.swift the same
 try:
     APP_VERSION = Path(ME).with_name('VERSION').read_text().strip()
 except OSError:

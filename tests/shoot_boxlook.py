@@ -1,7 +1,7 @@
 """The answer box over real backdrops, VM only (opt-in, not discovered: run this module by name).
 
 run.sh <repo> tests.shoot_boxlook  → measured glass colors, then PNGs printed as base64 (the runner copies nothing back).
-The box is the app's own glass (sliced from Rabik.swift) with the real ui.html on top.
+The box is the app's own glass (sliced from the app's Swift source) with the real ui.html on top.
 """
 import base64
 import json
@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 MATH = (r"Here is the step-by-step solution for problem 36." "\n\n"
@@ -100,7 +101,7 @@ SCENES = [('sections-dark', 'dark', ask('can you tell me the pythagorean theorem
 
 
 def fixture():
-    source = (ROOT / 'Rabik.swift').read_text()
+    source = native_source()
     start = source.index('        let bg = NSVisualEffectView(frame: web.frame)')
     glass = source[start:source.index('bg.addSubview(tint)', start)] + 'bg.addSubview(tint)'
     tint = re.search(r'alpha:([\d.]+)\)\.cgColor', glass)[1]

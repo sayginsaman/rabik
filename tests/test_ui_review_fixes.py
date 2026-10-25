@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import unittest
+from tests import native_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +32,7 @@ def tint(color, alpha, bg='#ffffff'):
 
 class UIReviewFixTests(unittest.TestCase):
     def setUp(self):
-        self.swift = (ROOT / 'Rabik.swift').read_text()
+        self.swift = native_source()
         self.box = (ROOT / 'ui/ui.html').read_text()
         self.settings = (ROOT / 'ui/settings.html').read_text()
         self.onboarding = (ROOT / 'ui/onboarding.html').read_text()

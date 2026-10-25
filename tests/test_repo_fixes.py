@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from tests.evals import fake_mac
 from tests.evals.scenarios import by_id, initial_state
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -70,7 +71,7 @@ class RepoFixTests(unittest.TestCase):
         self.assertNotIn('exec bash "$src/install.sh"', source)
 
     def test_nix_install_does_not_offer_the_git_updater(self):
-        swift = (ROOT / 'Rabik.swift').read_text()
+        swift = native_source()
         settings = (ROOT / 'ui/settings.html').read_text()
         readme = (ROOT / 'README.md').read_text()
         self.assertIn('static let managedByNix = src.hasPrefix("/nix/store/")', swift)

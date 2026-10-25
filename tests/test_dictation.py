@@ -11,7 +11,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from tests import run_swift
+from tests import native_source, run_swift
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -155,7 +155,7 @@ class DictationCleanupTests(unittest.TestCase):
 @unittest.skipUnless(sys.platform == 'darwin', 'macOS Swift regression')
 class DictationNativeTests(unittest.TestCase):
     def test_long_dictation_rollover_stitches_overlap_without_doubling(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         helper = source[source.index('func stitchTranscript'):source.index('final class SpeechInputs')]
         swift = 'import Foundation\n' + helper + r'''
 precondition(stitchTranscript("We should ship the release today", "the release today before lunch") == "We should ship the release today before lunch")
@@ -170,7 +170,7 @@ print("dictation stitching ok")
         self.assertIn('if !dictating && held > 60', timer)
 
     def test_verbatim_skips_ai_cleanup_uses_one_call_and_cancel_drops_result(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         start = source[source.index('    func start(dictate: Bool)'):source.index('    func heard(')]
         self.assertIn('if !dictate && (!replying || drawingReply) { unwarm(); warm = spawn() }', start)
         self.assertIn('if dictateCleanup { warmDictationCleanup() }', start)
@@ -251,7 +251,7 @@ print("dictation routing ok")
         self.assertIn('dictation routing ok', run_swift(self, swift, timeout=30))   # the hung-cleanup case waits out the 8 s fallback
 
     def test_selection_is_replaced_only_while_original_app_stays_front(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         method = source[source.index('    func insertDictation('):source.index('    func typed(')]
         swift = r'''import Foundation
 struct Prefs { static func bool(_ key: String) -> Bool { false } }
@@ -303,7 +303,7 @@ print("dictation target safety ok")
         self.assertIn('dictation target safety ok', run_swift(self, swift))
 
     def test_delivery_retries_only_a_proven_failure_and_keeps_failed_text(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         apply = source[source.index('    func apply(_ draft:'):source.index('    var value:', source.index('    func apply(_ draft:'))]
         insert = source[source.index('    func dictationDeliveryFailed('):source.index('    func typed(')]
         self.assertEqual(apply.count('.post(tap: .cghidEventTap)'), 1)
@@ -366,7 +366,7 @@ print("single delivery fallback ok")
 
     def test_release_waits_for_final_words_on_the_accurate_model(self):
         # Oct 19, 2026: a 0.35 s dictation guard inserted volatile words ("I", "I saw some stuff like.") before the final result.
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         at = source.index('    func stop()', source.index('final class App'))
         stop = source[at:source.index('    func applyReplacement(')]
         guard = stop[stop.index('Finalizing can hang'):]
@@ -379,7 +379,7 @@ print("single delivery fallback ok")
         self.assertIn('transcriptionOptions: [.punctuation], reportingOptions: [.volatileResults]', module)
 
     def test_fn_and_modifier_only_shortcuts_use_flags_events(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         helpers = source[source.index('let rabikFnKey'):source.index('func configuredHotkey')]
         recorder = source[source.index('    // "Change shortcut"'):source.index('    func done(', source.index('    // "Change shortcut"'))]
         registration_start = source.index('var specialGlobalHotkeys')
@@ -398,7 +398,7 @@ print("fn modifier shortcut ok")
         self.assertIn('fn modifier shortcut ok', run_swift(self, swift))
 
     def test_fn_alone_ignores_arrow_flags_and_yields_to_fn_key_chords(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         helpers = source[source.index('let rabikFnKey'):source.index('func configuredHotkey')]
         matcher = source[source.index('func specialHotkey'):source.index('func handleSpecialHotkeys')]
         swift = 'import Cocoa\nimport Carbon\n' + helpers + '\nvar specialGlobalHotkeys: Any?, specialLocalHotkeys: Any?, specialMainDown = false, specialDictateDown = false\n' + matcher + r'''
@@ -429,7 +429,7 @@ print("fn alone ok")
         self.assertIn('!toggleTalk', chord)
 
     def test_paste_borrows_the_clipboard_and_restores_every_type(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         helper = source[source.index('func borrowPasteboard'):source.index('struct TextSelection {')]
         swift = 'import Cocoa\n' + helper + r'''
 let pb = NSPasteboard(name: NSPasteboard.Name("rabik-test-" + UUID().uuidString)), custom = NSPasteboard.PasteboardType("com.example.private")
@@ -459,7 +459,7 @@ print("clipboard borrow ok")
             self.assertNotIn('clearContents', body)
 
     def test_globe_key_conflict_only_for_fn_alone(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         check = source[source.index('func globeKeyTaken()'):source.index('func transcriptKey(')]
         self.assertIn('"AppleFnUsageType"', check)
         self.assertIn('h.code < 0, h.mods == rabikFnKey', check)
@@ -468,7 +468,7 @@ print("clipboard borrow ok")
         self.assertIn('case "globeKey"', source)
 
     def test_overlay_states_follow_release_done_fallback_fail_and_cancel(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         at = source.index('    func stop()', source.index('final class App'))
         release = next(l for l in source[at:source.index('    func applyReplacement(')].splitlines() if 'js("finishing"' in l)
         self.assertIn('cue("soundRelease")', release)   # a sound when the key lets go and cleanup starts
@@ -543,7 +543,7 @@ print("dictation states ok")
 
     def test_pill_over_a_box_that_must_stay_gives_the_box_back(self):
         # A pinned, placed or drawing-holding box blocked hide(), so the pill sat on its green check and hid the answer.
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         hide = source[source.index('    func hide(after s: Double)'):source.index('    func defaultKey(')]
         swift = r'''import Foundation
 final class Ctx { var duration = 0.0 }
@@ -629,7 +629,7 @@ if (!answer.classList.contains('old')) process.exit(console.error('a real ask no
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_pill_morphs_with_transform_and_opacity_and_cross_fades_under_reduce_motion(self):
-        page, source = self.page, (ROOT / 'Rabik.swift').read_text()
+        page, source = self.page, native_source()
         for name, props in (('morph', {'opacity', 'transform'}), ('fade', {'opacity'})):
             frames = re.search(r'@keyframes ' + name + r' \{(.*?)\}\s*\}?\n', page, re.S).group(1)
             self.assertEqual(set(re.findall(r'([a-z-]+):', frames)), props, name)
@@ -655,7 +655,7 @@ if (!answer.classList.contains('old')) process.exit(console.error('a real ask no
     def test_pill_is_sized_by_the_page_and_shows_no_transcript_or_divider(self):
         # Oct 20, 2026: the pill had empty space between the wave and the lock, live words, and a line at finish
         # (the thread's .turn + .turn divider on a later dictation, and a shimmer swept across the words).
-        page, source = self.page, (ROOT / 'Rabik.swift').read_text()
+        page, source = self.page, native_source()
         self.assertIn("document.body.classList.contains('dictate') ? [card.offsetWidth, card.offsetHeight] : card.offsetHeight", page)
         card = re.search(r'body\.dictate #card \{(.*?)\}', page).group(1)
         self.assertIn('width: max-content', card)

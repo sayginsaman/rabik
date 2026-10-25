@@ -7,13 +7,14 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from tests import native_args, native_source
 
 ROOT=Path(__file__).resolve().parents[1]
 
 
 def native_fixture(body, real_mini=False):
     """The real agent panels with stubbed app, prefs and worker, then a fixture `body`."""
-    source=(ROOT/'Rabik.swift').read_text()
+    source=native_source()
     panels=source[source.index('// MARK: - Agent panels'):source.index('// First-run window')].replace('NSWorkspace.shared.accessibilityDisplayShouldReduceMotion','fixtureReduced')
     show=source[source.index('    func show()',source.index('final class App')):source.index('    func hide(after',source.index('final class App'))]
     lease=source[source.index('    static func screenLease()'):source.index('    static func fingerprint',source.index('    static func screenLease()'))]
@@ -250,7 +251,7 @@ nsapp.run()''','move shortcut checks ok')
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);binary=root/'Rabik'
             env={**os.environ,'RABIK_DIR':str(root),'RABIK_RESOURCES_DIR':str(ROOT)}
-            build=subprocess.run(['swiftc','-O',str(ROOT/'Rabik.swift'),'-o',str(binary)],env=env,capture_output=True,text=True)
+            build=subprocess.run(['swiftc','-O',*native_args(),'-o',str(binary)],env=env,capture_output=True,text=True)
             self.assertEqual(build.returncode,0,build.stderr)
             result=subprocess.run([str(binary),'--selftest'],env=env,capture_output=True,text=True,timeout=20)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

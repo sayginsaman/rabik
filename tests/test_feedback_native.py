@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from tests import native_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -12,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform == 'darwin', 'macOS native feedback worker')
 class FeedbackNativeTests(unittest.TestCase):
     def test_failed_worker_clears_url_and_reports_latest_error_without_crashing(self):
-        source = (ROOT / 'Rabik.swift').read_text()
+        source = native_source()
         method = source[source.index('    func feedbackPreview('):source.index('    // "Change shortcut":')]
         swift = '''import Cocoa
 func py(_ args:[String])->Process { let p=Process();p.executableURL=URL(fileURLWithPath:CommandLine.arguments[1]+"/missing-worker");return p }

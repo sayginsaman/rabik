@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from tests import native_source
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -11,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform=='darwin','macOS native replay')
 class ReplayNativeTests(unittest.TestCase):
     def test_menu_success_has_no_post_press_accessibility_queries(self):
-        source=(ROOT/'Rabik.swift').read_text()
+        source=native_source()
         start=source.index('            if input[0] == "menu" {')
         branch=source[start:source.index('\n            }\n',start)+15]
         swift='''import Foundation
