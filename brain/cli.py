@@ -70,11 +70,13 @@ def main():
         return meeting.meeting_demo()
     if args == ['--meeting-live']:
         return meeting.meeting_live()
-    if args[:1] in (['--meeting-prep'], ['--meeting-gather'], ['--meeting-save']):
+    if args[:1] in (['--meeting-prep'], ['--meeting-gather'], ['--meeting-save'], ['--meeting-speakers']):
         try:
             data = json.load(sys.stdin)
             if args == ['--meeting-save']:
                 return print(json.dumps({'path': meeting.meeting_save(data)}))
+            if args == ['--meeting-speakers']:
+                return print(json.dumps(meeting.meeting_speakers(data), ensure_ascii=False))
             if args == ['--meeting-gather']:
                 return print(json.dumps(meeting.meeting_gather(data), ensure_ascii=False))
             if args == ['--meeting-prep']:

@@ -149,6 +149,8 @@ final class MeetingWebView: WKWebView {
 final class MeetingCopilot: NSObject, WKScriptMessageHandler {
     var panel: KeyPanel?, web: WKWebView?, audio: MeetingAudio?, analyzer: SpeechAnalyzer?, reading: Task<Void, Never>?, starting: Task<Void, Never>?
     var translator: TranslationSession?, translationFailed = false   // Translate the call (MeetingSpeech)
+    var people: [String] = [], named: [String: String] = [:], sinceGuess = 0, lastGuess = Date.distantPast, guessing: Process?   // speaker names: callPeople, guessSpeakers
+    var other: String? { room || people.count != 1 ? nil : people[0] }   // a 1:1 on the calendar: who "Them" is
     var micAnalyzer: SpeechAnalyzer?, micReading: Task<Void, Never>?, analyzing: Task<Void, Never>?, micAnalyzing: Task<Void, Never>?, stopping: Task<Void, Never>?
     var micPending = "", micPartial = "", micSettle: DispatchWorkItem?, elapsed: TimeInterval = 0
     var partialQuestion: Int?, micPartialQuestion: Int?
@@ -181,7 +183,7 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
             panel.orderFrontRegardless(); focus(); return
         }
         self.demo = demo; self.nudge = nudge; minimized = false; loaded = false; generation += 1; transcript = []; brief = ""; pending = ""; partial = ""; micPending = ""; micPartial = ""; elapsed = 0; serial = 0
-        archive = nil; archiveEnded = false; meetingTitle = nudge?["context"] as? String == "" ? "" : nudge?["title"] as? String ?? ""; callApp = nudge?["app"] as? String ?? "Call"
+        archive = nil; archiveEnded = false; meetingTitle = nudge?["context"] as? String == "" ? "" : nudge?["title"] as? String ?? ""; callApp = nudge?["app"] as? String ?? "Call"; people = []; named = [:]; sinceGuess = 0
         let config = (Prefs.path as NSString).deletingLastPathComponent
         name = profileName(config + "/me.json")
         let frames = Prefs.d["meetingFrames"] as? [String: [Double]] ?? [:]
@@ -347,6 +349,7 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
         guard loaded, !running, Prefs.bool("meeting"), !Prefs.bool("paused") else { return }
         cancelWork(); brief = String(context.prefix(meetingBriefLimit)); briefEdited = false; running = true; began = Date().addingTimeInterval(-elapsed); nudge = nil; app.close(clear: false); app.shortcutDown = false
         if callApp == "Call" { callApp = demo ? "Demo" : callAppsOnMic().sorted().first ?? "Call" }
+        people = demo ? [] : callPeople()
         beginArchive()
         if archiveEnded { saveEvent(["kind": "resumed", "duration": elapsed]); archiveEnded = false }
         js("listen"); bar.paint()
@@ -431,7 +434,7 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
             serial += 1
             if mic { micPartialQuestion = serial } else { partialQuestion = serial }
             let now = Date().timeIntervalSince1970
-            let askedBy = room ? "Someone in the room" : callApp == "Call" ? "Someone else" : "Someone on " + callApp
+            let askedBy = room ? "Someone in the room" : other ?? (callApp == "Call" ? "Someone else" : "Someone on " + callApp)
             let row: [String: Any] = ["id": serial, "text": piece, "seconds": Int(Date().timeIntervalSince(began)), "speaker": askedBy]
             js("question", row.merging(["auto": true, "heard": true]) { $1 })
             enqueue(serial, piece, best: Prefs.str("meetingAuto") == "always", at: now, detectedAt: now)
@@ -455,12 +458,14 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
         let candidate = mic ? micPartialQuestion : partialQuestion
         if mic { micPartialQuestion = nil } else { partialQuestion = nil }
         if candidate == nil { serial += 1 }
-        let id = candidate ?? serial, speaker = you ? "You" : room ? "Room" : callApp == "Call" ? "Them" : callApp
-        let askedBy = you ? "You" : room ? "Someone in the room" : callApp == "Call" ? "Someone else" : "Someone on " + callApp
-        transcript.append(["at": at, "text": text, "seconds": Int(Date().timeIntervalSince(began)), "mic": you])
-        saveEvent(["kind": "transcript", "at": at, "text": text, "seconds": Int(Date().timeIntervalSince(began)), "mic": you, "speaker": speaker])
-        let row: [String: Any] = ["id": id, "text": text, "seconds": Int(Date().timeIntervalSince(began)), "mic": you, "speaker": askedBy]
+        let id = candidate ?? serial, speaker = you ? "You" : room ? "Room" : other ?? (callApp == "Call" ? "Them" : callApp)
+        let askedBy = you ? "You" : room ? "Someone in the room" : other ?? (callApp == "Call" ? "Someone else" : "Someone on " + callApp)
+        transcript.append(["id": id, "at": at, "text": text, "seconds": Int(Date().timeIntervalSince(began)), "mic": you])
+        saveEvent(["kind": "transcript", "id": id, "at": at, "text": text, "seconds": Int(Date().timeIntervalSince(began)), "mic": you, "speaker": speaker])
+        var row: [String: Any] = ["id": id, "text": text, "seconds": Int(Date().timeIntervalSince(began)), "mic": you, "speaker": askedBy]
+        if !you, let other { row["name"] = other }
         js("line", row)
+        if !you { sinceGuess += 1; guessSpeakers() }
         if !you, let session = translator, !translationFailed {   // the other side, in the Mac's language, under the line
             Task { @MainActor [weak self] in
                 do { let done = try await session.translate(text); self?.js("translated", ["id": id, "text": done.targetText]) }
@@ -631,6 +636,38 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
             }
         }
     }
+    // The other people on the calendar event happening now: one is a 1:1's name, more are the names a group guess picks from.
+    func callPeople() -> [String] {
+        guard !room, EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
+        let now = Date()
+        let event = calendar.events(matching: calendar.predicateForEvents(withStart: now.addingTimeInterval(-4 * 3600), end: now.addingTimeInterval(15 * 60), calendars: nil))
+            .filter { !$0.isAllDay && $0.status != .canceled && $0.startDate <= now.addingTimeInterval(10 * 60) && $0.endDate > now }
+            .max { $0.startDate < $1.startDate }
+        return (event?.attendees ?? []).filter { !$0.isCurrentUser && $0.participantType == .person && $0.participantStatus != .declined }
+            .compactMap { $0.name?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && !$0.contains("@") }
+    }
+    // Group calls: their lines share one channel, so every 8 lines (a minute apart at most once) Haiku names the ones the
+    // conversation makes clear (a name said, a reply to a name). The rest stay "Them". Off with AI meeting summaries (the brain checks).
+    func guessSpeakers() {
+        guard running, !room, !demo, people.count != 1, guessing == nil, sinceGuess >= 8, Date().timeIntervalSince(lastGuess) >= 60 else { return }
+        sinceGuess = 0; lastGuess = Date()
+        let p = py(["--meeting-speakers"]), input = Pipe(), output = Pipe(); p.standardInput = input; p.standardOutput = output
+        fcntl(input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        do { try p.run() } catch { return }; guessing = p
+        let g = generation, data: [String: Any] = ["people": people, "lines": Array(transcript.suffix(40))]
+        DispatchQueue.global().async { [weak self] in
+            if let body = try? JSONSerialization.data(withJSONObject: data) { try? input.fileHandleForWriting.write(contentsOf: body) }
+            try? input.fileHandleForWriting.close()
+            let out = output.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+            let names = ((try? JSONSerialization.jsonObject(with: out)) as? [String: Any])?["names"] as? [String: String] ?? [:]
+            DispatchQueue.main.async { [weak self] in
+                guard let self, guessing === p else { return }; guessing = nil
+                let fresh = names.filter { self.named[$0.key] == nil }
+                guard generation == g, running, !fresh.isEmpty else { return }
+                named.merge(fresh) { $1 }; js("speakers", fresh); saveEvent(["kind": "speakers", "names": fresh])
+            }
+        }
+    }
     func playDemo() {
         let p = py(["--meeting-demo"]), out = Pipe(); p.standardOutput = out; demoProcess = p
         let g = generation
@@ -651,7 +688,7 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
         try? p.run()
     }
     func cancelWork() {
-        process?.terminate(); process = nil; finishing?.terminate(); finishing = nil
+        process?.terminate(); process = nil; finishing?.terminate(); finishing = nil; guessing?.terminate(); guessing = nil
         answerOutput?.fileHandleForReading.readabilityHandler = nil; answerProcess?.terminate()
         answerProcess = nil; answerInput = nil; answerOutput = nil; answerTimes = [:]; answerQuestion = ""
         queue = []; pendingBrief = nil; answering = nil; partialQuestion = nil; micPartialQuestion = nil; gathering = false; prepWaiting = false

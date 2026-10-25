@@ -134,6 +134,7 @@ h1{font-size:17px;font-weight:600;letter-spacing:-.3px;margin:0}
 
 /* transcript: every line can be answered, for questions Rabik didn't catch */
 #lines{-webkit-user-select:text;user-select:text;cursor:text;padding-top:8px}
+.line .text b.guess{font-style:italic}
 .line .tr{display:block;margin-top:2px;color:var(--fg2);font-size:12px}
 .line{display:flex;gap:10px;font-size:12.5px;line-height:1.45;color:var(--fg);padding:5px 8px;margin:0 -8px;border-radius:8px;position:relative;transition:background .18s var(--ease)}
 .line.hover{background:var(--card)}
@@ -301,7 +302,7 @@ $('resize').onkeydown=e=>{const delta={ArrowLeft:[-20,0],ArrowRight:[20,0],Arrow
 $('resume').onclick=()=>{$('resume').disabled=true;post({do:'resume'})};
 $('save').onclick=()=>{$('save').disabled=true;$('resume').disabled=true;post({do:'save'})};
 $('delete').onclick=()=>post({do:'deleteSaved'});
-$('endcopy').onclick=()=>{post({do:'copy',text:savedTranscript.map(r=>`${time(r.seconds||0)}  ${r.mic?'You':'Them'}: ${r.text}`).join('\n')});toast('Transcript copied')};
+$('endcopy').onclick=()=>{post({do:'copy',text:savedTranscript.map(r=>`${time(r.seconds||0)}  ${r.mic?'You':r.name||'Them'}: ${r.text}`).join('\n')});toast('Transcript copied')};
 $('allmeetings').onclick=()=>post({do:'meetings'});
 // A meeting's action items: the user ticks the ones that are theirs and adds them to Reminders; added ones stay ticked and greyed.
 let todoMeeting='',shareRecap='';
@@ -359,6 +360,9 @@ window.meeting={
   mode(m){if(m)for(const b of $('mode').children)b.setAttribute('aria-pressed',String(b.dataset.mode===m));document.querySelector('#prep h1').textContent=room()?'Get ready for your meeting':'Get ready for your call';$('notice').textContent=(room()?'Rabik hears the room through your microphone.':'Rabik hears this call and your microphone.')+' Transcripts stay on this Mac.'},
   saving(on){saving=on;document.body.classList.toggle('saved',on);show('saving',running&&!minimized&&on);$('endnote').textContent=on?'Saved on this Mac.':'This transcript isn’t saved. Copy it before closing. Enable saving in Settings for future meetings.';$('delete').disabled=!on;$('restore').title=on?'Restore · Saving transcript':'Restore'},
   recap(m){$('recap').textContent=m.summary;show('recap',!!m.summary);todos(m);shareRecap=m.share||'';show('share',!!shareRecap);if(!running)fit()},
+  speakers(names){for(const [id,name] of Object.entries(names)){   // a group call: who said their lines, where the conversation made it clear
+    const row=savedTranscript.find(r=>String(r.id)===id&&!r.mic),text=$('lines').querySelector(`[data-id="${id}"] .text`);if(!row||row.name)continue;row.name=name;
+    if(text){const who=document.createElement('b');who.className='guess';who.title='Guessed from the conversation';who.textContent=name+' · ';text.prepend(who)}}},
   translated(r){if(r.error){toast(r.error);return}const text=$('lines').querySelector(`[data-id="${r.id}"] .text`);if(!text||text.querySelector('.tr'))return;
     const was=atEnd(),tr=document.createElement('span');tr.className='tr';tr.textContent=r.text;text.append(tr);follow(was)},   // Translate the call: under its line
   reminded(res){const note=$('remindnote');note.textContent=res.need?'Rabik can’t use Reminders yet. Allow it in System Settings → Privacy & Security → Reminders.'
@@ -392,7 +396,7 @@ window.meeting={
     const d=document.createElement('div');d.className='line'+(row.mic?' mine':'');d.dataset.id=row.id;
     const t=document.createElement('span');t.className='t';t.textContent=time(row.seconds||0);
     const text=document.createElement('span');text.className='text';text.textContent=row.text;
-    if(row.mic){const who=document.createElement('b');who.textContent='You · ';text.prepend(who)}
+    if(row.mic||row.name){const who=document.createElement('b');who.textContent=(row.mic?'You':row.name)+' · ';text.prepend(who)}
     d.append(t,text);
     if(!row.mic){const b=document.createElement('button');b.className='lineask';b.textContent='Answer';b.setAttribute('aria-label','Answer: '+row.text);b.onclick=()=>{post({do:'ask',text:row.text});tab('answers')};d.append(b)}
     $('lines').append(d);follow(was);
