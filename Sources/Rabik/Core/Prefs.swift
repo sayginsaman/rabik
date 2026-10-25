@@ -30,7 +30,7 @@ enum Prefs {
         "dictateHotkeyCode": -1, "dictateHotkeyMods": 0, "dictateHotkeyLabel": "", "dictateMode": "cleanup", "dictateHistory": true, "dictateLearn": true, "dictateWords": [], "dictateFixes": [String: String](), "boxW": 500, "boxH": 420]
     static let retiredKeys = ["quietAudio", "quietLevel", "autoCopy", "askMe", "linger", "soundStart", "soundRelease", "soundDone", "soundStop",
         "instant", "live", "ahead", "aheadDelay", "learn", "selection", "guideSteps", "workIn", "openOn", "miniScreen", "draftInsert",
-        "meetingNudge", "meetingDetect", "meetingAuto", "fixSetup", "dictateLearn"]
+        "meetingDetect", "meetingAuto", "fixSetup", "dictateLearn"]
     // Read from any queue (permission probes in Settings and setup, the speech queue), written on main: every access takes the lock,
     // so a reader gets a whole copy and never sees the dictionary mid-write.
     private static let lock = NSLock()

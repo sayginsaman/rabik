@@ -90,6 +90,16 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual(out['result']['label'], 'Box position')
         self.assertIn({'do': 'set', 'k': 'boxPosition', 'v': 'bottom-left'}, out['posts'])
 
+    def test_the_reminder_before_calls_is_a_visible_switch_that_starts_off(self):
+        source, page = native_source(), (ROOT / 'ui/settings.html').read_text()
+        defaults = source[source.index('static let defaults'):source.index('static let retiredKeys')]
+        retired = source[source.index('static let retiredKeys'):source.index(']', source.index('static let retiredKeys'))]
+        self.assertIn('"meetingNudge": false', defaults)
+        self.assertNotIn('"meetingNudge"', retired)
+        self.assertIn('<b>Remind me before calls</b>', page)
+        self.assertIn('<input type="checkbox" data-k="meetingNudge">', page)
+        self.assertIn('if k == "meetingNudge", v as? Bool == true, EKEventStore.authorizationStatus(for: .event) != .fullAccess', source)   # turning it on asks for Calendar
+
     def test_notice_shows_and_its_action_runs_once(self):
         out = self.page('''st.notice({text: 'Couldn’t save that change, so the old setting is back.'});
             const shown = !$('notice').hidden && $('noticebtn').hidden;
