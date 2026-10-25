@@ -782,6 +782,7 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
                 "modelToFirstMs": round((first - model) * 1000), "firstToShownMs": round((shown - first) * 1000)]
             if let json = try? JSONSerialization.data(withJSONObject: event), let text = String(data: json, encoding: .utf8) { print(text); fflush(stdout) }
         case "copy": if let text = b["text"] as? String { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string) }
+        case "share": shareText(b["text"] as? String ?? "", in: web, at: b["rect"] as? [Double] ?? [])
         case "remind": if let id = b["id"] as? String, let keys = b["keys"] as? [String] { dailyRecap.add("meeting:" + id, keys) { [weak self] in self?.js("reminded", $0) } }
         default: break
         }

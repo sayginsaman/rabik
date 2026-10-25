@@ -267,6 +267,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         case "meetingOpen": if let id = b["id"] as? String { meetings(["action": "get", "id": id]) }
         case "meetingDelete": if let id = b["id"] as? String { meetings(["action": "delete", "id": id]) }
         case "meetingExport": if let id = b["id"] as? String { exportMeeting(id) }
+        case "meetingShare": shareText(b["text"] as? String ?? "", in: web, at: b["rect"] as? [Double] ?? [])
         case "meetingRemind":
             if let id = b["id"] as? String, let keys = b["keys"] as? [String] { dailyRecap.add("meeting:" + id, keys) { [weak self] in self?.send("meetingReminded", $0) } }
         case "meetingCopy": if let text = b["text"] as? String { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string); send("meetings", ["notice": "Copied."]) }

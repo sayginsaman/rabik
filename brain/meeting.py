@@ -18,7 +18,7 @@ from brain import clients, memory, paths, prefs, prompts, turn, wording
 __all__ = ['MEETING_BRIEF_LIMIT', 'MEETING_STYLE_LIMIT', 'MEETING_PROMPT_LIMIT', 'MEETING_CONNECTOR_TOOLS', 'meeting_parse',
            'meeting_prompt', 'meeting_process', 'meeting_payload', 'meeting_call', 'meeting_live', 'meeting_local_brief',
            'meeting_connector_call', 'meeting_gather', 'meeting_save', 'meeting_path', 'meeting_append', 'meeting_file',
-           'meeting_read', 'meeting_list', 'meeting_markdown', 'meeting_finish', 'meeting_history', 'meeting_command',
+           'meeting_read', 'meeting_list', 'meeting_markdown', 'meeting_recap_text', 'meeting_finish', 'meeting_history', 'meeting_command',
            'MEETING_DEMO_BRIEF', 'meeting_demo']
 
 
@@ -389,6 +389,14 @@ def meeting_finish(identifier):
         return meeting_read(identifier)
 
 
+def meeting_recap_text(m):
+    """What sharing a meeting sends: its title and time, the recap and the action items; never the transcript."""
+    when = datetime.fromtimestamp(m['started']).strftime('%A, %B %d · %H:%M') + (f" · {m['app']}" if m.get('app') else '')
+    lines = [m['title'], when, '', m['summary'] or 'No summary yet.']
+    if m['action_items']: lines += ['', 'Action items:'] + ['• ' + str(item) for item in m['action_items']]
+    return '\n'.join(lines) + '\n'
+
+
 def meeting_history(words):
     stop = set('what did do we i you me my our in the a an on about from of to s meeting meetings call calls decide decided decision decisions happened tell said was last'.split())
     query = ' '.join(w for w in re.findall(r'[\w-]+', words.casefold()) if w not in stop)
@@ -408,6 +416,7 @@ def meeting_command(data):
         shutil.rmtree(meeting_path(identifier)); return {'deleted': identifier}
     m = meeting_finish(identifier) if action == 'finish' else meeting_read(identifier)
     if action not in ('get', 'finish', 'export'): raise ValueError('Unknown meeting action')
+    m['share'] = meeting_recap_text(m)   # the Share menu's text, in Settings and the meeting panel
     return {'meeting': m, 'markdown': meeting_markdown(m)}
 
 

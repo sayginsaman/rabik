@@ -501,7 +501,7 @@
     </div>
     <div id="meetingdetail" hidden>
       <button id="meetingback" class="btn">← All meetings</button><h1 id="meetingtitle" tabindex="-1"></h1><p id="meetingmeta"></p>
-      <div class="tools"><button id="meetingcopy" class="btn">Copy</button><button id="meetingexport" class="btn">Export Markdown</button><button id="meetingdelete" class="btn red">Delete</button></div>
+      <div class="tools"><button id="meetingshare" class="btn">Share…</button><button id="meetingcopy" class="btn">Copy</button><button id="meetingexport" class="btn">Export Markdown</button><button id="meetingdelete" class="btn red">Delete</button></div>
       <h3>Summary</h3><div id="meetingsummary" class="group"></div>
       <div id="meetingactionblock" hidden><h3>Action items</h3><div id="meetingactions" class="group"></div><div class="remindbar"><span id="meetingremindnote" role="status"></span><button class="btn blue" id="meetingremind" disabled>Add to Reminders</button></div></div>
       <div id="meetingnoteblock" hidden><h3>Notes</h3><div id="meetingnotes" class="group"></div></div>
@@ -924,7 +924,7 @@
     currentMeeting=m;meetingMarkdown=markdown;$('meetingbrowse').hidden=true;$('meetingdetail').hidden=false;meetingNotice('');
     $('meetingtitle').textContent=m.title;$('meetingmeta').textContent=[meetingDate(m.started),meetingDuration(m.duration),m.app,m.status].filter(Boolean).join(' · ');
     $('meetingsummary').textContent=m.summary||'A recap is not available yet. The transcript is below.';
-    $('meetingactionblock').hidden=!m.todos?.length;$('meetingremindnote').textContent='';meetingTodos(m.todos||[]);
+    $('meetingshare').hidden=!m.share;$('meetingactionblock').hidden=!m.todos?.length;$('meetingremindnote').textContent='';meetingTodos(m.todos||[]);
     $('meetingnoteblock').hidden=!m.notes;$('meetingnotes').textContent=m.notes||'';
     $('meetinganswerblock').hidden=!m.answers?.length;$('meetinganswers').textContent=(m.answers||[]).map(r=>(r.question||'')+'\n'+(r.lines||[]).join('\n')).join('\n\n');
     $('meetingtranscript').replaceChildren();
@@ -936,6 +936,7 @@
   $('meetingq').oninput=()=>{clearTimeout(meetingQueryTimer);meetingQueryTimer=setTimeout(requestMeetings,160)};
   $('meetingback').onclick=()=>meetingBack();
   $('meetingcopy').onclick=()=>post({do:'meetingCopy',text:meetingMarkdown});
+  $('meetingshare').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();post({do:'meetingShare',text:currentMeeting?.share||'',rect:[r.x,r.y,r.width,r.height]});};   // the recap and its action items, never the transcript
   $('meetingexport').onclick=()=>{if(currentMeeting)post({do:'meetingExport',id:currentMeeting.id})};
   $('meetingdelete').onclick=()=>{if(currentMeeting)post({do:'meetingDelete',id:currentMeeting.id})};   // native confirmation owns the deletion
   document.addEventListener('keydown',e=>{

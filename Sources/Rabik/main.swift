@@ -236,6 +236,14 @@ func currentRequestScreen(_ box: NSWindow? = nil) -> String {
     ((box?.isVisible == true ? box?.screen : nil) ?? mouseScreen).localizedName
 }
 
+// The macOS Share menu (Mail, Messages, Notes, Slack…) for a meeting's recap, under the button the page names: [x, y, width, height].
+func shareText(_ text: String, in web: WKWebView?, at rect: [Double]) {
+    guard let web, !text.isEmpty else { return }
+    let r = rect.count == 4 ? NSRect(x: rect[0], y: web.isFlipped ? rect[1] : web.bounds.height - rect[1] - rect[3], width: rect[2], height: rect[3])
+                            : NSRect(x: web.bounds.midX, y: web.bounds.midY, width: 1, height: 1)
+    NSSharingServicePicker(items: [text]).show(relativeTo: r, of: web, preferredEdge: .minY)
+}
+
 func axAttribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
     var value: CFTypeRef?
     return AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success ? value : nil

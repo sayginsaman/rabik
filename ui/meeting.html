@@ -224,7 +224,7 @@ body.reduce *{animation:none!important;transition:none!important}
 
 <footer id="askbar" hidden><div class="chips"><button data-ask="What did I miss?">Catch me up</button><button id="screen">Explain the screen</button></div><form id="askform"><input id="ask" placeholder="Ask about the call…" aria-label="Ask about the call" maxlength="1500" autocomplete="off"><button id="send" type="button" aria-label="Ask by voice" title="Ask by voice"><b>↑</b><svg class="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button></form><div id="voicebar" hidden><p id="heard" class="waiting">Listening…</p><button id="voicein" aria-label="Type instead" title="Click to type instead"><span id="askwave" aria-hidden="true"></span></button><button id="voicesend" class="blue" aria-label="Send">↑</button></div></footer>
 
-<section id="ended" hidden><h1 id="endtitle">Your meeting</h1><p class="note" id="endnote">Saved on this Mac.</p><div id="recap" hidden></div><div id="todos" hidden><h2>Action items</h2><div id="todolist"></div><button id="remind" class="blue big" disabled>Add to Reminders</button><p id="remindnote" hidden></p></div><button id="endcopy" class="quiet big">Copy transcript</button><button id="allmeetings" class="quiet big">See all meetings →</button><button id="resume" class="blue big">Resume listening</button><div class="bar" style="margin-top:8px"><button id="save">Done</button><button id="delete">Delete meeting</button></div></section>
+<section id="ended" hidden><h1 id="endtitle">Your meeting</h1><p class="note" id="endnote">Saved on this Mac.</p><div id="recap" hidden></div><div id="todos" hidden><h2>Action items</h2><div id="todolist"></div><button id="remind" class="blue big" disabled>Add to Reminders</button><p id="remindnote" hidden></p></div><button id="share" class="quiet big" hidden>Share recap…</button><button id="endcopy" class="quiet big">Copy transcript</button><button id="allmeetings" class="quiet big">See all meetings →</button><button id="resume" class="blue big">Resume listening</button><div class="bar" style="margin-top:8px"><button id="save">Done</button><button id="delete">Delete meeting</button></div></section>
 
 <p id="notice" hidden>Rabik hears this call and your microphone. Transcripts stay on this Mac.</p>
 <div id="toast" role="status" hidden></div>
@@ -303,7 +303,8 @@ $('delete').onclick=()=>post({do:'deleteSaved'});
 $('endcopy').onclick=()=>{post({do:'copy',text:savedTranscript.map(r=>`${time(r.seconds||0)}  ${r.mic?'You':'Them'}: ${r.text}`).join('\n')});toast('Transcript copied')};
 $('allmeetings').onclick=()=>post({do:'meetings'});
 // A meeting's action items: the user ticks the ones that are theirs and adds them to Reminders; added ones stay ticked and greyed.
-let todoMeeting='';
+let todoMeeting='',shareRecap='';
+$('share').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();post({do:'share',text:shareRecap,rect:[r.x,r.y,r.width,r.height]});};   // the macOS Share menu
 let orbWanted='breathing';   // the orb's state; the frame loop takes it up once the engine has loaded
 function remindCount(){const n=document.querySelectorAll('#todolist .todo[aria-checked=true]:not(.added)').length,b=$('remind');
   b.disabled=!n;b.textContent=n?'Add '+n+' to Reminders':'Add to Reminders';b.hidden=!document.querySelector('#todolist .todo:not(.added)');}
@@ -356,7 +357,7 @@ window.meeting={
   privacy(on){saving=on;this.mode()},
   mode(m){if(m)for(const b of $('mode').children)b.setAttribute('aria-pressed',String(b.dataset.mode===m));document.querySelector('#prep h1').textContent=room()?'Get ready for your meeting':'Get ready for your call';$('notice').textContent=(room()?'Rabik hears the room through your microphone.':'Rabik hears this call and your microphone.')+' Transcripts stay on this Mac.'},
   saving(on){saving=on;document.body.classList.toggle('saved',on);show('saving',running&&!minimized&&on);$('endnote').textContent=on?'Saved on this Mac.':'This transcript isn’t saved. Copy it before closing. Enable saving in Settings for future meetings.';$('delete').disabled=!on;$('restore').title=on?'Restore · Saving transcript':'Restore'},
-  recap(m){$('recap').textContent=m.summary;show('recap',!!m.summary);todos(m);if(!running)fit()},
+  recap(m){$('recap').textContent=m.summary;show('recap',!!m.summary);todos(m);shareRecap=m.share||'';show('share',!!shareRecap);if(!running)fit()},
   reminded(res){const note=$('remindnote');note.textContent=res.need?'Rabik can’t use Reminders yet. Allow it in System Settings → Privacy & Security → Reminders.'
     :res.error||(res.added?'Added '+res.added+' to '+(res.list||'Reminders')+'.':'Those are in Reminders already.');show('remindnote',true);
     if(res.items)todos({id:todoMeeting,todos:res.items});else remindCount();if(!running)fit()},
