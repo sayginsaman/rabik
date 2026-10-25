@@ -501,6 +501,8 @@ func meetingCalendarContext(_ done: @escaping ([String: Any]?, String?) -> Void)
     }
 }
 
+// enum MeetingSpeech lives in Meeting/MeetingSpeech.swift
+
 // final class MeetingCopilot lives in Meeting/Meeting.swift
 
 // enum Hands lives in Hands/Hands.swift
@@ -664,6 +666,7 @@ let agentsUI = AgentPanels()
 let dailyRecap = Recap()
 let routineWake = RoutineWake()
 dailyRecap.catchUp()
+MeetingSpeech.load { settings.send("meetingLanguages", MeetingSpeech.languages) }   // Settings → Meetings → Language
 let onboarding = Onboarding()
 if !UserDefaults.standard.bool(forKey: "onboarded") { DispatchQueue.main.async { onboarding.open() } }
 else { Onboarding.plan { c in if c["ok"] as? Bool != true { onboarding.open() } } }   // set up once, but Claude signed out since

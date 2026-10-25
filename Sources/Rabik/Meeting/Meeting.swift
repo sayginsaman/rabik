@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 import EventKit
 import CoreAudio
 import AudioToolbox
+import Translation
 
 // Meeting audio stays on-device; the journal stores text, never audio.
 final class MeetingArchive {
@@ -147,6 +148,7 @@ final class MeetingWebView: WKWebView {
 
 final class MeetingCopilot: NSObject, WKScriptMessageHandler {
     var panel: KeyPanel?, web: WKWebView?, audio: MeetingAudio?, analyzer: SpeechAnalyzer?, reading: Task<Void, Never>?, starting: Task<Void, Never>?
+    var translator: TranslationSession?, translationFailed = false   // Translate the call (MeetingSpeech)
     var micAnalyzer: SpeechAnalyzer?, micReading: Task<Void, Never>?, analyzing: Task<Void, Never>?, micAnalyzing: Task<Void, Never>?, stopping: Task<Void, Never>?
     var micPending = "", micPartial = "", micSettle: DispatchWorkItem?, elapsed: TimeInterval = 0
     var partialQuestion: Int?, micPartialQuestion: Int?
@@ -360,8 +362,9 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
                 let micAllowed = demo ? true : await AVCaptureDevice.requestAccess(for: .audio)
                 guard running, generation == g, !Task.isCancelled else { return }
                 guard micAllowed else { stop(); js("error", "Allow Microphone access for Rabik in System Settings"); return }
-                let mic = SpeechTranscriber(locale: Locale(identifier: "en-US"), preset: .progressiveTranscription)
-                let tr = SpeechTranscriber(locale: Locale(identifier: "en-US"), preset: .progressiveTranscription)
+                let locale = await MeetingSpeech.locale()   // Settings → Meetings → Language
+                let (mic, micWords) = await MeetingSpeech.transcriber(locale), (tr, words) = await MeetingSpeech.transcriber(locale)
+                translator = MeetingSpeech.translator(from: locale); translationFailed = false
                 if let request = try await AssetInventory.assetInstallationRequest(supporting: [tr]) { try await request.downloadAndInstall() }
                 guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [tr]) else {
                     if running && generation == g { stop(); js("error", "Speech recognition is unavailable. Resume to try again.") }; return
@@ -376,15 +379,13 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
                 try await micAn.setContext(context)
                 guard running, generation == g, !Task.isCancelled else { return }
                 reading = Task { [weak self] in
-                    do { for try await result in tr.results {
-                        let piece = String(result.text.characters)
-                        await MainActor.run { if self?.generation == g && self?.running == true { self?.speech(piece, final: result.isFinal) } }
+                    do { for try await (piece, final) in words {
+                        await MainActor.run { if self?.generation == g && self?.running == true { self?.speech(piece, final: final) } }
                     } } catch { await MainActor.run { if self?.running == true && self?.generation == g { self?.stop(); self?.js("error", "Speech stopped") } } }
                 }
                 micReading = Task { [weak self] in
-                    do { for try await result in mic.results {
-                        let piece = String(result.text.characters)
-                        await MainActor.run { if self?.generation == g && self?.running == true { self?.speech(piece, final: result.isFinal, mic: true) } }
+                    do { for try await (piece, final) in micWords {
+                        await MainActor.run { if self?.generation == g && self?.running == true { self?.speech(piece, final: final, mic: true) } }
                     } } catch { await MainActor.run { if self?.running == true && self?.generation == g { self?.stop(); self?.js("error", "Microphone transcription stopped. Resume to try again.") } } }
                 }
                 analyzing = Task { [weak self] in
@@ -460,6 +461,13 @@ final class MeetingCopilot: NSObject, WKScriptMessageHandler {
         saveEvent(["kind": "transcript", "at": at, "text": text, "seconds": Int(Date().timeIntervalSince(began)), "mic": you, "speaker": speaker])
         let row: [String: Any] = ["id": id, "text": text, "seconds": Int(Date().timeIntervalSince(began)), "mic": you, "speaker": askedBy]
         js("line", row)
+        if !you, let session = translator, !translationFailed {   // the other side, in the Mac's language, under the line
+            Task { @MainActor [weak self] in
+                do { let done = try await session.translate(text); self?.js("translated", ["id": id, "text": done.targetText]) }
+                catch { guard self?.translationFailed == false else { return }; self?.translationFailed = true
+                    self?.js("translated", ["id": id, "error": "Translation needs both languages: System Settings → General → Language & Region → Translation Languages."]) }
+            }
+        }
         if answer && !you {
             if let index = queue.firstIndex(where: { $0["id"] as? Int == id }) {
                 queue[index]["question"] = text; queue[index]["transcript"] = transcript; queue[index]["finalAt"] = at

@@ -134,6 +134,7 @@ h1{font-size:17px;font-weight:600;letter-spacing:-.3px;margin:0}
 
 /* transcript: every line can be answered, for questions Rabik didn't catch */
 #lines{-webkit-user-select:text;user-select:text;cursor:text;padding-top:8px}
+.line .tr{display:block;margin-top:2px;color:var(--fg2);font-size:12px}
 .line{display:flex;gap:10px;font-size:12.5px;line-height:1.45;color:var(--fg);padding:5px 8px;margin:0 -8px;border-radius:8px;position:relative;transition:background .18s var(--ease)}
 .line.hover{background:var(--card)}
 .line .t{flex:none;width:32px;color:var(--fg3);font-size:10.5px;font-variant-numeric:tabular-nums;padding-top:2px;-webkit-user-select:none;user-select:none}
@@ -358,6 +359,8 @@ window.meeting={
   mode(m){if(m)for(const b of $('mode').children)b.setAttribute('aria-pressed',String(b.dataset.mode===m));document.querySelector('#prep h1').textContent=room()?'Get ready for your meeting':'Get ready for your call';$('notice').textContent=(room()?'Rabik hears the room through your microphone.':'Rabik hears this call and your microphone.')+' Transcripts stay on this Mac.'},
   saving(on){saving=on;document.body.classList.toggle('saved',on);show('saving',running&&!minimized&&on);$('endnote').textContent=on?'Saved on this Mac.':'This transcript isn’t saved. Copy it before closing. Enable saving in Settings for future meetings.';$('delete').disabled=!on;$('restore').title=on?'Restore · Saving transcript':'Restore'},
   recap(m){$('recap').textContent=m.summary;show('recap',!!m.summary);todos(m);shareRecap=m.share||'';show('share',!!shareRecap);if(!running)fit()},
+  translated(r){if(r.error){toast(r.error);return}const text=$('lines').querySelector(`[data-id="${r.id}"] .text`);if(!text||text.querySelector('.tr'))return;
+    const was=atEnd(),tr=document.createElement('span');tr.className='tr';tr.textContent=r.text;text.append(tr);follow(was)},   // Translate the call: under its line
   reminded(res){const note=$('remindnote');note.textContent=res.need?'Rabik can’t use Reminders yet. Allow it in System Settings → Privacy & Security → Reminders.'
     :res.error||(res.added?'Added '+res.added+' to '+(res.list||'Reminders')+'.':'Those are in Reminders already.');show('remindnote',true);
     if(res.items)todos({id:todoMeeting,todos:res.items});else remindCount();if(!running)fit()},

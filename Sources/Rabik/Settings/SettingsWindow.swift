@@ -77,6 +77,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         let routines = (Prefs.path as NSString).deletingLastPathComponent + "/routines.json"
         d["routines"] = (try? JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:routines)))) as? [[String:Any]] ?? []
         // Reminders lists only once Rabik may read them: Settings never asks for access; the first Add to Reminders does
+        d["meetingLanguages"] = MeetingSpeech.languages
         d["reminderLists"] = ((try? CalendarTool.reminders(["action": "reminderLists"], store: calendar))?["lists"] as? [[String: Any]]) ?? []
         if let t = NSApp.applicationIconImage?.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) {
             d["icon"] = "data:image/png;base64," + png.base64EncodedString()

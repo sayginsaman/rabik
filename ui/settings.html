@@ -490,6 +490,8 @@
       <div class="row"><div class="t"><b>Meeting Copilot</b><span>The call and your mic, in a private panel. <i class="info" title="On supported calls, listening ends two seconds after the app releases the mic.">i</i></span></div><label class="sw"><input type="checkbox" data-k="meeting" aria-label="Meeting Copilot"></label></div>
       <div class="row"><div class="t"><b>Save meeting transcripts</b><span>On this Mac. <i class="info" title="Transcripts, notes and answers. At the end, choose Save or Don’t save. Turning off offers to keep or delete past meetings.">i</i></span></div><label class="sw"><input type="checkbox" data-k="meetingSave" aria-label="Save meeting transcripts"></label></div>
       <div class="row"><div class="t"><b>AI meeting summaries</b><span>Claude reads the transcript once. <i class="info" title="For a recap and action items. With Devin or Pi, meetings stay on this Mac. Off: a local recap, and prep won’t search connected email or documents.">i</i></span></div><label class="sw"><input type="checkbox" data-k="meetingSummary" aria-label="AI meeting summaries"></label></div>
+      <div class="row"><div class="t"><b>Language</b><span>What the call is in. Speech stays on this Mac.</span></div><select data-k="meetingLanguage" id="meetinglanguage" aria-label="Meeting language"></select></div>
+      <div class="row"><div class="t"><b>Translate the call</b><span>Their words, into your Mac’s language, on this Mac.</span></div><label class="sw"><input type="checkbox" data-k="meetingTranslate"></label></div>
       <div class="row"><div class="t"><b>Remind me before calls</b><span>A card when a call with a link or people starts soon. <i class="info" title="About two minutes before, from your calendar. Needs Calendar access.">i</i></span></div><label class="sw"><input type="checkbox" data-k="meetingNudge"></label></div>
       <div class="row"><div class="t"><b>Prep in a Claude chat</b><span>Copies a prompt for call notes.</span></div><button class="btn" data-do="meetingPrepPrompt" id="meetingPrepPrompt">Copy Prompt</button></div>
       </div>
@@ -662,6 +664,10 @@
   document.querySelector('[data-k="microphone"]').onchange = e => set('microphone', e.target.value);
   $('recapat').onchange = e => { if (/^([01]\d|2[0-3]):[0-5]\d$/.test(e.target.value)) set('recapAt', e.target.value); else paint(); };
   $('reminderslist').onchange = e => set('remindersList', e.target.value);
+  $('meetinglanguage').onchange = e => set('meetingLanguage', e.target.value);
+  let meetingLanguages = [];   // Rabik.app reads them from Apple's speech models once it starts
+  const paintMeetingLanguages = () => { const s = $('meetinglanguage'); s.replaceChildren(new Option('Automatic', ''), ...meetingLanguages.map(l => new Option(l.name, l.id)));
+    if (P.meetingLanguage && !meetingLanguages.some(l => l.id === P.meetingLanguage)) s.append(new Option(P.meetingLanguage, P.meetingLanguage)); s.value = P.meetingLanguage || ''; };
   let reminderLists = [];   // Rabik.app sends them once it may read Reminders; until then only the default list
   document.querySelectorAll('.seg[data-k]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => set(g.dataset.k, b.dataset.v)));
   document.querySelectorAll('.sw input[data-k]').forEach(i => i.onchange = () => set(i.dataset.k, i.checked));
@@ -699,7 +705,7 @@
       s.value = s.dataset.k === 'microphone' && ![...s.options].some(o => o.value === value) ? 'automatic' : value;
     });
     document.querySelectorAll('input[type=range]').forEach(r => r.value = P[r.dataset.k]);
-    $('recapat').value = P.recapAt || '21:00';
+    $('recapat').value = P.recapAt || '21:00'; paintMeetingLanguages();
     const lists = $('reminderslist'), chosen = P.remindersList || '';
     lists.replaceChildren(new Option('Default list', ''), ...reminderLists.map(l => new Option(l.title + (l.isDefault ? ' (default)' : ''), l.id)));
     if (chosen && !reminderLists.some(l => l.id === chosen)) lists.append(new Option('Your chosen list', chosen));   // not readable now: keep it, never reset
@@ -985,6 +991,7 @@
       $('localname').textContent = found.name; $('uselocal').textContent = `Use ${found.name}`;
       $('uselocal').onclick = () => { set('client', 'claude'); set('apiBase', found.base); if (found.models[0]) set('apiModel', found.models[0]); row.hidden = true; };
     },
+    meetingLanguages(list){meetingLanguages=list||[];paintMeetingLanguages();},
     meetingReminded(res){if(!currentMeeting)return;
       $('meetingremindnote').textContent=res.need?'Allow Reminders in System Settings → Privacy & Security → Reminders.':res.error||(res.added?'Added '+res.added+' to '+(res.list||'Reminders')+'.':'Those are in Reminders already.');
       if(res.items){currentMeeting.todos=res.items;meetingTodos(res.items);}else meetingRemindCount();},
@@ -1020,7 +1027,7 @@
     globe(on) { $('globefix').hidden = !on; },   // fn alone also fires macOS's own 🌐 action
     load(d) {
       P = {talkMode: 'hold', dictateMode: 'verbatim', dictateHotkeyLabel: '', microphone: 'automatic', meetingSave: true, meetingSummary: true, client: 'claude', ...d.prefs}; recording = '';
-      P.routines = d.routines || []; paintRoutines(); reminderLists = d.reminderLists || [];
+      P.routines = d.routines || []; paintRoutines(); reminderLists = d.reminderLists || []; if (d.meetingLanguages?.length) meetingLanguages = d.meetingLanguages;
       $('shortcut').classList.remove('rec'); $('change').textContent = 'Change Shortcut'; $('dictatechange').classList.remove('rec');
       hotkeyTaken = !!d.hotkeyTaken; dictateHotkeyTaken = !!d.dictateHotkeyTaken; if ($('schint').className !== 'warn') $('schint').className = hotkeyTaken ? 'taken' : '';
       if (d.icon) $('icon').src = $('bigicon').src = d.icon;

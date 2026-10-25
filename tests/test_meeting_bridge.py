@@ -33,6 +33,7 @@ import PDFKit
 import QuickLookThumbnailing
 import UniformTypeIdentifiers
 import EventKit
+import Translation
 let dir = CommandLine.arguments[1]
 ''' + prefs + '''
 let calendar = EKEventStore(), fixtureCalendar = EKAuthorizationStatus.notDetermined   // Fill in for me offered; no real calendar read
@@ -47,6 +48,7 @@ final class SettingsStub {
 let settings = SettingsStub()
 final class RecapStub { func add(_ source: String, _ keys: [String], _ reply: @escaping ([String: Any]) -> Void) {} }   // Add to Reminders: not in this check
 let dailyRecap = RecapStub()
+func shareText(_ text: String, in web: WKWebView?, at rect: [Double]) {}   // the Share menu: not in this check
 func callAppsOnMic() -> Set<String> { ["Zoom"] }
 func py(_ args: [String]) -> Process {
  let p = Process(); p.executableURL = URL(fileURLWithPath: CommandLine.arguments[2])

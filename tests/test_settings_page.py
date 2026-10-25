@@ -100,6 +100,19 @@ class SettingsPageTests(unittest.TestCase):
         self.assertIn('<input type="checkbox" data-k="meetingNudge">', page)
         self.assertIn('if k == "meetingNudge", v as? Bool == true, EKEventStore.authorizationStatus(for: .event) != .fullAccess', source)   # turning it on asks for Calendar
 
+    def test_meeting_language_lists_apples_languages_after_automatic(self):
+        out = self.page("""st.load({prefs: {hotkeyLabel: '⌃⌥Space', meeting: true, meetingLanguage: 'tr-TR'}}); await tick(20);
+            const s = $('meetinglanguage'), before = [...s.options].map(o => o.value);
+            st.meetingLanguages([{id: 'en-US', name: 'English (United States)'}, {id: 'tr-TR', name: 'Turkish (Türkiye)'}]);
+            const after = [...s.options].map(o => [o.value, o.text]), chosen = s.value;
+            s.value = 'en-US'; s.dispatchEvent(new Event('change'));
+            return {before, after, chosen, translate: !!document.querySelector('.sw input[data-k=meetingTranslate]')};""")
+        self.assertEqual(out['result']['before'], ['', 'tr-TR'])   # the saved choice stays until Apple's list arrives
+        self.assertEqual(out['result']['after'], [['', 'Automatic'], ['en-US', 'English (United States)'], ['tr-TR', 'Turkish (Türkiye)']])
+        self.assertEqual(out['result']['chosen'], 'tr-TR')
+        self.assertTrue(out['result']['translate'])
+        self.assertIn({'do': 'set', 'k': 'meetingLanguage', 'v': 'en-US'}, out['posts'])
+
     def test_notice_shows_and_its_action_runs_once(self):
         out = self.page('''st.notice({text: 'Couldn’t save that change, so the old setting is back.'});
             const shown = !$('notice').hidden && $('noticebtn').hidden;
