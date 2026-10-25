@@ -56,6 +56,7 @@ $SOURCE
 <key>NSMicrophoneUsageDescription</key><string>Rabik listens when you use its shortcut or microphone button.</string>
 <key>NSAppleEventsUsageDescription</key><string>Rabik controls apps like Finder, Chrome and Music when you ask it to.</string>
 <key>NSCalendarsFullAccessUsageDescription</key><string>Rabik reads your calendar, adds events you request, and asks before moving or deleting existing events. Calendar details are sent to your chosen AI model.</string>
+<key>NSRemindersFullAccessUsageDescription</key><string>Rabik adds the action items you choose to Reminders.</string>
 <key>NSSpeechRecognitionUsageDescription</key><string>Rabik turns your words into text on this Mac.</string>
 </dict></plist>
 P

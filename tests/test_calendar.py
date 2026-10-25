@@ -164,7 +164,7 @@ class CalendarNativeTests(unittest.TestCase):
         tool = source[source.index('enum CalendarTool {'):source.index('\nfunc currentMeetingEvent(')]
         fake = r'''
 import Foundation
-struct Kind: Equatable { static let event = Kind(); static let fullAccess = Kind(); static let denied = Kind() }
+struct Kind: Equatable { var name = ""; static let event = Kind(name: "event"); static let reminder = Kind(name: "reminder"); static let fullAccess = Kind(); static let denied = Kind() }
 // A distinct permission value without touching macOS privacy or real EventKit.
 enum Authorization { case fullAccess, denied }
 enum Span { case thisEvent }
@@ -181,12 +181,26 @@ class EKEvent {
     var status = Status.none
     init(eventStore: EKEventStore) {}
 }
+class EKReminder {
+    var calendar: EKCalendar!; var title: String?; var notes: String?; var dueDateComponents: DateComponents?
+    let calendarItemIdentifier = UUID().uuidString
+    init(eventStore: EKEventStore) {}
+}
 class EKEventStore {
-    static var permission = Authorization.fullAccess
-    static func authorizationStatus(for kind: Kind) -> Authorization { permission }
+    static var permission = Authorization.fullAccess, reminderPermission = Authorization.fullAccess
+    static func authorizationStatus(for kind: Kind) -> Authorization { kind == .reminder ? reminderPermission : permission }
+    var lists = [EKCalendar](), pending = [EKReminder](), reminders = [EKReminder](), failOn = ""
+    var defaultList: EKCalendar?
+    func defaultCalendarForNewReminders() -> EKCalendar? { defaultList }
+    func save(_ reminder: EKReminder, commit: Bool) throws {
+        if reminder.title == failOn { throw NSError(domain: "fixture", code: 1) }
+        pending.append(reminder)
+    }
+    func commit() throws { reminders += pending; pending = [] }
+    func reset() { pending = [] }
     var rows = [EKEvent](); var saved = 0; var removed = 0; var lastSpan: Span?
     var defaultCalendarForNewEvents: EKCalendar? = EKCalendar()
-    func calendars(for kind: Kind) -> [EKCalendar] { [defaultCalendarForNewEvents! ] }
+    func calendars(for kind: Kind) -> [EKCalendar] { kind == .reminder ? lists : [defaultCalendarForNewEvents!] }
     func calendar(withIdentifier id: String) -> EKCalendar? { id == "cal" ? defaultCalendarForNewEvents : nil }
     func predicateForEvents(withStart start: Date, end: Date, calendars: [EKCalendar]?) -> (Date, Date) { (start,end) }
     func events(matching range: (Date, Date)) -> [EKEvent] { rows.filter { $0.startDate < range.1 && $0.endDate > range.0 } }
@@ -235,3 +249,41 @@ precondition(try! CalendarTool.run(add, store:store)["need"] as? String == "cale
 print("fake EventKit calendar ok")
 '''
         self.assertIn('fake EventKit calendar ok', run_swift(self, fake + tool + checks))
+        reminders = r'''
+let store = EKEventStore()
+let home = EKCalendar(); home.calendarIdentifier = "home"; home.title = "Reminders"
+let work = EKCalendar(); work.calendarIdentifier = "work"; work.title = "Work"
+let shared = EKCalendar(); shared.calendarIdentifier = "shared"; shared.allowsContentModifications = false
+store.lists = [home, work, shared]; store.defaultList = home
+let lists = try! CalendarTool.run(["action":"reminderLists"], store:store)["lists"] as! [[String:Any]]
+precondition(lists.map { $0["id"] as! String } == ["home", "work"], "read-only lists are not offered")
+precondition(lists.map { $0["isDefault"] as! Bool } == [true, false])
+let one: [String:Any] = ["action":"addReminders","list":"work","items":[["title":"Send the deck","notes":"Rabik · Weekly sync, Oct 25","due":"2026-10-27"],["title":"Book the room"]]]
+let done = try! CalendarTool.run(one, store:store)
+precondition((done["added"] as! [String]).count == 2 && done["list"] as? String == "Work" && done["fellBack"] as? Bool == false)
+precondition(store.reminders.map { $0.calendar.calendarIdentifier } == ["work", "work"])
+precondition(store.reminders[0].dueDateComponents == DateComponents(year: 2026, month: 10, day: 27) && store.reminders[1].dueDateComponents == nil)
+precondition(store.reminders[0].notes == "Rabik · Weekly sync, Oct 25")
+var gone = one; gone["list"] = "deleted"; gone["items"] = [["title":"Call Sam","due":"2026-02-30"]]
+let fell = try! CalendarTool.run(gone, store:store)
+precondition(fell["fellBack"] as? Bool == true && store.reminders.last!.calendar.calendarIdentifier == "home")
+precondition(store.reminders.last!.dueDateComponents == nil, "an impossible date is no due date")
+let before = store.reminders.count
+store.failOn = "Second"
+var broken = one; broken["items"] = [["title":"First"],["title":"Second"]]
+do { _ = try CalendarTool.run(broken, store:store); preconditionFailure("a failed save must throw") } catch {}
+precondition(store.reminders.count == before && store.pending.isEmpty, "all or nothing: nothing saved, nothing to mark")
+broken["items"] = [["title":"  "]]
+precondition(try! CalendarTool.run(broken, store:store)["error"] != nil)
+broken["items"] = []
+precondition(try! CalendarTool.run(broken, store:store)["error"] != nil)
+EKEventStore.reminderPermission = .denied
+precondition(try! CalendarTool.run(one, store:store)["need"] as? String == "reminders")
+precondition(try! CalendarTool.run(["action":"reminderLists"], store:store)["need"] as? String == "reminders")
+precondition(EKEventStore.authorizationStatus(for: .event) == .fullAccess, "calendar access is separate")
+print("fake EventKit reminders ok")
+'''
+        self.assertIn('fake EventKit reminders ok', run_swift(self, fake + tool + reminders))
+
+    def test_reminders_usage_string_is_in_the_app(self):
+        self.assertIn('<key>NSRemindersFullAccessUsageDescription</key>', (Path(__file__).resolve().parents[1] / 'build.sh').read_text())
