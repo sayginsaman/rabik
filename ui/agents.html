@@ -390,7 +390,7 @@ setInterval(()=>{if(!visible)return;for(const r of rows){const chip=chipOf(r.id)
  const item=$('list').querySelector('[data-key="'+r.id+'"] small');if(item){setText(item,word(r)+' · '+time(r));setText(item.nextSibling,begun(r));}if(r.id===selected){const label=document.querySelector('#status .time-label');if(label)setText(label,'· '+time(r));const when=document.querySelector('#status .started');if(when)setText(when,'· Started '+begun(r));}}
  if(mode==='shelf'&&!over)for(const r of shelfRows())if(fin(r)){const s=onScreen.get(r.id)+1;onScreen.set(r.id,s);if(s>=LINGER)leave(r.id);}},1000);   // the clock stops while hidden, asleep or under the pointer
 $('scroll').addEventListener('scroll',()=>fit(),{passive:true});new ResizeObserver(()=>{if(mode==='view')fit();}).observe($('full'));
-const orbState=r=>!r?'breathing':r.status==='running'?(/search|reading/i.test(r.step||'')?'searching':'working'):'breathing';
+const orbState=r=>!r?'breathing':r.status==='running'?E.stepOrb(r.step):['queued','offered','waiting-screen'].includes(r.status)?'connecting':'breathing';   // orbs.js: one meaning per state
 (function frame(now){if(visible){t+=Math.min(.05,(now-last)/1000)*(reduced.matches?0:1);
  const pause=mode==='shelf'&&now<motionUntil;document.querySelectorAll('canvas').forEach(c=>{if(pause||c.hidden||!c.offsetParent)return;const size=+c.dataset.size||28,id=c.closest('[data-id]')?.dataset.id||selected,r=rows.find(x=>x.id===id);
   if(c.width!==size*2){c.width=c.height=size*2;}const ctx=c.getContext('2d'),p=E.r(orbState(r),size>=48?64:size>=26?32:20),still=r&&!ACTIVE.includes(r.status);if(still&&c.dataset.painted===r.status)return;c.dataset.painted=still?r.status:'';

@@ -1,4 +1,5 @@
 """Syntax checks for the embedded UI modules using the installed Node runtime."""
+import json
 from pathlib import Path
 import re
 import shutil
@@ -19,6 +20,35 @@ class JavaScriptTests(unittest.TestCase):
                 with self.subTest(file=path.name):
                     p = subprocess.run(['node', '--check', '--input-type=module'], input=code, capture_output=True, text=True)
                     self.assertEqual(p.returncode, 0, p.stderr)
+
+    def test_every_ai_and_agent_state_shows_one_of_the_nine_orbs(self):
+        # thinking-orbs (vendored in orbs.js) has nine states; stepOrb gives each its one meaning, the same in the box, the
+        # agents and the meeting panel, so a search always sweeps the globe and a drawing always shapes, wherever it runs.
+        root = Path(__file__).resolve().parents[1]
+        script = """
+const src = (await import('fs')).readFileSync(process.argv[2], 'utf8');   // argv[1] is '-': the script from stdin
+const m = await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'));
+const nine = ['working','searching','solving','listening','connecting','weaving','composing','breathing','shaping'];
+for (const s of nine) if (!m.r(s, 64) || !m.r(s, 20)) throw new Error('no preset for ' + s);
+console.log(JSON.stringify(Object.fromEntries(process.argv.slice(3).map(l => [l, m.stepOrb(l)]))));
+"""
+        labels = ['Searching the web', 'Reading the page', 'Taking a picture of Notes', 'Opening Spotify', 'Clicking Save', 'Typing into Name',
+                  'Drawing on your screen', 'Saving your shortcut', 'Working on it', 'Resuming…', 'Asking you which one', 'Thinking', '']
+        p = subprocess.run(['node', '--input-type=module', '-', str(root / 'ui' / 'orbs.js'), *labels], input=script, capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(json.loads(p.stdout), {
+            'Searching the web': 'searching', 'Reading the page': 'searching', 'Taking a picture of Notes': 'searching', 'Opening Spotify': 'working',
+            'Clicking Save': 'working', 'Typing into Name': 'composing', 'Drawing on your screen': 'shaping', 'Saving your shortcut': 'composing',
+            'Working on it': 'weaving', 'Resuming…': 'connecting', 'Asking you which one': 'breathing', 'Thinking': 'solving', '': 'weaving'})
+        box, agents, meeting = ((root / 'ui' / f).read_text() for f in ('ui.html', 'agents.html', 'meeting.html'))
+        self.assertIn('setState(E.stepOrb(s))', box)
+        self.assertIn("setState('composing'); reveal(a", box)   # an answer arriving is being written
+        self.assertIn("setState('connecting'); pill('finishing'", box)
+        self.assertIn("r.status==='running'?E.stepOrb(r.step)", agents)
+        for state in ('listening', 'solving', 'composing', 'searching', 'connecting', 'breathing'):
+            with self.subTest(meeting=state): self.assertIn(f"orbWanted='{state}'", meeting)
+        used = set(re.findall(r"'(\w+)'", box + agents + meeting + (root / 'ui' / 'orbs.js').read_text()[(root / 'ui' / 'orbs.js').read_text().index('const stepOrb'):]))
+        self.assertTrue({'working', 'searching', 'solving', 'listening', 'connecting', 'weaving', 'composing', 'breathing', 'shaping'} <= used)
 
     def test_failed_meeting_stream_restores_retry(self):
         source = (Path(__file__).resolve().parents[1] / 'ui' / 'meeting.html').read_text()

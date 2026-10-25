@@ -304,6 +304,7 @@ $('endcopy').onclick=()=>{post({do:'copy',text:savedTranscript.map(r=>`${time(r.
 $('allmeetings').onclick=()=>post({do:'meetings'});
 // A meeting's action items: the user ticks the ones that are theirs and adds them to Reminders; added ones stay ticked and greyed.
 let todoMeeting='';
+let orbWanted='breathing';   // the orb's state; the frame loop takes it up once the engine has loaded
 function remindCount(){const n=document.querySelectorAll('#todolist .todo[aria-checked=true]:not(.added)').length,b=$('remind');
   b.disabled=!n;b.textContent=n?'Add '+n+' to Reminders':'Add to Reminders';b.hidden=!document.querySelector('#todolist .todo:not(.added)');}
 function todos(m){todoMeeting=m.id||todoMeeting;const list=$('todolist');list.replaceChildren();
@@ -374,12 +375,12 @@ window.meeting={
   styles({list,pick,custom}){$('style').replaceChildren(...[...list.map(s=>s.name),'Custom…'].map(n=>new Option(n)));$('style').value=[...$('style').options].some(o=>o.value===pick)?pick:$('style').options[0].value;$('custom').value=custom||'';show('custom',$('style').value==='Custom…')},
   material(text){if(running){files=(files+'\n'+text).slice(0,20000);post({do:'prepare',context:$('brief').value+'\n'+files});toast('Adding file context…');return}files=(files+'\n'+text).slice(0,20000);$('filechip').title=`${Math.round(files.length/100)/10}k characters`;show('filechip',true);savePrep();fit()},
   prepared(r){if(r.error){toast('Using your notes as written.');return}$('brief').value=r.brief},
-  gathering(text){gathering=true;$('gather').textContent='Cancel';$('start').disabled=true;prepNote(text)},
-  gathered(r){gathering=false;$('gather').textContent='✦ Fill in for me';$('gather').disabled=false;$('start').disabled=false;if(r.brief!==undefined){$('context').value=r.brief;files='';$('prepfiles').replaceChildren();show('filechip',false);savePrep()}prepNote('Ready to edit');if(r.notice)toast(r.notice);$('context').focus();fit()},
+  gathering(text){gathering=true;orbWanted='searching';$('gather').textContent='Cancel';$('start').disabled=true;prepNote(text)},
+  gathered(r){gathering=false;orbWanted='breathing';$('gather').textContent='✦ Fill in for me';$('gather').disabled=false;$('start').disabled=false;if(r.brief!==undefined){$('context').value=r.brief;files='';$('prepfiles').replaceChildren();show('filechip',false);savePrep()}prepNote('Ready to edit');if(r.notice)toast(r.notice);$('context').focus();fit()},
   gatherCancelled(){gathering=false;$('gather').textContent='✦ Fill in for me';$('gather').disabled=false;$('start').disabled=false;prepNote('Preparation cancelled')},
   focus(){if(minimized){post({do:'compact',on:false});return}(running?$('ask'):!$('ended').hidden?($('resume').hidden?$('save'):$('resume')):!$('prep').hidden?$('context'):$('ready')).focus()},
-  listen(){running=true;capturing=false;minimized=false;document.body.classList.remove('compact');while($('prepfiles').firstChild)$('livefiles').append($('prepfiles').firstChild);$('h1').textContent='Meeting Copilot';$('resume').disabled=false;view('live');status('Getting ready');show('notice',true);setTimeout(()=>show('notice',false),8000)},
-  capturing(){if(running){capturing=true;status('Listening · '+time(seconds))}},
+  listen(){running=true;capturing=false;orbWanted='connecting';minimized=false;document.body.classList.remove('compact');while($('prepfiles').firstChild)$('livefiles').append($('prepfiles').firstChild);$('h1').textContent='Meeting Copilot';$('resume').disabled=false;view('live');status('Getting ready');show('notice',true);setTimeout(()=>show('notice',false),8000)},
+  capturing(){if(running){capturing=true;orbWanted='listening';status('Listening · '+time(seconds))}},
   clock(s){seconds=s;if(running&&capturing)status('Listening · '+time(s))},
   partial(row){if(!running)return;const was=atEnd(),id=row.mic?'micpartial':'partial';$(id).textContent=(row.mic?'You · ':'')+row.text;show(id,!!row.text);follow(was)},
   line(row){
@@ -393,8 +394,8 @@ window.meeting={
     $('lines').append(d);follow(was);
   },
   question(row){card(row);$('lines').querySelector(`[data-id="${row.id}"]`)?.classList.add('asked')},
-  thinking(id){const d=cards.get(id),b=d?.querySelector('.answer');d?.querySelector('.reason')?.remove();if(b){b.disabled=true;b.classList.add('thinking');b.textContent='Thinking…'}},
-  answerChunk(r){
+  thinking(id){orbWanted='solving';const d=cards.get(id),b=d?.querySelector('.answer');d?.querySelector('.reason')?.remove();if(b){b.disabled=true;b.classList.add('thinking');b.textContent='Thinking…'}},
+  answerChunk(r){orbWanted='composing';
     const d=cards.get(r.id);if(!d||!running)return;const was=answersAtEnd();d.hidden=false;show('empty',false);
     if($('scroll').hidden)$('tabs').children[0].classList.add('new');
     d.querySelector('.answer')?.remove();let res=d.querySelector('.response');
@@ -402,7 +403,7 @@ window.meeting={
     res.querySelector('strong').textContent+=r.text;requestAnimationFrame(()=>followAnswers(was));
     if(!d.dataset.measured){d.dataset.measured='1';requestAnimationFrame(()=>requestAnimationFrame(()=>post({do:'measured',id:r.id,shownAt:Date.now()/1000,timing:r.timing||{}})))}
   },
-  answer(r){
+  answer(r){orbWanted=running?'listening':'breathing';
     const d=cards.get(r.id);if(!d||!running)return;let b=d.querySelector('.answer');
     const reset=()=>b=retryAnswer(d);
     const shown=!d.hidden;
@@ -421,14 +422,16 @@ window.meeting={
   },
   heard(text){if(!voicing)return;$('heard').textContent=text||'Listening…';$('heard').classList.toggle('waiting',!text)},
   voiceEnd(){if(voicing){voicing=false;show('voicebar',false);show('askform',true)}},
-  stopped(paused=false){this.voiceEnd();running=false;capturing=false;minimized=false;document.body.classList.remove('compact');show('partial',false);show('micpartial',false);for(const d of cards.values())if(d.querySelector('.answer.thinking,.response.streaming'))retryAnswer(d);$('h1').textContent=paused?'Call paused':'Call ended';show('resume',paused);$('endtitle').textContent=paused||!saving?'Your meeting':'Keep this meeting?';$('delete').textContent=paused?'Delete meeting':'Don’t save';status(lineCount?`${lineCount} line${lineCount>1?'s':''} heard`:'Nothing heard');this.saving(saving);$('save').textContent=saving?(paused?'Done':'Save'):'Close without saving';$('save').classList.toggle('blue',saving&&!paused);$('save').disabled=false;show('notice',false);view('ended');$('resume').disabled=false;(paused?$('resume'):$('save')).focus()},
+  stopped(paused=false){this.voiceEnd();orbWanted='breathing';running=false;capturing=false;minimized=false;document.body.classList.remove('compact');show('partial',false);show('micpartial',false);for(const d of cards.values())if(d.querySelector('.answer.thinking,.response.streaming'))retryAnswer(d);$('h1').textContent=paused?'Call paused':'Call ended';show('resume',paused);$('endtitle').textContent=paused||!saving?'Your meeting':'Keep this meeting?';$('delete').textContent=paused?'Delete meeting':'Don’t save';status(lineCount?`${lineCount} line${lineCount>1?'s':''} heard`:'Nothing heard');this.saving(saving);$('save').textContent=saving?(paused?'Done':'Save'):'Close without saving';$('save').classList.toggle('blue',saving&&!paused);$('save').disabled=false;show('notice',false);view('ended');$('resume').disabled=false;(paused?$('resume'):$('save')).focus()},
   error(text){toast(text);$('save').disabled=false;$('resume').disabled=false}
 };
 post({do:'ready'});
-// Reuse Rabik's orb; it breathes while listening and holds still otherwise (and under Reduce Motion).
-const E=await import(URL.createObjectURL(new Blob([$('orbsrc').textContent],{type:'text/javascript'}))),S=64,dpr=2,reduced=matchMedia('(prefers-reduced-motion: reduce)'),preset=E.r('breathing',S);
+// Rabik's orb, in the state of what the copilot is doing (orbs.js): listening, thinking about an answer, writing it, gathering for
+// prep; it holds still when the call is not running (and under Reduce Motion).
+const E=await import(URL.createObjectURL(new Blob([$('orbsrc').textContent],{type:'text/javascript'}))),S=64,dpr=2,reduced=matchMedia('(prefers-reduced-motion: reduce)');
+let orbShown='breathing',preset=E.r(orbShown,S);
 const orbs=[$('orb'),$('orb2'),$('orb3')].map(cv=>{cv.width=cv.height=S*dpr;return cv.getContext('2d')});let t=0,prev=performance.now();
-(function frame(now){const moving=(running||!$('nudge').hidden)&&!reduced.matches&&!document.body.classList.contains('reduce');t+=Math.min(.05,(now-prev)/1000)*preset.speed*(moving?1:0);prev=now;
+(function frame(now){if(orbWanted!==orbShown){orbShown=orbWanted;preset=E.r(orbShown,S)}const moving=(running||!$('nudge').hidden)&&!reduced.matches&&!document.body.classList.contains('reduce');t+=Math.min(.05,(now-prev)/1000)*preset.speed*(moving?1:0);prev=now;
   for(const ctx of orbs){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,S,S);E.p(ctx,E.M[preset.mode](S,t,preset.opts),true,null)}
   moving?requestAnimationFrame(frame):setTimeout(()=>requestAnimationFrame(frame),250)})(prev);
 </script></body></html>

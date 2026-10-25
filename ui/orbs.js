@@ -835,6 +835,22 @@ function resolvePreset(state, size) {
 }
 export { MODE_FRAMES as M, paintFrame as p, resolvePreset as r };
 
+// ── Rabik, not part of the thinking-orbs engine: which of its nine states a step shows, the same in the box, the agents and the meeting panel ──
+// listening: the user talks · connecting: handing the words over, starting, waiting on an app · solving: the model thinks ·
+// searching: finding, reading, looking · working: acting in an app · composing: writing words (an answer arriving, typing, a note) ·
+// shaping: drawing or pointing on the screen · weaving: any other step of a longer job · breathing: idle, done, waiting for the user.
+const stepOrb = step => {
+  const s = String(step || '').trim();
+  return /^(Asking you|Waiting for you|Needs you)/i.test(s) ? 'breathing'
+    : /^(Search|Read|Look|Find|Check|Taking|Getting the|Brows|Fetch|Scan)/i.test(s) ? 'searching'
+    : /^(Draw|Getting ready to draw|Point|Showing (you|where)|Highlight|Mark)/i.test(s) ? 'shaping'
+    : /^(Writ|Draft|Compos|Typ|Fill|Sav|Not(e|ing)|Remember|Summari)/i.test(s) ? 'composing'
+    : /^(Mov|Open|Us(e|ing)|Click|Scroll|Press|Drag|Bring|Play|Add|Chang|Plac|Arrang|Clos|Quit|Switch|Run|Send)/i.test(s) ? 'working'
+    : /^(Think|Plan|Working out|Compar|Decid|Figur|Solv|Calculat)/i.test(s) ? 'solving'
+    : /^(Wait|Start|Resum|Connect|Hand|Prepar)/i.test(s) ? 'connecting'
+    : 'weaving';
+};
+
 // ── Rabik, not part of the thinking-orbs engine: Markdown and TeX math for every answer (the box, its agent card, the Agent view and shelf) ──
 // TeX → MathML, drawn by WebKit's own math layout: the subset short answers use. Anything else throws and shows the source.
 const MML = 'http://www.w3.org/1998/Math/MathML';
@@ -970,4 +986,4 @@ const shut = s => {   // a streamed line waits at a **bold, `code, [link or $mat
   const block = b.search(/(?<!\\)\$\$|\\[[(]/); if (block >= 0) open.push(block);   // $$, \[ or \( math still open, even lines back
   return !open.length || (s.match(/^\s*```/gm) || []).length % 2 ? s : s.slice(0, Math.min(...open));   // inside a code block every mark is text
 };
-export { MML, markdown, shut };
+export { MML, markdown, shut, stepOrb };

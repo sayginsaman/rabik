@@ -925,7 +925,7 @@
     },
     finishing(label) {   // dictation released: the wave goes and the pill folds into the working orb
       listening = false; boost = 1; $('orb').style.transform = ''; document.body.classList.remove('locked', 'hearing');
-      setState('solving'); pill('finishing', label);
+      setState('connecting'); pill('finishing', label);   // the words are being finalized and handed over
     },
     dictated({ text, ok, words, history }) {   // landed (no text): a green check; otherwise one short line (ok: with a check); words: unsaved, so they can be copied; history: saved there
       listening = false; boost = 1; $('orb').style.transform = ''; document.body.classList.remove('locked', 'hearing');
@@ -952,7 +952,7 @@
       let top = null;   // a streamed answer: the box keeps its start in view and never chases the bottom
       if (tag !== '…' && tag !== '✓') unstream();
       if (tag === '…') {   // the answer as it arrives; ✓ replaces it
-        const a = part('a'); if (a && !a.dataset.answer) { if (!s) unstream(); else { reveal(a, shut(s.replace(/\u2028/g, '\n').replace(/\S+$/, '')), a.classList.contains('streaming')); a.classList.add('streaming'); top = a; } }   // its last word may still be arriving
+        const a = part('a'); if (a && !a.dataset.answer) { if (!s) unstream(); else { setState('composing'); reveal(a, shut(s.replace(/\u2028/g, '\n').replace(/\S+$/, '')), a.classList.contains('streaming')); a.classList.add('streaming'); top = a; } }   // its last word may still be arriving
       }
       else if (tag === '▣') { try { miniUpdate(JSON.parse(s)); } catch {} }
       else if (tag === '@') miniPoint(s);
@@ -970,7 +970,7 @@
         if (positions) for (const e of st.children) e.animate([{transform:`translateY(${positions.has(e) ? positions.get(e).top - e.getBoundingClientRect().top : 19}px)`,opacity:positions.get(e)?.opacity??0},{transform:'none',opacity:1}],{duration:350,easing:'cubic-bezier(.2,.8,.2,1)'});
         }
         status(s, true);
-        setState(/^(Searching|Reading|Looking|Taking|Checking|Finding|Waiting)/.test(s) ? 'searching' : /^(Moving|Opening|Using|Clicking|Scrolling|Pressing|Dragging|Typing)/.test(s) ? 'working' : 'connecting');
+        setState(E.stepOrb(s));   // one meaning per orb state (orbs.js): what this step is doing
       } else if (tag === '✓') {
         miniFinish(); clockStop();
         working = false;
