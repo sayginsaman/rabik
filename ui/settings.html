@@ -512,6 +512,7 @@
       <div class="row"><div class="t"><b>Calendar</b><span>When you ask.</span></div><span class="pill ok">Allowed</span><button class="btn" data-g="calendar">Allow</button></div>
       <div class="row"><div class="t"><b>Claude connectors</b><span id="conntext">Checking your Claude account…</span></div><button class="btn" data-do="connectors">Connect in Claude</button></div>
       <div class="row"><div class="t"><b>Offer connectors</b><span>A card when an app you open has one to connect.</span></div><label class="sw"><input type="checkbox" data-k="connectorOffers"></label></div>
+      <div class="row"><div class="t"><b>Rabik in Claude Code</b><span id="mcptext">Claude Code can read Rabik’s memory, meetings and people. <i class="info" title="Read-only, on this Mac (MCP). Nothing can be changed. With AI meeting summaries off, transcripts stay private.">i</i></span></div><button class="btn" id="mcpcopy">Copy for Claude Desktop</button><button class="btn" id="mcpadd">Add to Claude Code</button></div>
     </div>
   </section>
 
@@ -651,6 +652,7 @@
     if (s === 'meetings') { meetingBack(false); requestMeetings(); }
     if (s === 'people') { personBack(false); post({ do: 'people' }); }
     if (s === 'general') post({ do: 'goals', args: ['list'] });
+    if (s === 'account') post({ do: 'mcpStatus' });
     if (s === 'feedback') { $('feedbackinclude').checked=false; feedbackPreview(); }
     if (s === 'apps') post({ do: 'apps' });   // fresh list and statuses each visit
     if (s === 'brain') probe();
@@ -702,6 +704,8 @@
   $('meetinglanguage').onchange = e => set('meetingLanguage', e.target.value);
   $('voice').onchange = e => set('voice', e.target.value);
   $('activityadd').onclick = () => post({do: 'activityExcludeAdd'});
+  $('mcpadd').onclick = () => { $('mcpadd').disabled = true; $('mcpadd').textContent = 'Adding…'; post({do: 'mcpAdd'}); };
+  $('mcpcopy').onclick = () => post({do: 'mcpCopy'});
   // Goals (brain/goals.py): tick one done, × removes it; open ones first
   const goalAdd = () => { const t = $('goalnew').value.trim(); if (!t) return; post({do: 'goals', args: ['add', t]}); $('goalnew').value = ''; };
   $('goaladd').onclick = goalAdd; $('goalnew').onkeydown = e => { if (e.key === 'Enter') goalAdd(); };
@@ -1103,6 +1107,7 @@
     reveal(item) { want = item; reveal(); },
     showMeeting(id) { expectedMeeting = id; post({do: 'meetingOpen', id}); },   // a source chip under an answer
     showPerson(id) { wantedPerson = id; post({ do: 'people' }); },
+    mcp(r) { const b = $('mcpadd'); b.disabled = !!r.added; b.textContent = r.added ? 'Added' : 'Add to Claude Code'; if (r.error) showNotice(r.error); },
     goals(r) { if (r.note && !/^Goal added|^Done|^Back/.test(r.note)) showNotice(r.note); if (r.goals) paintGoals(r.goals); },
     people(r) { if (r.error) { $('peoplecount').textContent = r.error; return; } savedPeople = r.people || []; paintPeople();
       if (wantedPerson) { const p = savedPeople.find(x => x.id === wantedPerson); wantedPerson = null; if (p) openPerson(p); } },

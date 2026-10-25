@@ -280,6 +280,17 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         case "set":
             guard let k = b["k"] as? String, let v = b["v"] else { return }
             apply(k, v)
+        case "mcpStatus", "mcpAdd":   // Settings → Rabik in Claude Code: `claude mcp add` on the user's click (brain/mcp.py)
+            let arg = b["do"] as? String == "mcpAdd" ? "--mcp-install" : "--mcp-status"
+            DispatchQueue.global().async { [weak self] in
+                let p = py([arg]), out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
+                self?.send("mcp", (try? JSONSerialization.jsonObject(with: runToEnd(p, out))) as? [String: Any] ?? ["added": false, "error": "Could not reach Claude Code."])
+            }
+        case "mcpCopy":   // Claude Desktop: its own settings file stays the user's to edit
+            let config: [String: Any] = ["mcpServers": ["rabik": ["command": "/bin/sh", "args": [dir + "/rabik.py", "--mcp"]]]]
+            guard let data = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) else { return }
+            NSPasteboard.general.clearContents(); NSPasteboard.general.setString(String(decoding: data, as: UTF8.self), forType: .string)
+            send("notice", ["text": "Copied. In Claude Desktop, open Settings → Developer → Edit Config and paste it."])
         case "goals":   // Settings → General → Goals: list, add, done, undo, drop (brain/goals.py)
             guard let args = b["args"] as? [String], let first = args.first, ["list", "add", "done", "undo", "drop"].contains(first), args.count <= 2 else { return }
             DispatchQueue.global().async { [weak self] in

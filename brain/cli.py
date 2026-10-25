@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from brain import (
     activity, agents, apps, ask, calendar, clients, dictation, drawing, environ, goals, hands, instant, interaction, macos, meeting, memory,
-    paths, people, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, sources, spotify, storage, support, telemetry, tips,
+    mcp, paths, people, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, sources, spotify, storage, support, telemetry, tips,
     toolhelp, turn, watcher, web, windows, wording)
 
 __all__ = ['INNER', 'BUDGET', 'main']
@@ -59,6 +59,10 @@ def main():
         return agents.agents_service()
     if args == ['--feedback']:
         return print(json.dumps(support.feedback(json.load(sys.stdin))))
+    if args == ['--mcp']:
+        return mcp.mcp_serve()
+    if args in (['--mcp-install'], ['--mcp-status']):
+        return print(json.dumps(mcp.mcp_install(check=args == ['--mcp-status'])))
     if args[:1] == ['--goals']:
         try: return print(json.dumps(goals.goals_command(args[1:]), ensure_ascii=False))
         except ValueError as e: return print(json.dumps({'error': str(e)}))
