@@ -24,8 +24,8 @@ def _import_rabik(repo):
     repo = Path(repo).resolve()
     if str(repo) not in sys.path:
         sys.path.insert(0, str(repo))
-    for mod in list(sys.modules):
-        if mod == 'rabik' or mod.startswith('rabik.'):
+    for mod in list(sys.modules):   # brain/ too: this repo's own modules, and hooks bound to this rabik rather than the caller's
+        if mod.split('.')[0] in ('rabik', 'brain'):
             del sys.modules[mod]
     import rabik  # noqa: F401
 

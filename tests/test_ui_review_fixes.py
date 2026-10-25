@@ -162,7 +162,7 @@ if (sent?.dictationHistory !== true || button.textContent !== 'History') process
     def test_removed_sonnet_offer_leaves_no_card_branch(self):
         self.assertNotIn('Sonnet', self.box[self.box.index('    respond(text)'):self.box.index('    improve()')])
         self.assertNotIn('"escalate"', self.swift[self.swift.index('func userContentController'):self.swift.index('    func show()')])
-        self.assertNotIn("j.get('off'", (ROOT / 'rabik.py').read_text())
+        self.assertNotIn("j.get('off'", ''.join(p.read_text() for p in [ROOT / 'rabik.py', *sorted((ROOT / 'brain').glob('*.py'))]))
 
     def test_agent_cost_reads_like_usage(self):
         script = ''

@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import signal
 import subprocess
 import sys
@@ -905,6 +906,7 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
     def test_hook_and_helper_launch_runs_from_cached_bytecode_outside_the_app(self):
         home = Path(scratch_dir(self)); app = home / 'Rabik.app'; app.mkdir()
         script = app / 'rabik.py'; script.write_text(Path(rabik.ME).read_text())
+        shutil.copytree(Path(rabik.ME).parent / 'brain', app / 'brain', ignore=shutil.ignore_patterns('__pycache__'))   # what build.sh copies
         env = {k: v for k, v in os.environ.items() if not k.startswith(('RABIK_', 'PYTHONDONTWRITEBYTECODE', 'PYTHONPYCACHEPREFIX'))} | {'HOME': str(home), 'RABIK_DIR': str(home), 'RABIK_CLIENT': 'pi'}   # a developer's own bytecode settings would hide the cache
         event = json.dumps({'tool_name': 'exec', 'tool_input': {'command': 'env FIXTURE=1 rm /tmp/file'}})
         run = lambda *a, stdin='': subprocess.run([*a], input=stdin, env=env, capture_output=True, text=True, cwd=home, timeout=20)
@@ -916,7 +918,8 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
             if args == ['--gate']: self.assertEqual(json.loads(r.stdout)['decision'], 'block')
             else: self.assertEqual(r.returncode, 2)
         self.assertTrue(list((home / 'Library/Caches/Rabik').rglob('rabik.*.pyc')))
-        self.assertFalse((app / '__pycache__').exists())   # never written inside the signed app
+        self.assertFalse((app / '__pycache__').exists() or (app / 'brain' / '__pycache__').exists())   # never written inside the signed app
+        self.assertTrue(list((home / 'Library/Caches/Rabik').rglob('telemetry.*.pyc')))   # brain/ modules come from the cache too
         hook = json.loads(Path(rabik.devin_config(str(home))).read_text())['hooks']['PreToolUse'][0]['hooks'][0]['command']
         self.assertTrue(hook.startswith(f'RABIK_CLIENT=devin /bin/sh "{rabik.ME}" --gate'))
 

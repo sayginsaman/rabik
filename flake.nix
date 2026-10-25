@@ -48,7 +48,9 @@
                 exec bash "$src/build.sh"
                 ;;
               --check)
-                python3 -c 'import pathlib, sys; compile(pathlib.Path(sys.argv[1]).read_text(), sys.argv[1], "exec")' "$src/rabik.py"
+                for f in "$src/rabik.py" "$src"/brain/*.py; do
+                  python3 -c 'import pathlib, sys; compile(pathlib.Path(sys.argv[1]).read_text(), sys.argv[1], "exec")' "$f"
+                done
                 bash -n "$src/build.sh"
                 printf '%s\n' 'rabik source checks passed'
                 ;;

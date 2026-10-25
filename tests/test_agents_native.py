@@ -258,6 +258,7 @@ nsapp.run()''','move shortcut checks ok')
             preview=ROOT/'test-artifacts'/'Rabik Agents Preview.app';contents=preview/'Contents'
             (contents/'MacOS').mkdir(parents=True,exist_ok=True);(contents/'Resources').mkdir(exist_ok=True)
             shutil.copy2(binary,contents/'MacOS'/'Rabik');shutil.copy2(ROOT/'rabik.py',contents/'Resources'/'rabik.py')
+            shutil.copytree(ROOT/'brain',contents/'Resources'/'brain',dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__'))
             shutil.copytree(ROOT/'ui',contents/'Resources'/'ui',dirs_exist_ok=True)
             launcher=contents/'MacOS'/'launch'
             launcher.write_text('#!/bin/zsh\nexport RABIK_DIR=$(mktemp -d)\nexport RABIK_RESOURCES_DIR="$(cd "$(dirname "$0")/../../../.." && pwd)"\nprintf \'%s\\n\' \'{"input":"type","safe":true}\' > "$RABIK_DIR/settings.json"\nexec "$(dirname "$0")/Rabik" -onboarded YES\n');launcher.chmod(0o755)

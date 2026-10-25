@@ -32,6 +32,8 @@ else
 fi
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/ui"
 cp rabik.py "$APP/Contents/Resources/"
+rm -rf "$APP/Contents/Resources/brain"; mkdir "$APP/Contents/Resources/brain"
+cp brain/*.py "$APP/Contents/Resources/brain/"   # the modules rabik.py imports; never a __pycache__ into the signed bundle
 cp ui/*.html ui/*.js ui/*.png "$APP/Contents/Resources/ui/"
 cp ui/AppIcon.icns "$APP/Contents/Resources/"
 # The in-app Git updater pulls and rebuilds this source folder; a release has none, so its updater stays off.
