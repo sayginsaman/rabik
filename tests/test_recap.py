@@ -12,8 +12,9 @@ import unittest
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import tests  # noqa: F401 -- first: scratch RABIK_DIR, no telemetry, host guard
-import brain.agents, brain.calendar, brain.interaction, brain.macos, brain.meeting, brain.policy, brain.prefs, brain.recap
-from tests import scratch_dir
+import brain.agents, brain.calendar, brain.interaction, brain.macos, brain.meeting, brain.policy, brain.prefs, brain.recap, brain.routine
+from tests import native_source, scratch_dir
+import plistlib
 
 DAY = '2026-10-25'
 NOON = datetime(2026, 10, 25, 12).timestamp()
@@ -155,8 +156,10 @@ class RecapTests(unittest.TestCase):
                 del self.prefs[key]
         self.prefs['recapAt'] = '07:15'
         self.assertTrue(brain.recap.recap_due(morning))
-        (self.root / 'recaps').mkdir(); (self.root / 'recaps' / f'{DAY}.json').write_text('{}')
-        self.assertFalse(brain.recap.recap_due(evening))   # made already: a later launch or wake does not make it again
+        (self.root / 'recaps').mkdir(); (self.root / 'recaps' / f'{DAY}.json').write_text('{"evening": false}')
+        self.assertTrue(brain.recap.recap_due(evening))   # one the user asked for earlier is not the evening recap
+        (self.root / 'recaps' / f'{DAY}.json').write_text('{"evening": true}')
+        self.assertFalse(brain.recap.recap_due(evening))   # the evening recap is made: a later launch or wake does not make it again
 
     def test_old_recaps_go_after_a_month(self):
         folder = self.root / 'recaps'; folder.mkdir()
@@ -211,6 +214,65 @@ class RecapTests(unittest.TestCase):
         decision = json.loads(out.getvalue())['hookSpecificOutput']
         self.assertEqual(decision['permissionDecision'], 'deny')
         self.assertIn('not model tools', decision['permissionDecisionReason'])
+
+    def test_an_asked_recap_still_gets_its_evening_recap_once(self):
+        self.meeting(); self.answer({'headline': 'One sync.'})
+        brain.recap.recap_make(DAY)   # "summarize my day" at 18:00
+        evening = datetime(2026, 10, 25, 21, 5)
+        self.assertTrue(brain.recap.recap_due(evening))
+        with patch.object(brain.recap, 'recap_due', return_value=True):
+            made = brain.recap.recap_command(['catch-up'])
+        self.assertTrue(made['evening'])
+        self.assertEqual(self.model.call_count, 1)   # nothing new since 18:00: the same recap, now the evening one
+        self.assertFalse(brain.recap.recap_due(evening))   # a later wake shows nothing again
+
+
+class RecapScheduleTests(unittest.TestCase):
+    def setUp(self):
+        self.root = scratch_dir(self)
+        self.prefs = {}
+        p = patch.object(brain.prefs, 'pref', side_effect=lambda k, d: self.prefs.get(k, d)); p.start(); self.addCleanup(p.stop)
+        self.job = Path(brain.routine.routine_job_path('recap'))
+
+    def test_the_job_follows_settings(self):
+        self.assertTrue(brain.routine.routine_recap_sync())
+        job = plistlib.loads(self.job.read_bytes())
+        self.assertEqual(job['StartCalendarInterval'], {'Hour': 21, 'Minute': 0})
+        self.assertEqual(job['ProgramArguments'][-2:], ['--routine-fire', 'recap'])
+        self.prefs['recapAt'] = '07:30'
+        brain.routine.routine_recap_sync()
+        self.assertEqual(plistlib.loads(self.job.read_bytes())['StartCalendarInterval'], {'Hour': 7, 'Minute': 30})
+        for key, value in (('recap', False), ('recapAt', '7:30pm')):
+            with self.subTest(key=key):
+                self.prefs.update({key: value})
+                self.assertFalse(brain.routine.routine_recap_sync())
+                self.assertFalse(self.job.exists())
+                self.prefs.pop(key); brain.routine.routine_recap_sync()
+        self.job.unlink()
+        brain.routine.routine_pop()   # every launch repairs the jobs: a missing recap job comes back
+        self.assertTrue(self.job.exists())
+        self.assertEqual(brain.recap.recap_command(['schedule']), {'scheduled': True})
+
+    def test_the_job_queues_the_recap_for_the_app_unless_paused_or_off(self):
+        self.assertTrue(brain.routine.routine_fire('recap'))
+        self.assertEqual(brain.routine.routine_pop(), ['recap'])
+        for key, value in (('paused', True), ('recap', False)):
+            with self.subTest(key=key):
+                self.prefs[key] = value
+                self.assertFalse(brain.routine.routine_fire('recap'))
+                self.assertEqual(brain.routine.routine_pop(), [])
+                del self.prefs[key]
+
+    def test_the_app_asks_on_the_job_a_launch_a_wake_and_a_settings_change(self):
+        swift = native_source()
+        recap = swift[swift.index('final class Recap {'):]
+        self.assertIn('NSWorkspace.didWakeNotification', recap)
+        self.assertIn('py(["--recap", "catch-up"])', recap)
+        self.assertIn('ids.forEach { $0 == "recap" ? dailyRecap.catchUp() : agentsUI.send(["action":"routine","id":$0]) }', swift)
+        self.assertIn('let dailyRecap = Recap()\nlet routineWake = RoutineWake()\ndailyRecap.catchUp()', swift)
+        self.assertIn('if k == "recap" || k == "recapAt" { dailyRecap.sync() }', swift)
+        defaults = swift[swift.index('static let defaults'):swift.index('static let retiredKeys')]
+        self.assertIn('"recap": true, "recapAt": "21:00", "remindersList": ""', defaults)
 
 if __name__ == '__main__':
     unittest.main()

@@ -8,7 +8,7 @@ import re
 import subprocess
 import time
 from datetime import date, datetime, timedelta
-from brain import agents, calendar, meeting, paths, prefs, storage
+from brain import agents, calendar, meeting, paths, prefs, routine, storage
 
 __all__ = ['RECAP_SYSTEM', 'RECAP_DATE_CUE', 'recap_path', 'recap_key', 'recap_day', 'recap_tomorrow', 'recap_inputs', 'recap_local',
            'recap_check', 'recap_read', 'recap_make', 'recap_due', 'recap_items', 'recap_remind', 'recap_command']
@@ -115,9 +115,10 @@ def recap_read(day):
     except (OSError, ValueError): return None
 
 
-def recap_make(day=None, force=False):
+def recap_make(day=None, force=False, evening=False):
     """The day's recap: the saved one while nothing new happened, else made again (one AI call) keeping what was already added.
-    An empty day makes nothing: no AI call, no file, no notification."""
+    An empty day makes nothing: no AI call, no file, no notification. evening: this is the day's evening recap, so a later launch
+    or wake does not show it again (one asked for at 18:00 still gets its evening recap at 21:00)."""
     day = day or date.today().isoformat()
     folder = os.path.join(paths.DIR, 'recaps'); os.makedirs(folder, mode=0o700, exist_ok=True)
     with open(os.path.join(folder, '.lock'), 'a') as lock:
@@ -127,7 +128,9 @@ def recap_make(day=None, force=False):
         fingerprint = json.dumps([len(inputs['asks']), inputs['asks'][-1:], [a['id'] for a in inputs['agents']],
                                   [[m['id'], len(m['summary']), len(m['actions'])] for m in inputs['meetings']], inputs['tomorrow']])
         old = recap_read(day)
-        if old and old.get('fingerprint') == fingerprint and not force: return old
+        if old and old.get('fingerprint') == fingerprint and not force:
+            if evening and not old.get('evening'): old['evening'] = True; storage.private_json(recap_path(day), old)
+            return old
         recap, source, note = recap_local(inputs), 'local', ''
         if prefs.client() == 'claude':
             shared = {**inputs, 'meetings': [] if inputs['private'] else inputs['meetings']}   # AI meeting summaries off: meetings stay on this Mac
@@ -144,7 +147,8 @@ def recap_make(day=None, force=False):
         added = {recap_key(a.get('text', '')): a['added'] for a in (old or {}).get('actions', []) if isinstance(a, dict) and a.get('added')}
         for action in recap['actions']:
             action.update(source=titles.get(action['from'], ''), added=added.get(recap_key(action['text']), ''))
-        result = {'day': day, 'made': time.time(), 'source': source, 'note': note, 'fingerprint': fingerprint, **recap}
+        result = {'day': day, 'made': time.time(), 'source': source, 'note': note, 'fingerprint': fingerprint,
+                  'evening': evening or bool((old or {}).get('evening')), **recap}
         storage.private_json(recap_path(day), result)
         for name in os.listdir(folder):   # a month of recaps, no more
             if re.fullmatch(r'\d{4}-\d{2}-\d{2}\.json', name) and name[:10] < (date.fromisoformat(day) - timedelta(days=30)).isoformat():
@@ -154,11 +158,12 @@ def recap_make(day=None, force=False):
 
 
 def recap_due(now=None):
-    """Whether a launch or a wake should make today's recap: it is on, Rabik is not paused, its time has passed and there is none yet."""
+    """Whether the job, a launch or a wake should make today's evening recap: it is on, Rabik is not paused, its time has passed and
+    today's evening recap is not made yet."""
     now = now or datetime.now()
     at = str(prefs.pref('recapAt', '21:00'))
     if not prefs.pref('recap', True) or prefs.pref('paused', False) or not re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d', at): return False
-    return now.strftime('%H:%M') >= at and recap_read(now.date().isoformat()) is None
+    return now.strftime('%H:%M') >= at and not (recap_read(now.date().isoformat()) or {}).get('evening')
 
 
 def recap_items(source):
@@ -202,8 +207,10 @@ def recap_remind(source, keys):
 
 
 def recap_command(args):
-    """--recap [YYYY-MM-DD] [--force] | --recap catch-up | --recap items <source> | --recap remind <source> '<json keys>'; prints JSON."""
-    if args[:1] == ['catch-up']: return recap_make() if recap_due() else {}
+    """--recap [YYYY-MM-DD] [--force] | catch-up | schedule | items <source> | remind <source> '<json keys>'; prints JSON.
+    catch-up: the evening recap if it is due (the job, a launch or a wake), else {}; schedule: the job follows Settings."""
+    if args[:1] == ['catch-up']: return recap_make(evening=True) if recap_due() else {}
+    if args[:1] == ['schedule']: return {'scheduled': routine.routine_recap_sync()}
     if args[:1] == ['items'] and len(args) == 2:
         title, day, items = recap_items(args[1]); return {'title': title, 'day': day, 'items': items}
     if args[:1] == ['remind'] and len(args) == 3:
@@ -211,5 +218,5 @@ def recap_command(args):
         if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys): raise ValueError('Give the item keys as a JSON list.')
         return recap_remind(args[1], keys)
     day = next((a for a in args if re.fullmatch(r'\d{4}-\d{2}-\d{2}', a)), None)
-    if any(a not in ('--force', day) for a in args): raise ValueError('Use --recap [YYYY-MM-DD] [--force] | catch-up | items <source> | remind <source> <keys>')
+    if any(a not in ('--force', day) for a in args): raise ValueError('Use --recap [YYYY-MM-DD] [--force] | catch-up | schedule | items <source> | remind <source> <keys>')
     return recap_make(day, '--force' in args)

@@ -286,6 +286,8 @@ func borrowPasteboard(_ text: String, _ pb: NSPasteboard = .general) -> (() -> V
 
 // final class RoutineWake lives in App/RoutineWake.swift
 
+// final class Recap lives in App/Recap.swift
+
 // final class Onboarding lives in Onboarding/Onboarding.swift
 
 // `Rabik --look <screen #> <out.jpg> [window id]` (rabik.py --look): the screen without Rabik's own box on it, 1280 px wide.
@@ -651,7 +653,9 @@ func checkMic() {
 Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in checkMic() }
 let app = App()
 let agentsUI = AgentPanels()
+let dailyRecap = Recap()
 let routineWake = RoutineWake()
+dailyRecap.catchUp()
 let onboarding = Onboarding()
 if !UserDefaults.standard.bool(forKey: "onboarded") { DispatchQueue.main.async { onboarding.open() } }
 else { Onboarding.plan { c in if c["ok"] as? Bool != true { onboarding.open() } } }   // set up once, but Claude signed out since

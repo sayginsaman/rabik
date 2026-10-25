@@ -16,7 +16,7 @@ import AudioToolbox
 // Settings, shared with rabik.py (model, screen, openOn, instant): ~/.config/rabik/settings.json
 enum Prefs {
     static let path = (ProcessInfo.processInfo.environment["RABIK_DIR"] ?? NSString(string: "~/.config/rabik").expandingTildeInPath) + "/settings.json"
-    static let defaults: [String: Any] = ["hotkeyCode": 49, "hotkeyMods": controlKey | optionKey, "hotkeyLabel": "⌃⌥Space", "login": true, "paused": false, "boxPosition": "top-center", "linger": "normal",
+    static let defaults: [String: Any] = ["hotkeyCode": 49, "hotkeyMods": controlKey | optionKey, "hotkeyLabel": "⌃⌥Space", "login": true, "paused": false, "boxPosition": "top-center", "recap": true, "recapAt": "21:00", "remindersList": "", "linger": "normal",
         "soundStart": "Pop", "soundRelease": "Bottle", "soundDone": "Glass", "soundStop": "Tink", "volume": 0.16, "client": "claude", "model": "haiku", "instant": true,
         "microphone": "automatic", "quietAudio": false, "quietLevel": 0.18, "agentModel": "sonnet", "agentUserTools": true, "fixSetup": false,
         "meetingStyle": "Direct", "meetingCustom": "", "meetingStyles": [

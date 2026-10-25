@@ -10,8 +10,8 @@ import time
 import uuid
 from brain import environ, paths, prefs, storage
 
-__all__ = ['routines', 'routine_label', 'routine_job_path', 'routine_install', 'routine_repair', 'routine_add', 'routine_remove',
-           'routine_slot', 'routine_fire', 'routine_pop', 'routine_command']
+__all__ = ['routines', 'routine_label', 'routine_job_path', 'routine_install', 'routine_recap_sync', 'routine_repair', 'routine_add',
+           'routine_remove', 'routine_slot', 'routine_queue', 'routine_wake', 'routine_fire', 'routine_pop', 'routine_command']
 
 
 def routines():
@@ -76,8 +76,27 @@ def routine_install(row):
             raise OSError('Could not start the routine. Try again.')
 
 
+def routine_recap_sync():
+    """The daily recap's launchd job follows Settings: on, a daily job at recapAt that wakes the app; off, no job."""
+    at, path = str(prefs.pref('recapAt', '21:00')), routine_job_path('recap')
+    if prefs.pref('recap', True) and re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d', at):
+        try:
+            with open(path, 'rb') as f:
+                if plistlib.load(f).get('StartCalendarInterval') == {'Hour': int(at[:2]), 'Minute': int(at[3:])}: return True
+        except (OSError, ValueError, AttributeError): pass
+        routine_install({'id': 'recap', 'kind': 'time', 'at': at, 'days': 'daily'})
+        return True
+    if os.path.exists(path):
+        if not environ.sandbox_dir():
+            subprocess.run(['/bin/launchctl', 'bootout', f'gui/{os.getuid()}', path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        os.remove(path)
+    return False
+
+
 def routine_repair():
-    """Replace weekday jobs written with the old Tuesday-Saturday values."""
+    """Replace weekday jobs written with the old Tuesday-Saturday values; keep the daily recap's job in step with Settings."""
+    try: routine_recap_sync()
+    except (OSError, ValueError): pass
     for row in routines():
         if row.get('kind') != 'time' or row.get('days') != 'weekdays': continue
         try:
@@ -156,9 +175,12 @@ def routine_slot(row, now=None):
 
 
 def routine_fire(identifier, now=None):
-    if not re.fullmatch(r'[a-f0-9]{12}', identifier): return False
     if prefs.pref('paused', False): return False
     os.makedirs(paths.DIR, mode=0o700, exist_ok=True)
+    if identifier == 'recap':   # the daily recap: the app makes it (recap_due decides), no agent
+        if not prefs.pref('recap', True): return False
+        routine_queue('recap'); routine_wake(); return True
+    if not re.fullmatch(r'[a-f0-9]{12}', identifier): return False
     lock = open(os.path.join(paths.DIR, 'routines.lock'), 'a+')
     try:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -167,18 +189,27 @@ def routine_fire(identifier, now=None):
         if not slot or row.get('lastSlot') == slot: return False
         row['lastSlot'], row['lastAt'] = slot, time.time() if now is None else now
         storage.private_json(os.path.join(paths.DIR, 'routines.json'), rows)
-        queue = os.path.join(paths.DIR, 'routine-queue.jsonl')
-        fd = os.open(queue, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        with os.fdopen(fd, 'a') as f:
-            fcntl.flock(f, fcntl.LOCK_EX); f.write(json.dumps({'id': identifier}) + '\n')
+        routine_queue(identifier)
     finally:
         lock.close()
-    if not environ.sandbox_dir():
-        wake = subprocess.run(['/bin/launchctl', 'kickstart', f'gui/{os.getuid()}/com.rabik.app'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if wake.returncode and subprocess.run(['/usr/bin/pgrep', '-f', paths.APP], stdout=subprocess.DEVNULL).returncode:
-            bundle = paths.APP.partition('/Contents/MacOS/')[0]
-            if bundle.endswith('.app'): subprocess.Popen(['/usr/bin/open', '-gj', bundle], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    routine_wake()
     return True
+
+
+def routine_queue(identifier):
+    """One due job for the app: a routine's ID, or "recap"."""
+    fd = os.open(os.path.join(paths.DIR, 'routine-queue.jsonl'), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, 'a') as f:
+        fcntl.flock(f, fcntl.LOCK_EX); f.write(json.dumps({'id': identifier}) + '\n')
+
+
+def routine_wake():
+    """The app reads the queue now: its login job is kicked, or, with no job and no app running, the app opens in the background."""
+    if environ.sandbox_dir(): return
+    wake = subprocess.run(['/bin/launchctl', 'kickstart', f'gui/{os.getuid()}/com.rabik.app'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if wake.returncode and subprocess.run(['/usr/bin/pgrep', '-f', paths.APP], stdout=subprocess.DEVNULL).returncode:
+        bundle = paths.APP.partition('/Contents/MacOS/')[0]
+        if bundle.endswith('.app'): subprocess.Popen(['/usr/bin/open', '-gj', bundle], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def routine_pop():

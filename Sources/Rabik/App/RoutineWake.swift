@@ -38,7 +38,7 @@ final class RoutineWake {
             let ids = (try? JSONSerialization.jsonObject(with:data)) as? [String] ?? []
             DispatchQueue.main.async {
                 guard let self else { return }
-                ids.forEach { agentsUI.send(["action":"routine","id":$0]) }
+                ids.forEach { $0 == "recap" ? dailyRecap.catchUp() : agentsUI.send(["action":"routine","id":$0]) }   // the recap job is no agent
                 self.draining = false
                 if self.pending { self.drain() }
             }
