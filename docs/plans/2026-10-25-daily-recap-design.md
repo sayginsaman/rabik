@@ -1,6 +1,6 @@
 # Akşam özeti ve toplantı aksiyonlarını Hatırlatıcılar'a ekleme — tasarım
 
-Tarih: 2026-10-25 · Durum: onaylandı, uygulanmadı · Esin: Omi'nin günlük özeti ve aksiyon maddeleri
+Tarih: 2026-10-25 · Durum: uygulandı (9c0c128 … 3921b1b); gerçek bildirim ve Hatırlatıcılar izni kullanıcının ilk denemesinde doğrulanacak · Esin: Omi'nin günlük özeti ve aksiyon maddeleri
 
 ## Amaç
 

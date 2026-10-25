@@ -62,6 +62,16 @@ Bu build hakkında:
 - [ ] "Bu sayfa 'shipped' yazınca haber ver" → izleme kurulur; "stop watching" ile durur.
 - [ ] "Her gün 9'da takvimimi özetle" → rutin kaydedilir; Settings → General → Scheduled routines'da görünür ve oradan silinir.
 
+## 8b. Akşam özeti ve Hatırlatıcılar
+- [ ] Gün içinde birkaç istek yap, sonra "summarize my day" (ya da "günümü özetle") de → kutuda özet kartı açılır: başlık, Bugün, Kararlar, Yapılacaklar, Yarın.
+- [ ] Bir yapılacak satırına tıkla → işaretlenir, düğme "Add 1 to Reminders" olur. Bas → ilk seferde Hatırlatıcılar izni sorulur; izin verince madde Hatırlatıcılar'ın varsayılan listesine düşer, kartta ✓ Added olarak kalır.
+- [ ] Aynı maddeyi tekrar eklemeye çalış → eklenemez (düğme yok ya da pasif).
+- [ ] Settings → General → Daily recap'te saati bir iki dakika sonrasına al → o saatte "Your day with Rabik" bildirimi gelir (ilk seferde bildirim izni sorulur); tıklayınca kart kutuda açılır.
+- [ ] Bildirim geldikten sonra Mac'i uyutup uyandır ya da Rabik'i yeniden aç → aynı gün ikinci bildirim gelmez.
+- [ ] Settings'te "Reminders list" seçicisinde, ilk eklemeden sonra kendi listelerin görünür; başka bir liste seçip ekle → madde o listeye düşer.
+- [ ] Bir toplantıdan sonra panelin altındaki "Action items" listesinden bir madde seçip ekle; Settings → Meetings'te o toplantıyı aç → aynı madde "Added to Reminders" görünür.
+- [ ] Daily recap'i kapat → o saatte bildirim gelmez.
+
 ## 9. Toplantı (isteğe bağlı)
 - [ ] Settings → Meetings → Meeting Copilot'u aç, demo'yu dene → panel açılır, sürüklenir, küçülür.
 - [ ] Demo bitince "See all meetings" → kayıt arşivde görünür.

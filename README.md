@@ -182,6 +182,12 @@ Remove: quit Rabik from the menu bar, then delete `Rabik.app` and `~/.config/rab
 
 Say "tell me when Codex is done" or "watch this page until it says shipped". Rabik sets it up once, then checks every 5 seconds on your Mac with no AI, so waiting is free. When it fires you get a notification, and it runs a follow-up if you asked for one. A window must stay open on this desktop (covered is fine). Coding agents like Codex are watched through their own log, with no screen at all. Say "stop watching" to cancel.
 
+## Daily recap
+
+Every evening (21:00 unless you pick another time in Settings → General → Daily recap) Rabik sends one notification with your day: what you asked, what your agents finished, what your meetings decided, and tomorrow's calendar. Click it to open the recap in the box. Its to-dos come from your meetings and agents; tick the ones that are yours and choose Add to Reminders. Nothing is added until you do, and an added to-do stays marked so it is never added twice. A meeting's action items have the same Add to Reminders on its end-of-call panel and its page in Settings → Meetings. Say "summarize my day" any time.
+
+A recap costs one Haiku call, and a day with nothing in it costs nothing. With AI meeting summaries off, your meetings never go to the AI for it; their own action items still show. Recaps stay on your Mac for a month.
+
 ## Routines
 
 Say "every weekday at 8, summarize my calendar" or "every 30 minutes, check my inbox". Rabik saves a routine and macOS wakes it on time, so it costs nothing while it waits. Each run starts a background agent on Cheapest unless you chose another mode, and you get a notification with the result. Runs are skipped while Rabik is paused, and a restart never repeats one. See and remove routines in Settings → General → Scheduled routines, or ask Rabik to remove one. Like other agents, routines need Claude Code.
