@@ -138,10 +138,10 @@ class FlowTests(unittest.TestCase):
              patch.object(brain.handoffs, 'MainMove') as moving, patch.object(brain.interaction, 'wait_commit', return_value=True), patch.object(brain.interaction, 'relay'), \
              patch.object(threading, 'Timer'), contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertFalse(brain.situation.main_delivery_required())
-            brain.ask.run('Context', p, request='Find 3 standing desks under $600')
+            attempt = brain.ask.run('Context', p, request='Find 3 standing desks under $600')
         moving.assert_not_called()
         self.assertNotIn('main-window delivery', p.stdin.write.call_args.args[0])
-        self.assertEqual(output.getvalue().count('⤴ '), 1); self.assertEqual(brain.ask.run.handoff['title'], 'Desk research')
+        self.assertEqual(output.getvalue().count('⤴ '), 1); self.assertEqual(attempt.handoff['title'], 'Desk research')
 
     def test_each_separate_task_in_one_ask_is_its_own_handoff(self):
         marker = '[agent {"title":"Ebike research","brief":"Best ebikes","app":"Alpha"}]\n[agent {"title":"Helmet research","brief":"Best helmets","app":"Beta"}]'
@@ -160,10 +160,10 @@ class FlowTests(unittest.TestCase):
              patch.object(brain.interaction, 'wait_commit', return_value=True), patch.object(brain.interaction, 'relay'), \
              patch.object(brain.web, 'running_app', side_effect=lambda app: app), patch.object(brain.web, 'work_page', side_effect=work_page), \
              patch.object(threading, 'Timer'), contextlib.redirect_stdout(io.StringIO()) as output:
-            brain.ask.run('Context', p, request='Research the best ebikes and, second, the best helmets')
+            attempt = brain.ask.run('Context', p, request='Research the best ebikes and, second, the best helmets')
         sent = [json.loads(l[2:]) for l in output.getvalue().splitlines() if l.startswith('⤴ ')]
         self.assertEqual([h['title'] for h in sent], ['Ebike research', 'Helmet research'])
-        self.assertEqual(len({h['handoffId'] for h in sent}), 2); self.assertIs(brain.ask.run.handoff, brain.ask.run.handoffs[0])
+        self.assertEqual(len({h['handoffId'] for h in sent}), 2); self.assertIs(attempt.handoff, attempt.handoffs[0])
         self.assertEqual(len(brain.handoffs.parse_handoffs('[agent {"title":"Desk research","brief":"Compare desks"}] Sure.')), 1)
         both = brain.handoffs.parse_handoffs('```\n[steer {"id":"abc","text":"under $200"}]\n[agent {"title":"Helmets","brief":"Best helmets"}]\n```')
         self.assertEqual([d.get('steer', d['title']) for d in both], ['abc', 'Helmets'])
@@ -192,8 +192,8 @@ class FlowTests(unittest.TestCase):
              patch.object(brain.interaction, 'wait_commit', return_value=True), patch.object(brain.interaction, 'relay'), patch.object(brain.macos, 'preview_commands'), \
              patch.object(brain.clients, 'stop_claude'), patch.object(threading, 'Timer'), patch.object(time, 'monotonic', side_effect=lambda: clock[0]), \
              contextlib.redirect_stdout(io.StringIO()) as output:
-            reply, _, _ = brain.ask.run('Context: Front app: Preview.', p, request=request)
-        return reply, output.getvalue()
+            self.attempt = brain.ask.run('Context: Front app: Preview.', p, request=request)
+        return self.attempt.reply, output.getvalue()
 
     def test_a_question_answered_from_window_pages_stays_in_the_box(self):
         request = ('And then for problem C too, could I just cross and multiply? Or do I have to multiply by like, or do I have to like, um, like how can I do it? '
@@ -201,7 +201,7 @@ class FlowTests(unittest.TestCase):
         answer = "Don't cross-multiply; divide straight across: outside with outside, inside with inside."
         reply, output = self.question_run(request, answer)
         self.assertEqual(reply, answer)
-        self.assertIsNone(brain.ask.run.handoff)
+        self.assertIsNone(self.attempt.handoff)
         self.assertNotIn('⤴', output)
         title = brain.handoffs.agent_title(request).lower().split()
         self.assertEqual(len(title), len(set(title)), title)
@@ -211,7 +211,7 @@ class FlowTests(unittest.TestCase):
         marker = '[agent {"title":"Cross-multiplying radicals","brief":"Explain problem C"}]'
         reply, output = self.question_run('Do this in the background: explain problem C.', marker)
         self.assertEqual(reply, '')
-        self.assertEqual(brain.ask.run.handoff['title'], 'Cross-multiplying radicals')
+        self.assertEqual(self.attempt.handoff['title'], 'Cross-multiplying radicals')
         self.assertEqual(output.count('⤴ '), 1)
 
     def test_long_writing_only_ask_stays_main_before_its_result_mode_arrives(self):
@@ -246,12 +246,12 @@ class FlowTests(unittest.TestCase):
         with patch.dict(os.environ, {'RABIK_UI': '1'}), patch.object(brain.clients, 'start_claude', return_value=second) as start, \
              patch.object(brain.clients, 'stop_claude') as stop, patch.object(brain.handoffs, 'persist_handoff') as persist, \
              patch.object(brain.interaction, 'relay'), contextlib.redirect_stdout(io.StringIO()) as output:
-            reply, cost, _ = brain.ask.run('Context: active guide', first, request='Write the draft', main_only=True)
+            reply, cost, _ = attempt = brain.ask.run('Context: active guide', first, request='Write the draft', main_only=True)
         self.assertEqual(reply, '[draft] Full draft')
         self.assertIsNone(cost)
         start.assert_called_once_with('sonnet')
-        self.assertTrue(brain.ask.run.ok)
-        self.assertIsNone(brain.ask.run.handoff)
+        self.assertTrue(attempt.ok)
+        self.assertIsNone(attempt.handoff)
         self.assertNotIn('⤴', output.getvalue())
         persist.assert_not_called()
         stop.assert_called_once_with(first)

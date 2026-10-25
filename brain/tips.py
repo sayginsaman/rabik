@@ -2,7 +2,7 @@
 import os
 import time
 from pathlib import Path
-from brain import ask, paths, prefs, protocol, wording
+from brain import paths, prefs, protocol, wording
 
 __all__ = ['TIPS', 'MISS', 'tip']
 
@@ -17,12 +17,12 @@ TIPS = ['Say "remember …" and Rabik keeps it as a rule.',
 MISS = 'Saying the same thing more than once? Tell Rabik how you want it done. It remembers next time.'
 
 
-def tip(reply, taught=''):
+def tip(reply, taught='', work=False):
     """One small tip under the answer ("i <tip>"). After a miss or a redo: how to teach it (the AI's own words if it gave some),
     every time; otherwise a general tip at most every 6 h. Off in Settings."""
     if os.environ.get('RABIK_UI') != '1':
         return
-    tips, miss = prefs.pref('tips', True), taught or wording.failed_action_reply(reply, getattr(ask.run, 'work', False))
+    tips, miss = prefs.pref('tips', True), taught or wording.failed_action_reply(reply, work)
     if taught.startswith('Learned:') or tips and miss:
         return protocol.say('i', taught or MISS)
     stamp = os.path.join(paths.DIR, 'tip')

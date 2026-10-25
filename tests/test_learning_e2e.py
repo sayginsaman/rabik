@@ -53,9 +53,8 @@ class Ask(unittest.TestCase):
 
     def ask(self, words, reply='', cmds=(), ok=True):
         """One spoken ask. The fake model answers only if the instant path did not; returns (shown answer, Learned pill, model used)."""
-        fake_run = Mock(return_value=(reply, 0, []))
-        fake_run.ok, fake_run.modes, fake_run.cmds, fake_run.ran = ok, {'text'}, list(cmds), list(cmds)
-        fake_run.observed = [{'action': c, 'error': False, 'result': 'done'} for c in cmds]
+        fake_run = Mock(return_value=brain.ask.RunResult(reply, 0, [], ok=ok, cmds=list(cmds), ran=list(cmds),
+                                                         observed=[{'action': c, 'error': False, 'result': 'done'} for c in cmds]))
         say, tip = Mock(), Mock()
         with patch('sys.argv', ['rabik.py', words]), tests.patches(patch.multiple(brain.ask, run=fake_run),
                                                                    patch.multiple(brain.protocol, say=say),
@@ -209,7 +208,7 @@ class WorkModeTests(Ask):
         self.assertEqual(self.calls[2:], [('Other Fixture', 'fullscreen', 'laptop'), ('Fixture Board', 'fullscreen', 'monitor')])
 
     def test_plain_moves_stay_parallel(self):
-        with patch.object(threading, 'Thread', THREAD): self.assertEqual(brain.instant.fast('Fixture Board left, Other Fixture right'), 'Fixture Board: left; Other Fixture: right.')
+        with patch.object(threading, 'Thread', THREAD): self.assertEqual(brain.instant.fast('Fixture Board left, Other Fixture right').reply, 'Fixture Board: left; Other Fixture: right.')
 
     def test_a_failed_replay_keeps_the_users_shortcut_when_the_redo_works(self):
         self.ask('When I say work mode, full screen Fixture Board on my laptop and full screen Other Fixture on my monitor')

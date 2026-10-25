@@ -32,7 +32,7 @@ class ReplayTests(unittest.TestCase):
     def test_legacy_three_steps_upgrade_and_replay_native_actions_without_ai_or_reads(self):
         (self.root/'skills.json').write_text(json.dumps({'make a fixture meeting':{'cmds':self.commands,'reply':'Started.','mine':True}}))
         with patch.object(brain.web,'show',return_value='opened Fixture in the background') as show,patch.object(brain.hands,'hands',return_value=('Clicked',True)) as hands,patch.object(subprocess,'run') as shell,patch.object(brain.clients,'start_claude') as ai:
-            self.assertEqual(brain.instant.fast('Please start a new fixture meeting'),'Started.')
+            self.assertEqual(brain.instant.fast('Please start a new fixture meeting').reply,'Started.')
         show.assert_called_once_with('Fixture',True);hands.assert_called_once_with('menu','com.rabik.fixture','Fixture > Start meeting')
         shell.assert_not_called();ai.assert_not_called();self.assertEqual(len(brain.skills.skills()['make a fixture meeting']['cmds']),2)
 
@@ -57,7 +57,7 @@ class ReplayTests(unittest.TestCase):
         brain.skills.save_skills({'put fixture alpha left':{'cmds':['open -a "Fixture Alpha"'],'reply':'Done.','mine':True}})
         resolve=lambda name:{'fixture alpha':'Fixture Alpha','fixture beta':'Fixture Beta'}.get(name.lower())
         with patch.object(brain.apps,'app_named',side_effect=resolve),patch.object(brain.web,'show',return_value='opened'),patch.object(brain.tips,'tip'):
-            self.assertEqual(brain.instant.fast('when I say layout mode, put fixture beta left'),'Done.')
+            self.assertEqual(brain.instant.fast('when I say layout mode, put fixture beta left').reply,'Done.')
         command=brain.skills.skills()['layout mode']['cmds'][0]
         self.assertIn('Fixture Beta',command);self.assertNotIn('Fixture Alpha',command)
 
@@ -90,13 +90,13 @@ class ReplayTests(unittest.TestCase):
         play='osascript -e \'tell application "Fixture" to play\''
         (self.root/'skills.json').write_text(json.dumps({'unpause fixture':{'cmds':[play],'reply':'Fixture is playing. The first check still showed it paused, but a second check confirmed it.'}}))
         with patch.object(subprocess,'run',return_value=subprocess.CompletedProcess([],0,'','')):
-            self.assertEqual(brain.instant.fast('unpause fixture'),'Fixture is playing.')
+            self.assertEqual(brain.instant.fast('unpause fixture').reply,'Fixture is playing.')
         for whole in ['Done: focus mode.','Typed "Hi! See you." into Mail.','Opened 10 Hail Pl. Tell me the city.','Playing 1M. It runs in the background.','I typed your reply into the mail box. It isn’t sent yet.','Notes is open. Do not close it.']:
             self.assertEqual(brain.skills.outcome(whole),whole)
 
     def test_unsupported_peekaboo_falls_back_without_running(self):
         brain.skills.save_skills({'do fixture':{'cmds':['peekaboo click --id 12'],'reply':'Done.','mine':True}})
-        with patch.object(subprocess,'run') as run:self.assertIsNone(brain.skills.replay('do fixture'));run.assert_not_called()
+        with patch.object(subprocess,'run') as run:self.assertIsNone(brain.skills.replay('do fixture').reply);run.assert_not_called()
         self.assertIsNone(brain.skills.shortcut_commands('do fixture',[self.commands[-1]+' && open -a Fixture']))
         self.assertIsNone(brain.skills.shortcut_commands('do fixture',[shlex.quote(brain.paths.ME)+' ask again']))
         reply,saved=brain.skills.remember_workflow('nested fixture',f'Done. [workflow nested fixture | Use the native app.] [replay python3 {shlex.quote(brain.paths.ME)} ask again]',True,['open Fixture'])
@@ -117,7 +117,7 @@ class ReplayTests(unittest.TestCase):
     def test_failed_direct_open_falls_back_instead_of_claiming_success(self):
         brain.skills.save_skills({'open fixture':{'cmds':[brain.paths.SHOW+' Fixture'],'reply':'Opened.','mine':True}})
         with patch.object(brain.web,'show',return_value='no app or file called "Fixture"'):
-            self.assertIsNone(brain.skills.replay('open fixture'))
+            self.assertIsNone(brain.skills.replay('open fixture').reply)
 
     def test_recent_memory_creates_missing_scratch_directory(self):
         missing=self.root/'new';recent=missing/'recent.jsonl'
@@ -133,16 +133,16 @@ class ReplayTests(unittest.TestCase):
             def __init__(self,*a,**kw): pass
             def start(self): pass
             def join(self,*a): pass
-        missing=self.root/'fresh';fake_run=unittest.mock.Mock(return_value=('Found them. [unlearn]',0,[]));fake_run.ok=True;fake_run.cmds=[];fake_run.ran=[];fake_run.observed=[]
+        missing=self.root/'fresh';fake_run=unittest.mock.Mock(return_value=brain.ask.RunResult('Found them. [unlearn]',0,[],ok=True))
         with patch.object(brain.paths,'DIR',str(missing)),patch.object(brain.paths,'RECENT',str(missing/'recent.jsonl')),patch.object(brain.paths,'MEMORY',str(missing/'memory.md')),patch.object(threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Find fixture notes']),tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
-                                                                                                                                                                                                                                                                                     patch.multiple(brain.instant, fast=lambda _:None),
+                                                                                                                                                                                                                                                                                     patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult(None)),
                                                                                                                                                                                                                                                                                      patch.multiple(brain.macos, front=lambda:('Fixture','Scratch'), osa=lambda *a:'', screens=lambda:[], describe=lambda *a:'Scratch display', restore_focus=lambda *a:None),
                                                                                                                                                                                                                                                                                      patch.multiple(brain.situation, selection_context=lambda:''),
                                                                                                                                                                                                                                                                                      patch.multiple(brain.screen, screen_for=lambda *a:None, look=lambda:[]),
                                                                                                                                                                                                                                                                                      patch.multiple(brain.ask, run=fake_run),
                                                                                                                                                                                                                                                                                      patch.multiple(brain.interaction, wait_commit=lambda:True),
                                                                                                                                                                                                                                                                                      patch.multiple(brain.protocol, say=lambda *a:None),
-                                                                                                                                                                                                                                                                                     patch.multiple(brain.tips, tip=lambda *a:None),
+                                                                                                                                                                                                                                                                                     patch.multiple(brain.tips, tip=lambda *a, **k: None),
                                                                                                                                                                                                                                                                                      patch.multiple(brain.hands, hands_map=lambda *a:None)):
             brain.cli.main();self.assertEqual(brain.memory.recent()[0]['a'],'Found them.');self.assertTrue((missing/'log.jsonl').exists())
         fake_run.assert_called_once()
@@ -159,10 +159,10 @@ class ReplayTests(unittest.TestCase):
         guarded='osascript -e \'tell application "Fixture"\' -e \'if player state is playing then pause\' -e \'end tell\''
         self.assertEqual(brain.skills.shortcut_commands('pause fixture',[guarded]),[guarded])
         def ask(task,reply,cmds):
-            fake_run=unittest.mock.Mock(return_value=(reply,0,[]));fake_run.ok=True;fake_run.cmds=cmds;fake_run.ran=cmds;fake_run.observed=[]
+            fake_run=unittest.mock.Mock(return_value=brain.ask.RunResult(reply,0,[],ok=True,cmds=cmds,ran=cmds))
             tip=unittest.mock.Mock()
             with patch.object(brain.paths,'DIR',str(self.root)),patch.object(brain.paths,'RECENT',str(self.root/'recent.jsonl')),patch.object(brain.paths,'MEMORY',str(self.root/'memory.md')),patch.object(threading,'Thread',NoThread),patch('sys.argv',['rabik.py',task]),tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
-                                                                                                                                                                                                                                                                               patch.multiple(brain.instant, fast=lambda _:None),
+                                                                                                                                                                                                                                                                               patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult(None)),
                                                                                                                                                                                                                                                                                patch.multiple(brain.macos, front=lambda:('Fixture','Scratch'), osa=lambda *a:'', screens=lambda:[], describe=lambda *a:'Scratch display', restore_focus=lambda *a:None, cached_hands=lambda:None),
                                                                                                                                                                                                                                                                                patch.multiple(brain.situation, selection_context=lambda:''),
                                                                                                                                                                                                                                                                                patch.multiple(brain.screen, screen_for=lambda *a:None, look=lambda:[]),
@@ -186,18 +186,18 @@ class ReplayTests(unittest.TestCase):
         resolve=lambda name: 'Fixture' if name == 'fixture display' else None
         with patch.object(brain.apps,'app_named',side_effect=resolve),patch.object(brain.apps,'app_id',return_value='com.example.fixture') as app_id, \
              patch.object(brain.apps,'quit_app',return_value=True) as quit_app,patch.object(brain.skills,'replay') as replay:
-            self.assertEqual(brain.instant.fast('close fixture display'),'Closed Fixture.')
+            self.assertEqual((done := brain.instant.fast('close fixture display')).reply,'Closed Fixture.')
             app_id.assert_called_once_with('Fixture');quit_app.assert_called_once_with('com.example.fixture');replay.assert_not_called()
-            self.assertIn('application id "com.example.fixture"',brain.instant.fast.cmds[0])
-            self.assertIsNone(brain.instant.fast('close this tab'))
-            self.assertIsNone(brain.instant.fast('close the window'))
+            self.assertIn('application id "com.example.fixture"',done.cmds[0])
+            self.assertIsNone((done := brain.instant.fast('close this tab')).reply)
+            self.assertIsNone((done := brain.instant.fast('close the window')).reply)
         with patch.object(brain.apps,'app_named',side_effect=resolve),patch.object(brain.apps,'app_id',return_value='com.example.fixture'), \
              patch.object(brain.apps,'quit_app',return_value=False):
-            self.assertEqual(brain.instant.fast('quit fixture display'),'Fixture is still open.')
-            self.assertEqual(brain.instant.fast.cmds,[])
+            self.assertEqual((done := brain.instant.fast('quit fixture display')).reply,'Fixture is still open.')
+            self.assertEqual(done.cmds,[])
         with patch.object(brain.apps,'app_named',return_value='Fixture'),patch.object(brain.apps,'app_id',return_value='com.example.fixture') as app_id, \
              patch.object(brain.apps,'quit_app',return_value=True) as quit_app,patch.object(subprocess,'run') as shell:
-            self.assertEqual(brain.skills.replay('end fixture'),'Ended.')
+            self.assertEqual(brain.skills.replay('end fixture').reply,'Ended.')
             app_id.assert_called_once_with('Fixture');quit_app.assert_called_once_with('com.example.fixture');shell.assert_not_called()
         with patch.object(brain.apps,'app_running',side_effect=[True,True,False]),patch.object(brain.macos,'osa') as osa,patch.object(time,'sleep'):
             self.assertTrue(brain.apps.quit_app('com.example.fixture'))
@@ -208,20 +208,20 @@ class ReplayTests(unittest.TestCase):
         brain.skills.save_skills({'hide fixture':{'cmds':[command],'reply':'Fixture is hidden.','mine':True}})
         worker=unittest.mock.Mock(returncode=0,stdout='fixture became hidden\n',stderr='')
         with patch.object(subprocess,'run',return_value=worker),patch.object(brain.macos,'preview_commands'):
-            answer=brain.instant.fast('hide fixture')
+            done=brain.instant.fast('hide fixture');answer=done.reply
         self.assertEqual(answer,'Fixture is hidden.')
-        brain.memory.remember_turn('hide fixture',answer,brain.instant.fast.shortcut)
+        brain.memory.remember_turn('hide fixture',answer,done.shortcut)
 
         class NoThread:
             def __init__(self,*a,**kw): pass
             def start(self): pass
             def join(self,*a): pass
-        fake_run=unittest.mock.Mock(return_value=('Fixture is hidden now. [unlearn] [workflow hide fixture | Hide it, then check.]',0,[]))
-        fake_run.ok=True;fake_run.cmds=fake_run.ran=[command];fake_run.observed=[{'action':command,'error':False,'result':'verified hidden'}]
+        fake_run=unittest.mock.Mock(return_value=brain.ask.RunResult('Fixture is hidden now. [unlearn] [workflow hide fixture | Hide it, then check.]',0,[],
+                                    ok=True,cmds=[command],ran=[command],observed=[{'action':command,'error':False,'result':'verified hidden'}]))
         say=unittest.mock.Mock()
         with patch.object(threading,'Thread',NoThread),patch('sys.argv',['rabik.py','It is still visible']), \
              tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
-                           patch.multiple(brain.instant, fast=lambda _:None),
+                           patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, front=lambda:('Fixture','Scratch'), osa=lambda *a:'', screens=lambda:[], describe=lambda *a:'Scratch display', restore_focus=lambda *a:None),
                            patch.multiple(brain.situation, selection_context=lambda:''),
                            patch.multiple(brain.screen, screen_for=lambda *a:None, look=lambda:[]),
@@ -229,7 +229,7 @@ class ReplayTests(unittest.TestCase):
                            patch.multiple(brain.ask, run=fake_run),
                            patch.multiple(brain.interaction, wait_commit=lambda:True),
                            patch.multiple(brain.protocol, say=say),
-                           patch.multiple(brain.tips, tip=lambda *a:None),
+                           patch.multiple(brain.tips, tip=lambda *a, **k: None),
                            patch.multiple(brain.hands, hands_map=lambda *a:None)):
             brain.cli.main()
         self.assertEqual(say.call_args.args[1],'Fixture is hidden now.')   # no control tag shows, and the redo saves nothing
@@ -246,18 +246,17 @@ class ReplayTests(unittest.TestCase):
         brain.skills.save_skills({'hide fixture':{'cmds':[command],'reply':'Fixture is hidden.','mine':True}})
         worker=unittest.mock.Mock(returncode=0,stdout='fixture became hidden\n',stderr='')
         with patch.object(subprocess,'run',return_value=worker),patch.object(brain.macos,'preview_commands'):
-            answer=brain.instant.fast('hide fixture')
-        brain.memory.remember_turn('hide fixture',answer,brain.instant.fast.shortcut)
+            done=brain.instant.fast('hide fixture');answer=done.reply
+        brain.memory.remember_turn('hide fixture',answer,done.shortcut)
 
         class NoThread:
             def __init__(self,*a,**kw): pass
             def start(self): pass
             def join(self,*a): pass
-        fake_run=unittest.mock.Mock(return_value=('The unrelated answer.',0,[]))
-        fake_run.ok=True;fake_run.cmds=fake_run.ran=[];fake_run.observed=[]
+        fake_run=unittest.mock.Mock(return_value=brain.ask.RunResult('The unrelated answer.',0,[],ok=True))
         with patch.object(threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Explain an unrelated topic']), \
              tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
-                           patch.multiple(brain.instant, fast=lambda _:None),
+                           patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, front=lambda:('Fixture','Scratch'), osa=lambda *a:'', screens=lambda:[], describe=lambda *a:'Scratch display', restore_focus=lambda *a:None),
                            patch.multiple(brain.situation, selection_context=lambda:''),
                            patch.multiple(brain.screen, screen_for=lambda *a:None, look=lambda:[]),
@@ -265,7 +264,7 @@ class ReplayTests(unittest.TestCase):
                            patch.multiple(brain.ask, run=fake_run),
                            patch.multiple(brain.interaction, wait_commit=lambda:True),
                            patch.multiple(brain.protocol, say=lambda *a:None),
-                           patch.multiple(brain.tips, tip=lambda *a:None),
+                           patch.multiple(brain.tips, tip=lambda *a, **k: None),
                            patch.multiple(brain.hands, hands_map=lambda *a:None)):
             brain.cli.main()
         self.assertIn('Previous learned shortcut',fake_run.call_args.args[0])
@@ -276,12 +275,11 @@ class ReplayTests(unittest.TestCase):
             def __init__(self,*a,**kw): pass
             def start(self): pass
             def join(self,*a): pass
-        fake_run=unittest.mock.Mock(return_value=('Done. [unlearn]',0,[]))
-        fake_run.ok=True;fake_run.cmds=fake_run.ran=[];fake_run.observed=[]
+        fake_run=unittest.mock.Mock(return_value=brain.ask.RunResult('Done. [unlearn]',0,[],ok=True))
         say=unittest.mock.Mock()
         with patch.object(threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Do the fixture task']), \
              tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
-                           patch.multiple(brain.instant, fast=lambda _:None),
+                           patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, front=lambda:('Fixture','Scratch'), osa=lambda *a:'', screens=lambda:[], describe=lambda *a:'Scratch display', restore_focus=lambda *a:None),
                            patch.multiple(brain.situation, selection_context=lambda:''),
                            patch.multiple(brain.screen, screen_for=lambda *a:None, look=lambda:[]),
@@ -289,7 +287,7 @@ class ReplayTests(unittest.TestCase):
                            patch.multiple(brain.ask, run=fake_run),
                            patch.multiple(brain.interaction, wait_commit=lambda:True),
                            patch.multiple(brain.protocol, say=say),
-                           patch.multiple(brain.tips, tip=lambda *a:None),
+                           patch.multiple(brain.tips, tip=lambda *a, **k: None),
                            patch.multiple(brain.hands, hands_map=lambda *a:None)):
             brain.cli.main()
         self.assertEqual(say.call_args.args[1],'Done.')
@@ -300,24 +298,23 @@ class ReplayTests(unittest.TestCase):
         brain.skills.save_skills({'bye fixture':{'cmds':[quit],'reply':'Fixture is closed.','mine':True}})
         with tests.patches(patch.multiple(brain.apps, app_id=lambda *a:'com.example.fixture', app_named=lambda *a:None),
                            patch.multiple(brain.macos, osa=lambda *a,**k:'')),patch.object(brain.apps,'app_running',side_effect=[True,False]),patch.object(time,'sleep'),patch.object(subprocess,'run') as shell:
-            self.assertEqual(brain.instant.fast('bye fixture'),'Fixture is closed.')   # verified: the same instant reply
-            self.assertIsNone(brain.instant.fast.failed);shell.assert_not_called()
+            self.assertEqual((done := brain.instant.fast('bye fixture')).reply,'Fixture is closed.')   # verified: the same instant reply
+            self.assertIsNone(done.failed);shell.assert_not_called()
         with patch.object(brain.macos,'wants_focus',return_value=True),tests.patches(patch.multiple(brain.apps, app_id=lambda *a:'com.example.fixture', app_named=lambda *a:None),
                                                                                patch.multiple(brain.macos, osa=lambda *a,**k:'')),patch.object(time,'sleep'),patch.object(brain.macos,'preview_commands'), \
              patch.object(subprocess,'run',return_value=subprocess.CompletedProcess([],0,'','')):
             brain.skills.save_skills({**brain.skills.skills(),'show fixture':{'cmds':['open -a Fixture'],'reply':'Opened.','mine':True}})
-            with patch.object(brain.apps,'app_running',return_value=False): self.assertIsNone(brain.skills.replay('show fixture'))
-            self.assertEqual(brain.skills.replay.ran[-1],'Fixture => not running')
-            with patch.object(brain.apps,'app_running',return_value=True): self.assertEqual(brain.skills.replay('show fixture'),'Opened.')
+            with patch.object(brain.apps,'app_running',return_value=False): self.assertIsNone((replayed := brain.skills.replay('show fixture')).reply)
+            self.assertEqual(replayed.ran[-1],'Fixture => not running')
+            with patch.object(brain.apps,'app_running',return_value=True): self.assertEqual((replayed := brain.skills.replay('show fixture')).reply,'Opened.')
 
         class NoThread:
             def __init__(self,*a,**kw): pass
             def start(self): pass
             def join(self,*a): pass
         replacement=brain.paths.HANDS+" menu com.example.fixture 'Fixture > Quit'"
-        fake_run=unittest.mock.Mock(return_value=('Fixture is closed now; the shortcut had not quit it. [unlearn]',0,[]))
-        fake_run.ok=True;fake_run.cmds=fake_run.ran=[replacement]
-        fake_run.observed=[{'action':replacement,'error':False,'result':'Fixture closed'}]
+        fake_run=unittest.mock.Mock(return_value=brain.ask.RunResult('Fixture is closed now; the shortcut had not quit it. [unlearn]',0,[],ok=True,
+                                    cmds=[replacement],ran=[replacement],observed=[{'action':replacement,'error':False,'result':'Fixture closed'}]))
         say,tip=unittest.mock.Mock(),unittest.mock.Mock()
         with patch.object(threading,'Thread',NoThread),patch('sys.argv',['rabik.py','bye fixture']),patch.object(brain.apps,'app_running',return_value=True),patch.object(time,'sleep'), \
              tests.patches(patch.multiple(brain.apps, app_id=lambda *a:'com.example.fixture', app_named=lambda *a:None),
@@ -359,18 +356,18 @@ class ReplayTests(unittest.TestCase):
         brain.storage.private_json(str(agent/'context.json'),{'id':'a'*32,'status':'done','created':time.time(),
                                                        'brief':'Find a useful post','links':[url]})
         (self.root/'worked.json').write_text(json.dumps({'app':'Reader Fixture','window':'Earlier post'}))
-        fake_run=unittest.mock.Mock(return_value=('Opened the earlier post.',0,[]));fake_run.ok=True;fake_run.cmds=[];fake_run.ran=[];fake_run.observed=[]
+        fake_run=unittest.mock.Mock(return_value=brain.ask.RunResult('Opened the earlier post.',0,[],ok=True))
         with patch.object(brain.paths,'RECENT',str(self.root/'recent.jsonl')),patch.object(brain.paths,'MEMORY',str(self.root/'memory.md')):
             brain.memory.remember_turn('Find a useful post','Opened '+url)
             with patch.object(threading,'Thread',NoThread),patch('sys.argv',['rabik.py','Open that post you opened']),tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
-                                                                                                                                          patch.multiple(brain.instant, fast=lambda _:None),
+                                                                                                                                          patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult(None)),
                                                                                                                                           patch.multiple(brain.macos, front=lambda:('Fixture','Scratch'), osa=lambda *a:'', screens=lambda:[], describe=lambda *a:'Scratch display', restore_focus=lambda *a:None),
                                                                                                                                           patch.multiple(brain.situation, selection_context=lambda:''),
                                                                                                                                           patch.multiple(brain.screen, screen_for=lambda *a:None, look=lambda:[]),
                                                                                                                                           patch.multiple(brain.ask, run=fake_run),
                                                                                                                                           patch.multiple(brain.interaction, wait_commit=lambda:True),
                                                                                                                                           patch.multiple(brain.protocol, say=lambda *a:None),
-                                                                                                                                          patch.multiple(brain.tips, tip=lambda *a:None),
+                                                                                                                                          patch.multiple(brain.tips, tip=lambda *a, **k: None),
                                                                                                                                           patch.multiple(brain.hands, hands_map=lambda *a:None)):
                 brain.cli.main()
         prompt=fake_run.call_args.args[0]

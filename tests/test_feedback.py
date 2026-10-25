@@ -52,7 +52,7 @@ class FeedbackTests(unittest.TestCase):
                 self.assertIn('! feedback', out.getvalue())
                 self.assertIn('Review your feedback', out.getvalue())
             with patch.dict(os.environ, {'RABIK_LIVE': '1'}, clear=True), patch('sys.stdout', new_callable=io.StringIO) as out:
-                self.assertIsNone(brain.instant.fast(request)); self.assertEqual(out.getvalue(), '')
+                self.assertIsNone(brain.instant.fast(request).reply); self.assertEqual(out.getvalue(), '')
 
     def test_a_request_about_keys_is_an_ordinary_ask(self):
         # Atticus kept an unused $5 Gumroad check on every ask: "key bindings" went to Gumroad's license API and got

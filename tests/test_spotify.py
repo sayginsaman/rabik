@@ -189,10 +189,10 @@ class SpotifyTests(unittest.TestCase):
              patch.dict(os.environ, {'RABIK_LIVE': '1'}):
             for request in ('add Fixture song to my queue', 'queue Fixture song next'):
                 with self.subTest(request=request):
-                    self.assertEqual(brain.instant.fast(request), 'Added Fixture song to your Spotify queue.')
+                    self.assertEqual(brain.instant.fast(request).reply, 'Added Fixture song to your Spotify queue.')
                     queue.assert_called_with('fixture song')
             queue.reset_mock()
-            self.assertIsNone(brain.instant.fast('add it to my queue'))
+            self.assertIsNone(brain.instant.fast('add it to my queue').reply)
             queue.assert_not_called()
 
     def test_queue_cli_and_step_label(self):

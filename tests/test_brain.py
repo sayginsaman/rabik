@@ -105,12 +105,25 @@ class BrainTests(unittest.TestCase):
         with patch.object(brain.turn, 'STOPPING', True), self.assertRaises(InterruptedError):
             brain.hands.hands_call(['state'])
 
-    def test_log_turn_still_falls_back_to_the_last_replay(self):
-        # turn sits below skills: it reads the last replay's steps through the hook rabik.py sets
-        with patch.object(brain.turn, 'TURN', {}), patch.object(brain.skills.replay, 'ran', ['open -a Notes'], create=True), \
-                patch.object(brain.storage, 'append_log') as log:
+    def test_no_function_keeps_state_on_itself(self):
+        # run.ok, fast.cmds and replay.ran were a hidden second return value, stale from the last call and written from
+        # several threads: run(), fast() and replay() return RunResult, FastResult and ReplayResult instead.
+        modules = {path.stem for path in MODULES}
+        for path in MODULES:
+            tree = ast.parse(path.read_text())
+            functions = {n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+            writes = [n.lineno for n in ast.walk(tree) if isinstance(n, ast.Attribute) and isinstance(n.ctx, ast.Store) and (
+                isinstance(n.value, ast.Name) and n.value.id in functions or
+                isinstance(n.value, ast.Attribute) and isinstance(n.value.value, ast.Name) and n.value.value.id in modules)]
+            with self.subTest(path.name):
+                self.assertEqual(writes, [])
+
+    def test_a_replay_reaches_the_ask_log_through_its_result(self):
+        # log_turn logs what it is given; main() passes the replayed shortcut's steps from fast()'s result.
+        with patch.object(brain.turn, 'TURN', {}), patch.object(brain.storage, 'append_log') as log:
+            brain.turn.log_turn('open notes', 'Done.', time.time(), ran=['open -a Notes  => ok'])
             brain.turn.log_turn('open notes', 'Done.', time.time())
-        self.assertEqual(log.call_args.args[0]['ran'], ['open -a Notes'])
+        self.assertEqual([c.args[0]['ran'] for c in log.call_args_list], [['open -a Notes  => ok'], []])
 
     def test_the_helper_path_is_the_entry_script(self):
         self.assertEqual(brain.paths.ME, str(ROOT / 'rabik.py'))

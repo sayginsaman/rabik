@@ -6,27 +6,46 @@ import shlex
 import subprocess
 import time
 import urllib.parse
+from dataclasses import dataclass, field
 from pathlib import Path
 from brain import apps, hands, macos, paths, prefs, protocol, skills, spotify, telemetry, tips, web, windows, wording
 
-__all__ = ['fast']
+__all__ = ['FastResult', 'fast']
+
+
+@dataclass
+class FastResult:
+    """What an instant command did: its reply (None hands the ask to the AI), the commands a shortcut may learn from it,
+    the shortcut it replayed or taught, a replay that failed for the AI to redo, and the steps a replay ran (ask log)."""
+    reply: object = None
+    cmds: list = field(default_factory=list)
+    shortcut: object = None
+    failed: object = None
+    ran: list = field(default_factory=list)
 
 
 def fast(text):
     """Simple commands with no AI: learned shortcuts, open <app/site>, close <app>, snap/move <it/app> left/right/full/center, to laptop/monitor.
-    Returns a reply, or None to hand the request to Haiku."""
-    fast.cmds = []
-    fast.shortcut = fast.failed = None
+    Its reply is None to hand the request to Haiku."""
+    result = FastResult()
+    result.reply = _fast(text, result)
+    return result
+
+
+def _fast(text, result):
+    """fast()'s work. A nested step ("open X", then "move X") starts over on the same result, as a fresh call did."""
+    result.cmds = []
+    result.shortcut = result.failed = None
     text = text.strip()
     named = skills.named_shortcut(text)
     if named and prefs.pref('learn', True):
         if os.environ.get('RABIK_LIVE') == '1': return None
         name, action = (named[1] or named[2]).strip(), text[named.end():].strip(' ,:;')
         if hands.hands_command(wording.plain(action)) or skills.named_shortcut(action): return None
-        reply = action and fast(action)
-        if reply and skills.learn(name, fast.cmds, reply, text) is not None:
-            output = fast.shortcut['output'] if fast.shortcut else [reply]
-            fast.shortcut = {'key': wording.plain(name), 'commands': fast.cmds, 'output': output}
+        reply = action and _fast(action, result)
+        if reply and skills.learn(name, result.cmds, reply, text) is not None:
+            output = result.shortcut['output'] if result.shortcut else [reply]
+            result.shortcut = {'key': wording.plain(name), 'commands': result.cmds, 'output': output}
             tips.tip(reply, f'Learned: Say “{name}” any time.')
             return reply
         return None
@@ -54,23 +73,24 @@ def fast(text):
             return None
         if not apps.quit_app(bid):
             return f'{app} is still open.'
-        fast.cmds = [shlex.join(['osascript', '-e', f'tell application id "{bid}" to quit'])]
+        result.cmds = [shlex.join(['osascript', '-e', f'tell application id "{bid}" to quit'])]
         return f'Closed {app}.'
     sk, g = (skills.skills() if prefs.pref('learn', True) else {}), wording.gist(t)
     k, swap = (t, None) if t in sk else (None, None) if wording.DEICTIC.search(t) or not g else skills.like(g, sk)   # same words that matter, any order or filler, or another app
     if k:
         if os.environ.get('RABIK_LIVE') == '1':
             return None   # even a shortcut named "open Spotify" waits for confirmed words
-        r = skills.replay(k, swap)
-        if r:
-            fast.cmds = skills.replay.commands
-            fast.shortcut = {'key': t if swap else k, 'commands': skills.replay.commands, 'output': skills.replay.ran}
-            return r
-        if skills.replay.ran:   # it acted, then a step failed or its check contradicted: never another instant reply, the AI redoes it
-            fast.failed = {'key': k, 'commands': skills.replay.commands, 'output': skills.replay.ran, 'failed_at': skills.replay.failed_at}
+        replayed = skills.replay(k, swap)
+        result.ran = replayed.ran
+        if replayed.reply:
+            result.cmds = replayed.commands
+            result.shortcut = {'key': t if swap else k, 'commands': replayed.commands, 'output': replayed.ran}
+            return replayed.reply
+        if replayed.ran:   # it acted, then a step failed or its check contradicted: never another instant reply, the AI redoes it
+            result.failed = {'key': k, 'commands': replayed.commands, 'output': replayed.ran, 'failed_at': replayed.failed_at}
             if telemetry.telemetry_enabled():
                 telemetry.report_error('replay', shortcut=hashlib.sha256((telemetry.install_id() + '\0' + k).encode()).hexdigest()[:16],
-                             failed_at=skills.replay.failed_at)
+                             failed_at=replayed.failed_at)
             return None
     site = re.fullmatch(r'(?:search(?: up)?|google|look up) ([a-z0-9][\w.-]*) for (.+)', t)
     m = site or re.fullmatch(r'(?:search(?: up)?|google|look up)(?: for)? (.+)', t)
@@ -81,30 +101,30 @@ def fast(text):
                   'https://www.google.com/search?q=' + urllib.parse.quote(query))
         if not str(web.show(target, bg=True)).startswith('opened '):
             return None
-        fast.cmds = [f'{paths.SHOW} --bg {shlex.quote(target)}']
+        result.cmds = [f'{paths.SHOW} --bg {shlex.quote(target)}']
         return f'Searched {query}' + (f' on {site[1]}.' if site else '.')
     m = re.fullmatch(r'play (?:my |the )?(?:spotify )?(?:playlist )?(?:called |named )?(.+?)( playlist)?( on spotify)?', t)
     if m and not wording.DEICTIC.search(m[1]) and not wording.MORE.search(m[1]):   # "play X" alone may mean a video: only the user's playlist here, anything else goes to the AI (which uses --play)
         reply = spotify.play(m[1], anything=bool(m[3]))
-        if reply and reply.startswith('Playing '): fast.cmds = [f'{paths.PLAY} {shlex.quote(m[1])}']
+        if reply and reply.startswith('Playing '): result.cmds = [f'{paths.PLAY} {shlex.quote(m[1])}']
         return reply
     m = re.fullmatch(r'(?:add|put) (.+?) (?:to|in|on) (?:my |the )?(?:spotify )?queue|queue (.+?)(?: next)?', t)
     name = (m[1] or m[2]).removeprefix('the song ').removeprefix('song ') if m else ''
     if name and not wording.DEICTIC.search(name) and not wording.MORE.search(name):
         reply = spotify.queue(name)
-        if reply.startswith('Added '): fast.cmds = [f'{paths.QUEUE} {shlex.quote(name)}']
+        if reply.startswith('Added '): result.cmds = [f'{paths.QUEUE} {shlex.quote(name)}']
         return reply
     m = re.fullmatch(r'(?:open(?: up)?|launch|start|pull up|bring up|focus(?: on)?|switch to|go to)\s+(?!up$)(.+?)'
                      r'(?:\s+(?:on|to|in|at)\s+(?:the\s+|my\s+)?(left|right|full ?screen|center|middle|laptop|monitor)(?:\s+(?:side|half|screen))?)?', t)
     if m and m[2]:   # "open Chrome on my monitor": open it, then the move command below
         if not macos.asks_front(text): macos.free_focus(user=True)   # the inner "open" skips this, as if allow_focus had seen these words
-        if not fast(f'open {m[1]}'):
+        if not _fast(f'open {m[1]}', result):
             return None
-        opened = fast.cmds[:]
+        opened = result.cmds[:]
         for _ in range(20):   # a just-launched app needs a moment for its window
-            r = fast(f'move {m[1]} to {m[2]}')
+            r = _fast(f'move {m[1]} to {m[2]}', result)
             if r:
-                fast.cmds = opened + fast.cmds
+                result.cmds = opened + result.cmds
                 return r
             time.sleep(0.1)
         return None
@@ -120,7 +140,7 @@ def fast(text):
                 return None
             if opened.returncode:
                 return None
-            fast.cmds = ['open ' + shlex.quote(site if site.startswith(('https://', 'http://')) else 'https://' + site)]
+            result.cmds = ['open ' + shlex.quote(site if site.startswith(('https://', 'http://')) else 'https://' + site)]
             return f'Opened {target}.'
         app = apps.app_named(target) or apps.app_heard(target)
         if not app:
@@ -136,7 +156,7 @@ def fast(text):
                 return None
             if opened.returncode:
                 return None
-        fast.cmds = [f'{paths.SHOW} {shlex.quote(app)}']
+        result.cmds = [f'{paths.SHOW} {shlex.quote(app)}']
         Path(paths.LAST).write_text(app)
         return f'Opened {app}.'
     parts = [wording.plain(p) for p in re.split(r'\s*(?:[,;]|\band then\b|\band\b|\bthen\b)\s*', text) if wording.plain(p)]
@@ -146,7 +166,7 @@ def fast(text):
             out = windows.place_many([x for a, w, sc in moves for x in ('+', apps.proc_of(a), w, sc)][1:])   # as --place a + b does
             if windows.place_failed(out): return None
             if 'could not check' in out: return windows.model_note(out)
-            fast.cmds = [paths.PLACE + ' ' + ' + '.join(shlex.join([apps.proc_of(a), w, sc]) for a, w, sc in moves)]
+            result.cmds = [paths.PLACE + ' ' + ' + '.join(shlex.join([apps.proc_of(a), w, sc]) for a, w, sc in moves)]
             Path(paths.LAST).write_text(moves[-1][0])
             return '; '.join(f'{a}: {w.replace("fullscreen", "full screen")}' + (f' on {sc}' if sc != 'current' else '') for a, w, sc in moves) + '.'   # one sentence: a replay says the whole outcome
     m = windows.move_target(t)
@@ -157,6 +177,6 @@ def fast(text):
     if windows.place_failed(out):
         return None
     if 'could not check' in out: return windows.model_note(out)
-    fast.cmds = [paths.PLACE + ' ' + shlex.join([apps.proc_of(app), where, screen])]
+    result.cmds = [paths.PLACE + ' ' + shlex.join([apps.proc_of(app), where, screen])]
     Path(paths.LAST).write_text(app)
     return f'{app}: {where.replace("fullscreen", "full screen")}' + (f' on {screen}' if screen != 'current' else '') + '.'

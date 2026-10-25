@@ -198,13 +198,13 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
     def routing_ask(self, prefs, outcomes, *, quick=None, retry='n', tip=None):
         def attempt(*args, **kwargs):
             reply, ok, actions = outcomes[min(fake_run.call_count - 1, len(outcomes) - 1)]
-            fake_run.ok = ok; fake_run.cmds = actions[:] if ok else []; fake_run.ran = actions[:]; fake_run.handoff = None; fake_run.work = bool(actions)
-            fake_run.observed = [{'action': action, 'result': 'Verified fixture state', 'error': False} for action in actions]
             prior = Path(os.environ['RABIK_ASK'], 'prior-work.json'); fake_run.prior = json.loads(prior.read_text()) if prior.exists() else None   # the ask folder goes with main()
-            return reply, .001, actions[:]
+            fake_run.last = brain.ask.RunResult(reply, .001, actions[:], ok=ok, cmds=actions[:] if ok else [], ran=actions[:], work=bool(actions),
+                                                observed=[{'action': action, 'result': 'Verified fixture state', 'error': False} for action in actions])
+            return fake_run.last   # what main() reads, and changes, after this attempt
         fake_run = unittest.mock.Mock(side_effect=attempt)
         with tests.patches(patch.multiple(brain.telemetry, ping=lambda: None),
-                           patch.multiple(brain.instant, fast=lambda _: quick),
+                           patch.multiple(brain.instant, fast=lambda _: brain.instant.FastResult(quick)),
                            patch.multiple(brain.macos, front=lambda: ('Fixture', 'Scratch'), osa=lambda *a: '', screens=lambda: [], describe=lambda *a: '', restore_focus=lambda *a: None),
                            patch.multiple(brain.situation, selection_context=lambda: ''),
                            patch.multiple(brain.memory, relevant_rules=lambda _: '', recent=lambda: [], remember_turn=lambda *a: None),
@@ -212,7 +212,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                            patch.multiple(brain.screen, screen_for=lambda *a: None),
                            patch.multiple(brain.interaction, wait_commit=lambda: True),
                            patch.multiple(brain.ask, run=fake_run),
-                           patch.multiple(brain.tips, tip=tip or (lambda *a: None))), \
+                           patch.multiple(brain.tips, tip=tip or (lambda *a, **k: None))), \
              patch.object(brain.prefs, 'pref', side_effect=lambda k,d:prefs.get(k,d)), \
              patch.object(brain.interaction, 'ask_user', return_value=retry) as ask, \
              patch.object(brain.clients, 'start_ai', return_value=None) as start, \
@@ -226,7 +226,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
         tip = unittest.mock.Mock()
         self.routing_ask({'routing': 'cheapest'}, [('Opened.', True, ['open -a Notes'])], tip=tip)
         self.assertEqual(tip.call_args.args, ('Opened.', ''))
-        self.assertIn('do not have a verified procedure', brain.instant.fast('remember how to fixture task'))
+        self.assertIn('do not have a verified procedure', brain.instant.fast('remember how to fixture task').reply)
 
     def test_a_cursor_request_tells_the_model_to_return_an_insertable_draft(self):
         with patch.dict(os.environ, {'RABIK_CARET': '1'}):
@@ -252,7 +252,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                             self.assertIn('Verified fixture state', fake_run.call_args.args[0])
                             self.assertEqual(fake_run.prior['actions'], actions)
                             self.assertEqual(log.call_args.args[5], ['inspect','verify'])
-                            self.assertEqual(fake_run.cmds, [], 'a continuation must not teach a partial shortcut')
+                            self.assertEqual(fake_run.last.cmds, [], 'a continuation must not teach a partial shortcut')
                     else: start.assert_not_called()
         fake_run, start, ask, _ = self.routing_ask({'routing':'balanced', 'model':'opus'}, [('Stopped.',False,['inspect'])])
         self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('opus'); ask.assert_not_called()
@@ -334,13 +334,13 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                                       'Updated a background agent. Started an agent: Helmets.')):
             with self.subTest(first=first, handoff=handoff):
                 def attempt(*args, **kwargs):
-                    fake_run.ok = False; fake_run.cmds = []; fake_run.ran = ['attempt']
-                    fake_run.handoffs = handoff if isinstance(handoff, list) else [handoff]
-                    fake_run.handoff = fake_run.handoffs[0] if fake_run.call_count == 2 else None
-                    return ('', None, ['moved']) if fake_run.handoff else (first, .001, [])
+                    handoffs = handoff if isinstance(handoff, list) else [handoff]
+                    moved = handoffs[0] if fake_run.call_count == 2 else None
+                    return brain.ask.RunResult(*(('', None, ['moved']) if moved else (first, .001, [])), ok=False, ran=['attempt'], work=True,
+                                               handoff=moved, handoffs=handoffs)   # it acted, then failed: escalates or retries
                 fake_run = unittest.mock.Mock(side_effect=attempt)
                 with tests.patches(patch.multiple(brain.telemetry, ping=lambda: None),
-                                   patch.multiple(brain.instant, fast=lambda _: None),
+                                   patch.multiple(brain.instant, fast=lambda _: brain.instant.FastResult(None)),
                                    patch.multiple(brain.macos, front=lambda: ('Fixture', 'Scratch'), osa=lambda *a: '', screens=lambda: []),
                                    patch.multiple(brain.situation, selection_context=lambda: ''),
                                    patch.multiple(brain.memory, relevant_rules=lambda _: '', recent=lambda: [], remember_turn=unittest.mock.Mock()),
@@ -362,10 +362,10 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                 learn.assert_not_called()
 
     def test_partial_request_handoff_keeps_one_original_log_row(self):
-        fake_run=unittest.mock.Mock(return_value=('',None,[]));fake_run.handoff={'accepted':True};fake_run.handoffs=[fake_run.handoff];fake_run.ran=[];fake_run.ok=True
+        moved={'accepted':True};fake_run=unittest.mock.Mock(return_value=brain.ask.RunResult('',None,[],ok=True,handoff=moved,handoffs=[moved]))
         request=json.dumps({'front':'Fixture','task':'Original request','done':['Opened fixture.'],'remaining':'Finish it'})
         with tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
-                           patch.multiple(brain.instant, fast=lambda _:None),
+                           patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, allow_focus=lambda _:None, front=lambda:('Fixture','Scratch'), osa=lambda *a:'', screens=lambda:[]),
                            patch.multiple(brain.situation, selection_context=lambda:''),
                            patch.multiple(brain.memory, relevant_rules=lambda _:'', recent=lambda:[]),
@@ -387,9 +387,9 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
             def __init__(self, target=None, **_): self.target, self.starts = target, 0; self.made.append(self)
             def start(self): self.starts += 1
             def join(self, *_): pass
-        fake_run = unittest.mock.Mock(return_value=('Done.', 0, [])); fake_run.ok = True; fake_run.cmds = fake_run.ran = []; fake_run.observed = []
+        fake_run = unittest.mock.Mock(return_value=brain.ask.RunResult('Done.', 0, [], ok=True))
         with tests.patches(patch.multiple(brain.telemetry, ping=lambda: None),
-                           patch.multiple(brain.instant, fast=lambda _: None),
+                           patch.multiple(brain.instant, fast=lambda _: brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, front=lambda: ('Fixture', 'Scratch'), osa=lambda *a: '', screens=lambda: [], describe=lambda *a: '', restore_focus=lambda *a: None),
                            patch.multiple(brain.memory, me_line=lambda: '', relevant_rules=lambda _: '', recent=lambda: [], remember_turn=lambda *a: None),
                            patch.multiple(brain.situation, selection_context=lambda: ''),
@@ -397,7 +397,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                            patch.multiple(brain.screen, screen_for=lambda *a: None),
                            patch.multiple(brain.interaction, wait_commit=lambda: True),
                            patch.multiple(brain.ask, run=fake_run),
-                           patch.multiple(brain.tips, tip=lambda *a: None)), \
+                           patch.multiple(brain.tips, tip=lambda *a, **k: None)), \
              patch.object(threading, 'Thread', NoThread), patch('sys.argv', ['rabik.py', 'Do fixture']), \
              patch('sys.stdout', io.StringIO()):
             brain.cli.main()
@@ -405,10 +405,10 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
         self.assertIn('Text head unavailable', fake_run.call_args.args[0])
 
     def test_a_correction_reports_the_ask_not_the_answer_it_corrects(self):
-        fake_run = unittest.mock.Mock(return_value=('Done.', 0, [])); fake_run.ok = True; fake_run.cmds = fake_run.ran = []; fake_run.observed = []
+        fake_run = unittest.mock.Mock(return_value=brain.ask.RunResult('Done.', 0, [], ok=True))
         earlier = [{'t': time.time(), 'q': 'Summarize my inbox', 'a': 'Dana wrote about the lawsuit settlement'}]
         with tests.patches(patch.multiple(brain.telemetry, ping=lambda: None, POSTHOG_KEY='fixture-token'),
-                           patch.multiple(brain.instant, fast=lambda _: None),
+                           patch.multiple(brain.instant, fast=lambda _: brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, front=lambda: ('Fixture', 'Scratch'), osa=lambda *a: '', screens=lambda: [], describe=lambda *a: '', restore_focus=lambda *a: None),
                            patch.multiple(brain.memory, me_line=lambda: '', relevant_rules=lambda _: '', recent=lambda: earlier, remember_turn=lambda *a: None),
                            patch.multiple(brain.situation, selection_context=lambda: ''),
@@ -416,7 +416,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                            patch.multiple(brain.screen, screen_for=lambda *a: None),
                            patch.multiple(brain.interaction, wait_commit=lambda: True),
                            patch.multiple(brain.ask, run=fake_run),
-                           patch.multiple(brain.tips, tip=lambda *a: None)), \
+                           patch.multiple(brain.tips, tip=lambda *a, **k: None)), \
              patch.object(brain.prefs, 'pref', side_effect=lambda k, d: True if k == 'improve' else d), \
              patch.object(brain.telemetry, 'posthog') as sent, patch.object(threading, 'Thread'), \
              patch('sys.argv', ['rabik.py', 'no, I meant the work inbox']), patch('sys.stdout', io.StringIO()):
@@ -428,10 +428,10 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
     def test_front_window_is_one_system_events_call_and_displays_are_read_alongside(self):
         calls = []
         def osa(script, *_): calls.append(script); return 'Q3 plan, draft, -1400, 30' if 'of front window' in script else ''
-        fake_run = unittest.mock.Mock(return_value=('Done.', 0, [])); fake_run.ok = True; fake_run.cmds = fake_run.ran = []; fake_run.observed = []
+        fake_run = unittest.mock.Mock(return_value=brain.ask.RunResult('Done.', 0, [], ok=True))
         displays = unittest.mock.Mock(return_value=[('Built-in', 0, 0, 1470, 956, True), ('Acer', -1920, 0, 1920, 1080, False)])
         with tests.patches(patch.multiple(brain.telemetry, ping=lambda: None),
-                           patch.multiple(brain.instant, fast=lambda _: None),
+                           patch.multiple(brain.instant, fast=lambda _: brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, osa=osa, screens=displays, restore_focus=lambda *a: None),
                            patch.multiple(brain.screen, window_summary=lambda *a: {'text': 'Readable'}),
                            patch.multiple(brain.toolhelp, tool_help=lambda *a, **k: ''),
@@ -440,7 +440,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                            patch.multiple(brain.skills, workflows=lambda *a: '', remember_workflow=lambda task, reply, *a: (reply, False), learn=lambda *a: False),
                            patch.multiple(brain.interaction, wait_commit=lambda: True),
                            patch.multiple(brain.ask, run=fake_run),
-                           patch.multiple(brain.tips, tip=lambda *a: None)), \
+                           patch.multiple(brain.tips, tip=lambda *a, **k: None)), \
              patch.dict(os.environ, {'RABIK_FRONT': 'Notes', 'RABIK_UI': '1'}), patch('sys.argv', ['rabik.py', 'Do fixture']), patch('sys.stdout', io.StringIO()):
             brain.cli.main()
         prompt = fake_run.call_args.args[0]
@@ -510,7 +510,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
     def test_main_never_waits_for_background_tool_help(self):
         source = (Path(brain.paths.ME).parent / 'brain/cli.py').read_text()   # main()
         start = source.index('help_ = toolhelp.tool_help(task, cached_only=True)')
-        critical = source[start:source.index('reply, cost, steps = ask.run(', start)]
+        critical = source[start:source.index('attempt = ask.run(', start)]
         self.assertIn('threading.Thread(target=toolhelp.tool_help', critical)
         self.assertNotIn('helping.join', critical)
 
@@ -519,7 +519,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
             brain.tips.tip('Joined Zoom.')
         self.assertEqual(out.getvalue(), '')
         with patch.dict(os.environ, {'RABIK_UI': '1'}), patch('sys.stdout', new_callable=io.StringIO) as out:
-            brain.tips.tip('Could not join Zoom.')
+            brain.tips.tip('Could not join Zoom.', work=True)   # after an action: the reply admits it did not work
         self.assertIn(brain.tips.MISS, out.getvalue())
         with patch.dict(os.environ, {'RABIK_UI': '1'}), patch.object(brain.prefs, 'pref', return_value=False), \
              patch('sys.stdout', new_callable=io.StringIO) as out:
@@ -547,7 +547,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
             for request, url in [('Open github.com.', 'https://github.com'),
                                  ('Open github dot com', 'https://github.com'),
                                  ('Open https://github.com/SaarthurR/rabik?q=UI', 'https://github.com/SaarthurR/rabik?q=UI')]:
-                self.assertTrue(brain.instant.fast(request))
+                self.assertTrue(brain.instant.fast(request).reply)
                 self.assertEqual(run.call_args.args[0], ['open', url])
 
     def test_typing_uses_native_focus_and_clipboard_validation(self):
@@ -711,8 +711,8 @@ print(json.dumps(rabik.look(cleanup=sys.argv[3] != 'standalone')))
             p.stdin = io.StringIO(); p.ask = root; p.relaying = True; p.returncode = 0
             p.stdout = map(json.dumps, [use, denied, {'type': 'result', 'result': 'Sofia.'}])
             with patch.object(brain.protocol, 'say'):
-                reply, _, steps = brain.ask.run('fixture', p)
-            self.assertEqual((reply, steps, brain.ask.run.ok, brain.ask.run.error), ('Sofia.', [], True, ''))   # no failure card, no "Tool reported"
+                reply, _, steps = attempt = brain.ask.run('fixture', p)
+            self.assertEqual((reply, steps, attempt.ok, attempt.error), ('Sofia.', [], True, ''))   # no failure card, no "Tool reported"
             move = brain.handoffs.MainMove('fixture', p); move.record(use); move.record(denied)
             self.assertEqual(move.trace, {})   # three real steps move an ask; the redirect is not one
             open(os.path.join(root, 'searched'), 'w').close()
@@ -770,7 +770,7 @@ print('Ready.')
             try:
                 with patch.dict(os.environ, {'PATH': root + os.pathsep + os.environ['PATH'], 'DEVIN_LOG': str(log), 'DEVIN_REMOVED': str(removed)}), \
                      patch.object(brain.prefs, 'pref', side_effect=lambda k, d: 'devin' if k == 'client' else False if k == 'safe' else d):
-                    self.assertEqual(brain.ask.run_devin('Context: old Request: distractor', request='Write a note titled Request: Vacation')[0], 'Ready.')
+                    self.assertEqual(brain.ask.run_devin('Context: old Request: distractor', request='Write a note titled Request: Vacation').reply, 'Ready.')
             finally:
                 signal.signal(signal.SIGTERM, previous)
             args = json.loads(log.read_text())
@@ -812,12 +812,12 @@ raise SystemExit(4)
             try:
                 with patch.dict(os.environ, {'PATH': root + os.pathsep + os.environ['PATH']}), \
                      patch.object(brain.prefs, 'pref', side_effect=lambda k, d: 'devin' if k == 'client' else False if k == 'safe' else d):
-                    reply, _, _ = brain.ask.run_devin('test')
+                    reply, _, _ = attempt = brain.ask.run_devin('test')
             finally:
                 signal.signal(signal.SIGTERM, previous)
             self.assertIn('Devin stopped: fixture failure.', reply)
             self.assertIn('choose Set Up', reply)
-            self.assertFalse(brain.ask.run.ok)
+            self.assertFalse(attempt.ok)
 
     def test_devin_cleanup_failure_keeps_the_answer_and_does_not_retry_the_task(self):
         with tempfile.TemporaryDirectory() as root:
@@ -832,12 +832,12 @@ print('Ready.')
             try:
                 with patch.dict(os.environ, {'PATH': root + os.pathsep + os.environ['PATH']}), \
                      patch.object(brain.prefs, 'pref', side_effect=lambda k, d: 'devin' if k == 'client' else False if k == 'safe' else d):
-                    reply, _, _ = brain.ask.run_devin('test')
+                    reply, _, _ = attempt = brain.ask.run_devin('test')
             finally:
                 signal.signal(signal.SIGTERM, previous)
             self.assertIn('Ready.', reply)
             self.assertIn('could not delete Devin’s saved session', reply)
-            self.assertTrue(brain.ask.run.ok)
+            self.assertTrue(attempt.ok)
 
     def test_devin_timeout_is_not_relabelled_as_a_generic_crash(self):
         process = unittest.mock.Mock(pid=123, returncode=-signal.SIGKILL, ask='')
@@ -847,9 +847,9 @@ print('Ready.')
              patch.object(subprocess, 'Popen', return_value=process), \
              patch.object(brain.clients, 'stop_claude'), patch.object(brain.clients, 'delete_devin_session', return_value=True), \
              patch.object(brain.interaction, 'relay'), patch.object(signal, 'signal'), patch.object(atexit, 'register'):
-            reply, _, _ = brain.ask.run_devin('test')
+            reply, _, _ = attempt = brain.ask.run_devin('test')
         self.assertEqual(reply, 'Devin timed out before finishing. Please try again.')
-        self.assertFalse(brain.ask.run.ok)
+        self.assertFalse(attempt.ok)
 
     def test_external_client_errors_do_not_expose_tracebacks(self):
         for client in ('pi', 'devin'):
@@ -864,20 +864,21 @@ print('Ready.')
                          patch.object(brain.clients, 'plan', return_value={'ok': True}), \
                          patch.object(brain.clients, 'delete_devin_session', return_value=True), \
                          python_fixture_cli():
-                        reply, _, _ = brain.ask.run('test')
+                        reply, _, _ = attempt = brain.ask.run('test')
                 finally:
                     signal.signal(signal.SIGTERM, previous)
                 self.assertIn(f'{client.title()} stopped:', reply)
                 self.assertIn('choose Set Up', reply)
                 self.assertNotIn('fixture/internal.py', reply)
-                self.assertFalse(brain.ask.run.ok)
+                self.assertFalse(attempt.ok)
 
-    def test_every_client_leaves_run_state_main_reads(self):
+    def test_every_client_returns_the_run_state_main_reads(self):
         for name in ('pi', 'devin'):
-            brain.ask.run.__dict__.clear()
-            with patch.object(brain.prefs, 'client', return_value=name), patch.object(brain.ask, 'run_' + name, return_value=('x', 0, 0)):
-                brain.ask.run('task')
-            self.assertEqual((brain.ask.run.work, brain.ask.run.observed, brain.ask.run.handoffs), (False, [], []))
+            answered = brain.ask.RunResult('x', 0, 0)
+            with patch.object(brain.prefs, 'client', return_value=name), patch.object(brain.ask, 'run_' + name, return_value=answered):
+                attempt = brain.ask.run('task')
+            self.assertIs(attempt, answered)
+            self.assertEqual((attempt.work, attempt.observed, attempt.handoffs), (False, [], []))
 
     def test_pi_does_not_start_before_confirmation(self):
         with tempfile.TemporaryDirectory() as root:
@@ -1065,8 +1066,8 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
         with patch.dict(os.environ, {'RABIK_LIVE': '1'}), \
              patch.object(brain.skills, 'skills', return_value={k: {'cmds': ['echo private'], 'reply': 'Done'} for k in ['daily mode', 'open spotify']}), \
              patch.object(subprocess, 'run') as run:
-            self.assertIsNone(brain.instant.fast('daily mode'))
-            self.assertIsNone(brain.instant.fast('open Spotify'))
+            self.assertIsNone(brain.instant.fast('daily mode').reply)
+            self.assertIsNone(brain.instant.fast('open Spotify').reply)
             run.assert_not_called()
 
     def test_safe_gate_asks_before_unsandboxed_code_or_uploads(self):
@@ -1119,13 +1120,13 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
     def test_risky_saved_shortcut_defers_to_safe_gate(self):
         with patch.object(brain.skills, 'skills', return_value={'send mail': {'cmds': ['osascript -e \'tell application "Mail" to send outgoing message 1\''], 'reply': 'Sent'}}), \
              patch.object(subprocess, 'run') as run:
-            self.assertIsNone(brain.skills.replay('send mail'))
+            self.assertIsNone(brain.skills.replay('send mail').reply)
             run.assert_not_called()
 
     def test_fast_action_is_logged_once_at_zero_cost(self):
         with tempfile.TemporaryDirectory() as root, patch.object(brain.paths, 'DIR', root), \
              tests.patches(patch.multiple(brain.telemetry, ping=lambda: None),
-                           patch.multiple(brain.instant, fast=lambda _: 'Opened Spotify.'),
+                           patch.multiple(brain.instant, fast=lambda _: brain.instant.FastResult('Opened Spotify.')),
                            patch.multiple(brain.memory, remember_turn=lambda *_: None)), \
              patch.object(os, 'setpgrp'), patch.object(signal, 'signal'), \
              patch('sys.argv', ['rabik.py', '--fast', 'open Spotify']), \
@@ -1182,7 +1183,7 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
              patch('sys.stdin', io.StringIO('Notes\topen Notes\n')), patch.dict(os.environ, {'RABIK_COMMIT': ''}):
             # Even without a CLI, --wait must read the request instead of treating its flag as a question.
             mocks['start_ai'].return_value = None
-            mocks['fast'].return_value = 'Opened Notes.'
+            mocks['fast'].return_value = brain.instant.FastResult('Opened Notes.')
             brain.cli.main()
             mocks['fast'].assert_called_once_with('open Notes')
             mocks['front'].assert_not_called()
@@ -1196,7 +1197,7 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
         process.stdout = [json.dumps({'type': 'result', 'result': 'Done.', 'total_cost_usd': 0})]
         with patch.dict(os.environ, {'RABIK_RELAY_ACTIVE': str(os.getpid())}), \
              patch.object(threading, 'Thread') as thread, patch.object(threading, 'Timer'):
-            self.assertEqual(brain.ask.run('Fixture', process)[0], 'Done.')
+            self.assertEqual(brain.ask.run('Fixture', process).reply, 'Done.')
         thread.assert_not_called()
 
     def test_stream_routes_observed_work_and_unverified_giveup_without_word_matching(self):
@@ -1214,9 +1215,9 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
                 p.stdin=io.StringIO(); p.ask=''; p.returncode=0
                 p.stdout=map(json.dumps,events+[{'type':'result','result':answer,'total_cost_usd':.001}])
                 with patch.object(brain.clients,'stop_claude') as stop, patch.object(brain.protocol,'say'), patch.object(brain.macos,'preview_commands'):
-                    reply,cost,_=brain.ask.run('Fixture request'+(brain.prompts.MODEL_OFFER if auto else ''),p,auto_work=auto)
-                self.assertEqual(reply,expected); self.assertEqual(brain.ask.run.ok,ok)
-                if events: self.assertEqual(brain.ask.run.observed[0]['result'],'Observed state 1')
+                    reply,cost,_=attempt = brain.ask.run('Fixture request'+(brain.prompts.MODEL_OFFER if auto else ''),p,auto_work=auto)
+                self.assertEqual(reply,expected); self.assertEqual(attempt.ok,ok)
+                if events: self.assertEqual(attempt.observed[0]['result'],'Observed state 1')
                 stop.assert_not_called(); self.assertEqual(cost,.001)
 
     def test_action_success_and_learning_require_observed_tool_evidence(self):
@@ -1228,11 +1229,11 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
                 p = unittest.mock.Mock(); p.stdin = io.StringIO(); p.ask = ''; p.returncode = 0
                 p.stdout = map(json.dumps, [tool, result, {'type':'result','result':'I sent it.'}])
                 with patch.object(brain.protocol, 'say'), patch.object(brain.macos, 'preview_commands'):
-                    reply, _, _ = brain.ask.run('send it', p)
+                    reply, _, _ = attempt = brain.ask.run('send it', p)
                 self.assertEqual(reply, expected)
-                self.assertEqual(brain.ask.run.ok, ok)
-                self.assertEqual(brain.ask.run.cmds, ['fixture action'] if ok else [])
-                self.assertEqual(brain.ask.run.ran, ['fixture action'])
+                self.assertEqual(attempt.ok, ok)
+                self.assertEqual(attempt.cmds, ['fixture action'] if ok else [])
+                self.assertEqual(attempt.ran, ['fixture action'])
 
     def test_read_only_question_tools_stay_on_haiku_without_a_completion_marker(self):
         events=[]
@@ -1243,9 +1244,9 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
         p=unittest.mock.Mock(); p.stdin=io.StringIO(); p.ask=''; p.returncode=0
         p.stdout=map(json.dumps,events+[{'type':'result','result':'A sourced answer.'}])
         with patch.object(brain.turn,'TURN',{}), patch.object(brain.clients,'stop_claude') as stop, patch.object(brain.protocol,'say'), patch.object(brain.macos,'preview_commands'):
-            reply,_,_=brain.ask.run('A question'+brain.prompts.MODEL_OFFER,p,auto_work=True)
-        stop.assert_not_called(); self.assertFalse(brain.ask.run.work)
-        self.assertEqual(reply,'A sourced answer.'); self.assertTrue(brain.ask.run.ok)
+            reply,_,_=attempt = brain.ask.run('A question'+brain.prompts.MODEL_OFFER,p,auto_work=True)
+        stop.assert_not_called(); self.assertFalse(attempt.work)
+        self.assertEqual(reply,'A sourced answer.'); self.assertTrue(attempt.ok)
 
     def test_multi_step_work_is_not_interrupted_for_tool_count(self):
         events=[]
@@ -1256,8 +1257,8 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
         p=unittest.mock.Mock(); p.stdin=io.StringIO(); p.ask=''; p.returncode=0; p.stdout=map(json.dumps,events)
         with patch.object(brain.turn,'TURN',{}), patch.object(brain.clients,'stop_claude') as stop, \
              patch.object(brain.protocol,'say'), patch.object(brain.macos,'preview_commands'):
-            reply,cost,_=brain.ask.run('Research',p,auto_work=True)
-        stop.assert_not_called(); self.assertEqual((reply,cost),('Research complete.',.001)); self.assertTrue(brain.ask.run.ok)
+            reply,cost,_=attempt = brain.ask.run('Research',p,auto_work=True)
+        stop.assert_not_called(); self.assertEqual((reply,cost),('Research complete.',.001)); self.assertTrue(attempt.ok)
 
     def test_failed_tool_can_retry_another_method_on_haiku(self):
         tool = lambda n, command: {'type':'assistant','message':{'content':[{'type':'tool_use','id':str(n),'name':'Bash','input':{'command':command}}]}}
@@ -1268,9 +1269,9 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
         p=unittest.mock.Mock(); p.stdin=io.StringIO(); p.ask=''; p.returncode=0; p.stdout=map(json.dumps,events)
         with patch.object(brain.turn,'TURN',{}), patch.object(brain.clients,'stop_claude') as stop, \
              patch.object(brain.protocol,'say'), patch.object(brain.macos,'preview_commands'):
-            reply,_,_=brain.ask.run('Routine action'+brain.prompts.MODEL_OFFER,p,auto_work=True)
-        stop.assert_not_called(); self.assertEqual(reply,'Done another way.'); self.assertTrue(brain.ask.run.ok)
-        self.assertEqual(brain.ask.run.cmds,['different method'])
+            reply,_,_=attempt = brain.ask.run('Routine action'+brain.prompts.MODEL_OFFER,p,auto_work=True)
+        stop.assert_not_called(); self.assertEqual(reply,'Done another way.'); self.assertTrue(attempt.ok)
+        self.assertEqual(attempt.cmds,['different method'])
 
     def test_warmed_models_follow_routing_without_a_classifier(self):
         for mode, expected in (('cheapest','haiku'),('balanced','haiku'),('capable','opus')):
@@ -1289,10 +1290,10 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
             p.stdin = io.StringIO()
             p.stdout = [json.dumps(row) + '\n' for row in stream]
             p.ask = ''; p.returncode = 0
-            reply, _, _ = brain.ask.run('test', p)
+            reply, _, _ = attempt = brain.ask.run('test', p)
             self.assertEqual(reply, expected)
-            self.assertEqual(brain.ask.run.cmds, [])
-            self.assertEqual(brain.ask.run.ok, expected == 'Found it.')
+            self.assertEqual(attempt.cmds, [])
+            self.assertEqual(attempt.ok, expected == 'Found it.')
 
     def test_stream_ignores_malformed_message_frames(self):
         p = unittest.mock.Mock()
@@ -1301,8 +1302,8 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
                                     {'type': 'assistant', 'message': {'content': None}},
                                     {'type': 'user', 'message': None},
                                     {'type': 'result', 'result': 'Done.', 'total_cost_usd': 0}])
-        self.assertEqual(brain.ask.run('test', p)[0], 'Done.')
-        self.assertTrue(brain.ask.run.ok)
+        self.assertEqual((attempt := brain.ask.run('test', p)).reply, 'Done.')
+        self.assertTrue(attempt.ok)
 
     def test_cli_preference_write_failure_preserves_existing_settings(self):
         prefs = self.root / 'settings.json'
@@ -1388,10 +1389,10 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
             {'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'name': 'Bash', 'input': {'command': 'open -a Notes'}}]}},
             {'type': 'result', 'is_error': True, 'result': 'Could not finish.'}])
         with patch.object(brain.protocol, 'say'):
-            brain.ask.run('test', p)
-        self.assertEqual(brain.ask.run.cmds, [])
-        self.assertEqual(brain.ask.run.ran, ['open -a Notes'])
-        self.assertFalse(brain.ask.run.ok)
+            attempt = brain.ask.run('test', p)
+        self.assertEqual(attempt.cmds, [])
+        self.assertEqual(attempt.ran, ['open -a Notes'])
+        self.assertFalse(attempt.ok)
 
     def test_recovered_tool_error_keeps_success_but_is_not_learned(self):
         p = unittest.mock.Mock()
@@ -1400,9 +1401,9 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
             {'type': 'user', 'message': {'content': [{'type': 'tool_result', 'is_error': True}]}},
             {'type': 'user', 'message': {'content': [{'type': 'tool_result', 'is_error': False, 'content': 'Verified.'}]}},
             {'type': 'result', 'result': 'Recovered.'}])
-        brain.ask.run('test', p)
-        self.assertTrue(brain.ask.run.ok)
-        self.assertEqual(brain.ask.run.cmds, [])
+        attempt = brain.ask.run('test', p)
+        self.assertTrue(attempt.ok)
+        self.assertEqual(attempt.cmds, [])
 
     def test_failed_final_tool_preserves_reply_without_learning(self):
         p = unittest.mock.Mock()
@@ -1410,11 +1411,11 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
         p.stdout = map(json.dumps, [
             {'type': 'user', 'message': {'content': [{'type': 'tool_result', 'is_error': True, 'content': 'Image not found'}]}},
             {'type': 'result', 'result': 'I sent the message.'}])
-        reply, _, _ = brain.ask.run('send the question', p)
-        self.assertFalse(brain.ask.run.ok)
+        reply, _, _ = attempt = brain.ask.run('send the question', p)
+        self.assertFalse(attempt.ok)
         self.assertEqual(reply, 'I sent the message.')
-        self.assertEqual(brain.ask.run.error, 'Image not found')
-        self.assertEqual(brain.ask.run.cmds, [])
+        self.assertEqual(attempt.error, 'Image not found')
+        self.assertEqual(attempt.cmds, [])
 
     def test_blocked_tool_reply_includes_the_gate_reason(self):
         p = unittest.mock.Mock()
@@ -1423,9 +1424,9 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
             {'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': 'blocked', 'name': 'Bash', 'input': {'command': 'fixture'}}]}},
             {'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': 'blocked', 'is_error': True, 'content': 'Tools cannot start another ask.'}]}},
             {'type': 'result', 'result': 'The tool blocked the command.'}])
-        reply, _, _ = brain.ask.run('send the message', p)
+        reply, _, _ = attempt = brain.ask.run('send the message', p)
         self.assertEqual(reply, 'The tool blocked the command. Tool reported: Tools cannot start another ask.')
-        self.assertEqual(brain.ask.run.error, 'Tools cannot start another ask.')
+        self.assertEqual(attempt.error, 'Tools cannot start another ask.')
 
     def test_harmless_last_tool_failure_keeps_real_reply_or_empty_fallback(self):
         for answer in ('No matching processes; the app is closed.', ''):
@@ -1437,11 +1438,11 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
                     {'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': 'probe', 'is_error': True, 'content': 'Exit code 1'}]}},
                     {'type': 'result', 'result': answer}])
                 with patch.object(brain.protocol, 'say'):
-                    reply, _, _ = brain.ask.run('test', p)
+                    reply, _, _ = attempt = brain.ask.run('test', p)
                 self.assertEqual(reply, answer or 'The last tool failed, so I could not verify that the request was completed. Please try again.')
-                self.assertFalse(brain.ask.run.ok)
-                self.assertEqual(brain.ask.run.cmds, [])
-                self.assertEqual(brain.ask.run.ran, ['pgrep fixture'])
+                self.assertFalse(attempt.ok)
+                self.assertEqual(attempt.cmds, [])
+                self.assertEqual(attempt.ran, ['pgrep fixture'])
 
     def test_expired_signin_opens_setup_despite_logged_in_status(self):
         error = 'Failed to authenticate: OAuth session expired and could not be refreshed'
@@ -1452,14 +1453,14 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
                 events = [{'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'name': 'Bash', 'input': {'command': 'echo fixture'}}]}}] if tools else []
                 p.stdout = map(json.dumps, events + [{'type': 'result', 'is_error': is_error, 'result': text}])
                 with patch.object(brain.protocol, 'say') as say, patch.object(brain.clients, 'plan', return_value={'ok': True, 'text': 'Logged in'}) as plan:
-                    reply, _, _ = brain.ask.run('test', p)
+                    reply, _, _ = attempt = brain.ask.run('test', p)
                 if is_error and text == error:
                     self.assertEqual(say.call_args_list.count(unittest.mock.call('!', 'setup')), 1)
                     self.assertEqual(reply, 'Your Claude sign-in expired. Rabik setup is open to sign in again.')
-                    self.assertFalse(brain.ask.run.ok)
+                    self.assertFalse(attempt.ok)
                 elif is_error:
                     self.assertIn('temporarily unavailable', reply)
-                    self.assertEqual(brain.ask.run.error, text)
+                    self.assertEqual(attempt.error, text)
                 else:
                     self.assertEqual(reply, text)
                     self.assertNotIn(unittest.mock.call('!', 'setup'), say.call_args_list)
@@ -1477,11 +1478,11 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
                 p = unittest.mock.Mock()
                 p.stdin = io.StringIO(); p.stdout = []; p.ask = ''; p.returncode = 1; p.errors = io.StringIO(detail)
                 with patch.object(brain.clients, 'plan', return_value={'ok': True, 'text': 'Ready'}):
-                    reply, _, _ = brain.ask.run('test', p)
+                    reply, _, _ = attempt = brain.ask.run('test', p)
                 self.assertIn(expected, reply)
                 self.assertNotIn(detail, reply)
                 self.assertNotIn('/private/fixture', reply)
-                self.assertNotIn('abcdefghijklmnopqrstuvwxyz123456', brain.ask.run.error)
+                self.assertNotIn('abcdefghijklmnopqrstuvwxyz123456', attempt.error)
 
     def test_terminal_error_text_uses_friendly_mapping_and_copy_details(self):
         for detail, expected in [('HTTP 429 rate limit exceeded', 'rate-limited'),
@@ -1491,12 +1492,12 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
                 p = unittest.mock.Mock()
                 p.stdin = io.StringIO(); p.ask = ''; p.returncode = 0; p.errors = io.StringIO('stderr context')
                 p.stdout = [json.dumps({'type': 'result', 'is_error': True, 'result': detail})]
-                reply, _, _ = brain.ask.run('test', p)
+                reply, _, _ = attempt = brain.ask.run('test', p)
                 self.assertIn(expected, reply)
                 self.assertNotIn(detail, reply)
-                self.assertIn('stderr context', brain.ask.run.error)
-                self.assertNotIn('abcdefghijklmnopqrstuvwxyz123456', brain.ask.run.error)
-                self.assertFalse(brain.ask.run.ok)
+                self.assertIn('stderr context', attempt.error)
+                self.assertNotIn('abcdefghijklmnopqrstuvwxyz123456', attempt.error)
+                self.assertFalse(attempt.ok)
 
     def test_cancellation_stops_descendant(self):
         with tempfile.TemporaryDirectory() as root:
@@ -1620,7 +1621,7 @@ rabik.main()
                     timer = threading.Timer(3, brain.clients.stop_claude, args=(p,))
                     timer.start()
                     try:
-                        self.assertEqual(brain.ask.run('test', p)[0], 'Ready.')
+                        self.assertEqual(brain.ask.run('test', p).reply, 'Ready.')
                     finally:
                         timer.cancel(); timer.join(); brain.clients.stop_claude(p); p.errors.close()
             finally:

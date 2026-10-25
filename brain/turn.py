@@ -3,18 +3,26 @@
 STOPPING is rebound when the ask is cancelled, so it is not in __all__ and never copied: read it as turn.STOPPING."""
 import atexit
 import os
+import threading
 import time
+from functools import wraps
 from brain import prefs, storage, telemetry
 
 __all__ = ['TURN', 'checkpoint', 'begin_turn', 'end_turn', 'log_turn']
 
-replayed = lambda: []   # rabik.py: the steps the last replayed shortcut ran (skills still lives there)
-
-
 TURN = {}
 STOPPING = False
+_LOCK = threading.RLock()   # the run's timeout timer ends the turn while main() logs it
 
 
+def _locked(f):
+    @wraps(f)
+    def one_at_a_time(*args, **kwargs):
+        with _LOCK: return f(*args, **kwargs)
+    return one_at_a_time
+
+
+@_locked
 def checkpoint(**values):
     """Append lightweight progress; read_rows folds it into the full request row."""
     if not TURN: return
@@ -28,6 +36,7 @@ def checkpoint(**values):
     storage.append_log(row)
 
 
+@_locked
 def begin_turn(task):
     global STOPPING
     STOPPING = False
@@ -41,6 +50,7 @@ def begin_turn(task):
     checkpoint()
 
 
+@_locked
 def end_turn(status='cancelled', emit=True):
     if TURN and TURN.get('status') == 'running':
         now = time.monotonic()
@@ -57,13 +67,14 @@ def end_turn(status='cancelled', emit=True):
 atexit.register(end_turn)
 
 
+@_locked
 def log_turn(task, reply, started, cost=0, steps=0, ran=(), pics=0, *, model=None, path='model', escalated=False, escalate_why=None, attempt_usd=None, attempt_usage=None):
     status = TURN.get('status', 'completed')
     model = model or TURN.get('model') or prefs.main_model()
     attempt_usd = list(attempt_usd) if attempt_usd is not None else ([] if model == 'instant' else [cost])
     row = {'at': time.strftime('%Y-%m-%d %H:%M:%S'), 'task': task, 'reply': reply,
            'usd': round(cost, 5) if cost is not None else None, 'secs': round(time.time() - started, 1), 'steps': steps,
-           'ran': list(ran) or replayed(), 'live': os.environ.get('RABIK_LIVE') == '1',
+           'ran': list(ran), 'live': os.environ.get('RABIK_LIVE') == '1',
            'pics': pics, 'cursor': os.environ.get('RABIK_CARET') == '1', 'model': model, 'path': path, 'escalated': bool(escalated),
            'escalate_why': escalate_why if escalated else None, 'attempt_usd': attempt_usd,
            'attempt_usage': list(attempt_usage) if attempt_usage is not None else list(TURN.get('attempt_usage', []))}

@@ -64,7 +64,8 @@ class StreamTests(unittest.TestCase):
         p.stdout = map(json.dumps, rows + [{'type': 'result', 'result': final, 'total_cost_usd': .001}])
         with patch.dict(os.environ, {'RABIK_UI': '1', 'RABIK_COMMIT': '', **(env or {})}), patch.object(threading, 'Thread'), \
              patch.object(threading, 'Timer'), patch.object(brain.macos, 'preview_commands'), contextlib.redirect_stdout(io.StringIO()) as out:
-            reply, _, _ = brain.ask.run('Request: fixture', p)
+            self.attempt = brain.ask.run('Request: fixture', p)
+            reply = self.attempt.reply
         lines = out.getvalue().rstrip('\n').split('\n')   # not splitlines(): an answer's own line breaks travel as U+2028
         return reply, lines, [line[2:] for line in lines if line.startswith('… ')]
 
@@ -101,7 +102,7 @@ class StreamTests(unittest.TestCase):
             reply, lines, shown = self.run_stream(message(marker + '\n' + ANSWER), marker + '\n' + ANSWER, ask=ask)
         self.assertEqual(reply, ''); self.assertEqual(shown, [])
         self.assertEqual(sum(line.startswith('⤴ ') for line in lines), 1)
-        self.assertEqual(brain.ask.run.handoff['title'], 'Research desks')
+        self.assertEqual(self.attempt.handoff['title'], 'Research desks')
         self.assertFalse(any(line.startswith(('✓', '·')) for line in lines))
 
     def test_note_before_a_tool_never_shows_as_the_answer(self):

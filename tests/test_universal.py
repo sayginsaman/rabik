@@ -168,10 +168,10 @@ class UniversalTests(unittest.TestCase):
                 factory.call_args.args[1](*factory.call_args.kwargs['args'])
                 yield from ()
             p.stdout = stream()
-            brain.ask.run('Slow unfamiliar task', p)
+            attempt = brain.ask.run('Slow unfamiliar task', p)
         stop.assert_called_once_with(p)
         timer.cancel.assert_called()
-        self.assertFalse(brain.ask.run.ok)
+        self.assertFalse(attempt.ok)
         self.assertEqual(brain.storage.read_rows(str(self.root / 'log.jsonl'))[0]['status'], 'timed_out')
 
     def test_successful_retry_is_not_failed_by_the_previous_timeout(self):
@@ -180,8 +180,8 @@ class UniversalTests(unittest.TestCase):
         p = Mock(); p.ask = ''; p.stdin = io.StringIO(); p.returncode = 0
         p.stdout = [json.dumps({'type': 'result', 'result': 'Done.', 'is_error': False})]
         with patch.object(brain.protocol, 'say'):
-            brain.ask.run('Retry slow unfamiliar task', p)
-        self.assertTrue(brain.ask.run.ok)
+            attempt = brain.ask.run('Retry slow unfamiliar task', p)
+        self.assertTrue(attempt.ok)
 
     def test_idle_deadline_resets_on_tool_progress(self):
         brain.turn.begin_turn('Task with progress')
@@ -192,10 +192,10 @@ class UniversalTests(unittest.TestCase):
             {'type': 'result', 'result': 'Done.', 'is_error': False}])
         timer = Mock()
         with patch.object(threading, 'Timer', return_value=timer) as factory, patch.object(brain.protocol, 'say'):
-            brain.ask.run('Task with progress', p)
+            attempt = brain.ask.run('Task with progress', p)
         self.assertEqual(factory.call_count, 3)
         self.assertGreaterEqual(timer.cancel.call_count, 3)
-        self.assertTrue(brain.ask.run.ok)
+        self.assertTrue(attempt.ok)
 
     def test_idle_deadline_pauses_while_a_card_waits(self):
         brain.turn.begin_turn('Wait for approval')
@@ -209,10 +209,10 @@ class UniversalTests(unittest.TestCase):
                 p.waiting.clear()
                 yield json.dumps({'type': 'result', 'result': 'Done.', 'is_error': False})
             p.stdout = stream()
-            brain.ask.run('Wait for approval', p)
+            attempt = brain.ask.run('Wait for approval', p)
         stop.assert_not_called()
         self.assertEqual(factory.call_count, 2)
-        self.assertTrue(brain.ask.run.ok)
+        self.assertTrue(attempt.ok)
 
     def test_presenting_an_allow_card_resets_the_idle_deadline(self):
         card = Path(brain.paths.question_path(self.root)); card.parent.mkdir(parents=True, exist_ok=True)
@@ -244,28 +244,28 @@ class UniversalTests(unittest.TestCase):
 
     def test_generic_and_site_searches_keep_the_fast_path(self):
         with patch.object(brain.skills, 'skills', return_value={}), patch.object(brain.web, 'show', return_value='opened search') as show:
-            self.assertEqual(brain.instant.fast('search for unfamiliar words'), 'Searched unfamiliar words.')
+            self.assertEqual(brain.instant.fast('search for unfamiliar words').reply, 'Searched unfamiliar words.')
             self.assertIn('google.com/search?q=unfamiliar%20words', show.call_args.args[0])
-            self.assertEqual(brain.instant.fast('search youtube for unfamiliar words'), 'Searched unfamiliar words on youtube.')
+            self.assertEqual(brain.instant.fast('search youtube for unfamiliar words').reply, 'Searched unfamiliar words on youtube.')
             self.assertEqual(show.call_args.args[0], 'https://duckduckgo.com/?q=!youtube+unfamiliar+words')
-            self.assertEqual(brain.instant.fast('search for restaurants in boston'), 'Searched restaurants in boston.')
+            self.assertEqual(brain.instant.fast('search for restaurants in boston').reply, 'Searched restaurants in boston.')
             self.assertIn('restaurants%20in%20boston', show.call_args.args[0])
-            self.assertEqual(brain.instant.fast('search for reporting on unfamiliar events'), 'Searched reporting on unfamiliar events.')
+            self.assertEqual(brain.instant.fast('search for reporting on unfamiliar events').reply, 'Searched reporting on unfamiliar events.')
 
     def test_failed_fast_launches_fall_through_without_recording_success(self):
         failed = subprocess.CompletedProcess([], 1)
         with patch.object(brain.skills, 'skills', return_value={}), patch.object(brain.hands, 'fast_hands', return_value=None), \
              patch.object(brain.web, 'show', return_value='could not open search'):
-            self.assertIsNone(brain.instant.fast('search for unfamiliar words'))
-            self.assertEqual(brain.instant.fast.cmds, [])
+            self.assertIsNone((done := brain.instant.fast('search for unfamiliar words')).reply)
+            self.assertEqual(done.cmds, [])
         with patch.object(brain.skills, 'skills', return_value={}), patch.object(brain.hands, 'fast_hands', return_value=None), \
              patch.object(subprocess, 'run', return_value=failed):
-            self.assertIsNone(brain.instant.fast('open unfamiliar.example'))
-            self.assertEqual(brain.instant.fast.cmds, [])
+            self.assertIsNone((done := brain.instant.fast('open unfamiliar.example')).reply)
+            self.assertEqual(done.cmds, [])
         with patch.object(brain.skills, 'skills', return_value={}), patch.object(brain.hands, 'fast_hands', return_value=None), \
              patch.object(brain.apps, 'app_named', return_value='Fixture'), patch.object(subprocess, 'run', return_value=failed):
-            self.assertIsNone(brain.instant.fast('open fixture'))
-            self.assertEqual(brain.instant.fast.cmds, [])
+            self.assertIsNone((done := brain.instant.fast('open fixture')).reply)
+            self.assertEqual(done.cmds, [])
 
     def test_polite_opens_take_the_fast_path_but_bare_words_and_tasks_do_not(self):
         ok = subprocess.CompletedProcess([], 0)
@@ -273,14 +273,14 @@ class UniversalTests(unittest.TestCase):
         with patch.object(brain.skills, 'skills', return_value={}), patch.object(brain.hands, 'fast_hands', return_value=None), patch.object(brain.macos, 'free_focus'), \
              patch.object(brain.paths, 'HOME', str(self.root)), patch.object(brain.apps, 'app_named', side_effect=lambda name: 'Fixture' if name == 'fixture' else None), \
              patch.object(brain.paths, 'LAST', str(self.root / 'last_app')), patch.object(subprocess, 'run', return_value=ok) as run, patch.object(brain.web, 'show') as show:
-            self.assertEqual(brain.instant.fast('Can you open up unfamiliar.com?'), 'Opened unfamiliar.com.')
+            self.assertEqual(brain.instant.fast('Can you open up unfamiliar.com?').reply, 'Opened unfamiliar.com.')
             self.assertEqual(run.call_args.args[0], ['open', 'https://unfamiliar.com'])
-            self.assertEqual(brain.instant.fast('Um, could you please open up Fixture for me?'), 'Opened Fixture.')
+            self.assertEqual(brain.instant.fast('Um, could you please open up Fixture for me?').reply, 'Opened Fixture.')
             self.assertEqual(run.call_args.args[0], ['open', '-a', 'Fixture'])
             run.reset_mock()
             for ask in ('open homework', 'open unfamiliar', 'Can you open up Unfamiliar?', 'Um, search Unfamiliar for e-bikes and find me the cheapest one.',
                         'What am I looking at?', 'open downloads', 'open it', 'Can you open up?', 'open my unfamiliar homework', 'open unfamiliar and play music'):
-                self.assertIsNone(brain.instant.fast(ask), ask)   # one bare word may be his file or tab, not <word>.com: the AI finds it
+                self.assertIsNone(brain.instant.fast(ask).reply, ask)   # one bare word may be his file or tab, not <word>.com: the AI finds it
         run.assert_not_called(); show.assert_not_called()
 
     def test_video_promises_stay_on_the_same_instant_path(self):
@@ -305,7 +305,7 @@ class UniversalTests(unittest.TestCase):
             }
             for said, reply in expected.items():
                 with self.subTest(said=said):
-                    self.assertEqual(brain.instant.fast(said), reply)
+                    self.assertEqual(brain.instant.fast(said).reply, reply)
 
     def test_agent_titles_start_at_the_words_that_matter(self):
         self.assertEqual(brain.handoffs.agent_title('Can you do the steps and get me the post hog API key?'), 'Get post hog API key')
@@ -315,7 +315,7 @@ class UniversalTests(unittest.TestCase):
     def test_searching_an_installed_app_defers_to_the_ai(self):
         with patch.object(brain.skills, 'skills', return_value={}), patch.object(brain.apps, 'app_named', side_effect=lambda name: 'Fixture' if name == 'fixture' else None), \
              patch.object(brain.web, 'show') as show:
-            self.assertIsNone(brain.instant.fast('search fixture for unfamiliar words'))
+            self.assertIsNone(brain.instant.fast('search fixture for unfamiliar words').reply)
         show.assert_not_called()
 
     def test_app_names_derive_from_installed_apps_and_ambiguous_names_defer(self):

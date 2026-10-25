@@ -7,11 +7,12 @@ import subprocess
 import sys
 import tempfile
 import time
+from dataclasses import dataclass, field
 from brain import apps, hands, macos, memory, paths, policy, prefs, web, windows, wording
 
 __all__ = ['SKILLS', 'INTERNAL_TASK_MARKERS', 'UNSAFE', 'NAMED', 'named_shortcut', 'TRIGGER', 'shortcut_name', 'skills',
            'PLACING', 'LOOKUPS', 'shortcut_commands', 'save_skills', 'learn', 'unlearn', 'app_in', 'like', 'swapped',
-           'replay_quit', 'replay', 'outcome', 'workflows', 'replayable', 'remember_workflow']
+           'replay_quit', 'ReplayResult', 'replay', 'outcome', 'workflows', 'replayable', 'remember_workflow']
 
 
 # Learned shortcuts: an action the AI got right is saved as the exact commands it ran; the same words later replay
@@ -251,62 +252,75 @@ def replay_quit(tokens):
     return m[2] if m[1] else apps.app_id(apps.app_named(m[2]) or m[2])
 
 
+@dataclass
+class ReplayResult:
+    """One replay of a learned shortcut: its reply (None: the AI takes over), the commands it chose, what each step said
+    (ran, for the ask log and a redo), and the step that failed."""
+    reply: object = None
+    commands: list = field(default_factory=list)
+    ran: list = field(default_factory=list)
+    failed_at: object = None
+
+
 def replay(k, swap=None):
-    replay.ran = []
-    replay.commands = []
-    replay.failed_at = None
+    result = ReplayResult()
+    result.reply = _replay(k, swap, result)
+    return result
+
+
+def _replay(k, swap, result):
     s = skills().get(k)
     asked = s.get('asked') or k if s else k   # a named shortcut's own words say nothing about focus; the words that taught it do
     commands = shortcut_commands(asked, swapped(s['cmds'], *swap) if swap else s['cmds']) if s else None
     if not commands:
         return None
-    replay.commands = commands
+    result.commands = commands
     if prefs.pref('safe', True) and any(policy.risky(c) for c in commands):
         return None   # the AI's tool gate can show the Allow card; direct replay cannot
     if not macos.wants_focus(asked) and prefs.pref('workIn', 'back') != 'front' and any(policy.focus_command(c) for c in commands): return None
     for index, c in enumerate(commands):   # any failure: hand it to the AI instead
-        replay.failed_at = index
+        result.failed_at = index
         try:
             tokens = shlex.split(c)
             with_request = os.environ.get('RABIK_REQUEST'); os.environ['RABIK_REQUEST'] = asked
             try:
                 if tokens[:2] == [paths.ME, '--show'] and (len(tokens) == 3 or len(tokens) == 4 and tokens[2] == '--bg'):
                     reply = web.show(tokens[-1], '--bg' in tokens)   # as the verified run did: the model chose front or --bg from the words in any language
-                    replay.ran.append(f'{c[:200]}  => {reply[:200]}')
+                    result.ran.append(f'{c[:200]}  => {reply[:200]}')
                     if reply.startswith(('could not', 'no app or file')): return None
                 elif tokens[:2] == [paths.ME, '--hands']:
                     out, ok = hands.hands(*tokens[2:])
-                    replay.ran.append(f'{c[:200]}  => {out[:200]}')
+                    result.ran.append(f'{c[:200]}  => {out[:200]}')
                     if not ok: return None
                 elif tokens[:2] == [paths.ME, '--place']:
                     began = time.time()
                     out = windows.place_many(tokens[2:])
-                    replay.ran.append(f'{c[:200]}  => {out[:200]} ({time.time() - began:.1f}s)')
+                    result.ran.append(f'{c[:200]}  => {out[:200]} ({time.time() - began:.1f}s)')
                     if windows.place_failed(out): return None
                 elif (bid := replay_quit(tokens)) is not None:
                     if not bid: return None
                     began = time.time()
                     closed = apps.quit_app(bid)
-                    replay.ran.append(f'{c[:200]}  => {"closed" if closed else "still open"} ({time.time() - began:.1f}s)')
+                    result.ran.append(f'{c[:200]}  => {"closed" if closed else "still open"} ({time.time() - began:.1f}s)')
                     if not closed: return None
                 else:
                     if policy.ARRANGE.search(c): macos.free_focus()
                     began = time.time()
                     r = subprocess.run(['/bin/zsh', '-c', c], capture_output=True, text=True, timeout=20, env={**os.environ, 'RABIK_REQUEST': asked})
-                    replay.ran.append(f'{c[:200]}  => {(r.stdout.strip() or r.stderr.strip() or "exit " + str(r.returncode))[:200]} ({time.time() - began:.1f}s)')   # what each step said, and how long
+                    result.ran.append(f'{c[:200]}  => {(r.stdout.strip() or r.stderr.strip() or "exit " + str(r.returncode))[:200]} ({time.time() - began:.1f}s)')   # what each step said, and how long
                     if r.returncode or wording.FAILED.search(r.stdout) or 'no window found' in r.stdout: return None   # a step that says it failed is a failure: the AI takes over
                     if tokens[0] == 'open' and len(tokens) in (3, 4) and tokens[1:-1] in (['-a'], ['-g', '-a']) and (bid := apps.app_id(apps.app_named(tokens[-1]) or tokens[-1])) and not apps.app_up(bid):
-                        replay.ran.append(f'{tokens[-1]} => not running'); return None   # exit 0 is not proof: check by bundle id, as quit does
+                        result.ran.append(f'{tokens[-1]} => not running'); return None   # exit 0 is not proof: check by bundle id, as quit does
                     macos.preview_commands(c)
             finally:
                 if with_request is None: os.environ.pop('RABIK_REQUEST', None)
                 else: os.environ['RABIK_REQUEST'] = with_request
         except (OSError, ValueError, subprocess.TimeoutExpired) as e:
-            replay.ran.append(f'{c[:200]}  => {type(e).__name__}')
+            result.ran.append(f'{c[:200]}  => {type(e).__name__}')
             return None
     if s.get('used') != time.strftime('%Y-%m-%d'):   # used today: the 30-day clock starts again
         sk = skills(); sk[k]['used'] = time.strftime('%Y-%m-%d'); save_skills(sk)
-    replay.failed_at = None
+    result.failed_at = None
     return outcome(s['reply'].replace(*swap) if swap else s['reply'])
 
 

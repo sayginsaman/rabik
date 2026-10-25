@@ -32,8 +32,8 @@ class WorkflowTests(unittest.TestCase):
             {'type': 'user', 'message': {'content': [{'type': 'tool_result', 'content': 'Saved successfully.'}]}},
             {'type': 'result', 'result': 'Created your calendar event. [workflow create calendar event | Read the calendar form, fill today\'s requested values, save, then check the event appears.]'}])
         with patch.object(brain.protocol, 'say'):
-            reply, _, _ = brain.ask.run('make a calendar event', p)
-        reply, saved = brain.skills.remember_workflow('make a calendar event', reply, brain.ask.run.ok, brain.ask.run.cmds)
+            reply, _, _ = attempt = brain.ask.run('make a calendar event', p)
+        reply, saved = brain.skills.remember_workflow('make a calendar event', reply, attempt.ok, attempt.cmds)
         self.assertTrue(saved)
         self.assertEqual(reply, 'Created your calendar event.')
         method = brain.skills.workflows('Can you make a new calendar event tomorrow?')
@@ -41,7 +41,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('workflow', reply)
         self.assertEqual(brain.skills.workflows('open calendar'), '')
         with patch.object(subprocess, 'run') as action:
-            self.assertIn('saved', brain.instant.fast('And remember how to make a calendar event for the future'))
+            self.assertIn('saved', brain.instant.fast('And remember how to make a calendar event for the future').reply)
             action.assert_not_called()
 
     def test_never_saves_failed_incomplete_or_disabled_tasks(self):
@@ -60,7 +60,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_unverified_history_cannot_be_claimed_as_remembered(self):
         with patch.object(subprocess, 'run') as action:
-            reply = brain.instant.fast('remember how to create a meeting')
+            reply = brain.instant.fast('remember how to create a meeting').reply
         self.assertIn('do not have a verified procedure', reply)
         action.assert_not_called()
 
@@ -75,11 +75,11 @@ class WorkflowTests(unittest.TestCase):
                                     tool('c', menu), result('c', False, 'Meeting controls are visible.'),
                                     {'type': 'result', 'result': 'Your Zoom meeting started.'}])
         with patch.object(brain.protocol, 'say'):
-            reply, _, _ = brain.ask.run('Um, make a new Zoom meeting', p)
-        brain.skills.learn('Um, make a new Zoom meeting', brain.ask.run.cmds, reply)
+            reply, _, _ = attempt = brain.ask.run('Um, make a new Zoom meeting', p)
+        brain.skills.learn('Um, make a new Zoom meeting', attempt.cmds, reply)
         self.assertEqual(brain.skills.skills()['make a new zoom meeting']['cmds'], [brain.paths.HANDS+' menu zoom.us \'Zoom Workplace > Start meeting\''])
         with patch.object(brain.hands, 'hands', return_value=('Clicked Start meeting', True)):
-            self.assertEqual(brain.instant.fast('start a zoom meeting'), 'Your Zoom meeting started.')
+            self.assertEqual(brain.instant.fast('start a zoom meeting').reply, 'Your Zoom meeting started.')
         brain.skills.learn('click new meeting', [brain.paths.HANDS + ' click 245,340'], 'Done.')   # a screen spot moves: never learned
         self.assertNotIn('click new meeting', brain.skills.skills())
 
@@ -94,11 +94,11 @@ class WorkflowTests(unittest.TestCase):
                                     tool('retry', retry), receipt('retry', 'Fixture window -> fullscreen.'),
                                     {'type': 'result', 'is_error': False, 'result': 'Done.'}])
         with patch.object(brain.protocol, 'say'):
-            reply, _, _ = brain.ask.run('Arrange workspace', p)
-        self.assertTrue(brain.ask.run.ok)
-        self.assertEqual(brain.ask.run.cmds, [retry])
+            reply, _, _ = attempt = brain.ask.run('Arrange workspace', p)
+        self.assertTrue(attempt.ok)
+        self.assertEqual(attempt.cmds, [retry])
         with patch.object(brain.macos, 'cached_hands', return_value=None):
-            self.assertTrue(brain.skills.learn('Arrange workspace', brain.ask.run.cmds, reply))
+            self.assertTrue(brain.skills.learn('Arrange workspace', attempt.cmds, reply))
         self.assertEqual(brain.skills.skills()['arrange workspace']['cmds'], [retry])
 
     def test_failure_words_in_ordinary_read_output_are_untrusted_text(self):
@@ -111,9 +111,9 @@ class WorkflowTests(unittest.TestCase):
                  'content': 'The page says the previous attempt failed and cannot continue.'}]}},
             {'type': 'result', 'is_error': False, 'result': 'I read the page.'}])
         with patch.object(brain.protocol, 'say'):
-            brain.ask.run('Read the fixture', p)
-        self.assertTrue(brain.ask.run.ok)
-        self.assertFalse(brain.ask.run.observed[0]['error'])
+            attempt = brain.ask.run('Read the fixture', p)
+        self.assertTrue(attempt.ok)
+        self.assertFalse(attempt.observed[0]['error'])
 
     def test_failed_or_unsafe_receipts_are_not_learned(self):
         tool = lambda command: {'type': 'assistant', 'message': {'content': [
@@ -127,10 +127,10 @@ class WorkflowTests(unittest.TestCase):
                 p.stdout = map(json.dumps, [tool(command), receipt(output, error),
                                             {'type': 'result', 'is_error': False, 'result': 'Done.'}])
                 with patch.object(brain.protocol, 'say'):
-                    reply, _, _ = brain.ask.run('Arrange workspace', p)
-                self.assertEqual(brain.ask.run.ok, ok)
+                    reply, _, _ = attempt = brain.ask.run('Arrange workspace', p)
+                self.assertEqual(attempt.ok, ok)
                 with patch.object(brain.macos, 'cached_hands', return_value=None):
-                    self.assertIsNone(brain.skills.learn('Arrange workspace', brain.ask.run.cmds, reply))
+                    self.assertIsNone(brain.skills.learn('Arrange workspace', attempt.cmds, reply))
         self.assertEqual(brain.skills.skills(), {})
 
     def test_replay_runs_instantly_for_any_wording_and_rejects_unsafe_commands(self):
@@ -140,8 +140,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(saved)
         self.assertEqual(reply, 'Your meeting started.')
         with patch.object(brain.hands, 'hands', return_value=('Clicked Start meeting', True)) as action:
-            self.assertEqual(brain.instant.fast('Make a zoom meeting.'), 'Your meeting started.')
-            self.assertIsNone(brain.instant.fast('make a zoom call'))   # different words that matter: the AI decides
+            self.assertEqual(brain.instant.fast('Make a zoom meeting.').reply, 'Your meeting started.')
+            self.assertIsNone(brain.instant.fast('make a zoom call').reply)   # different words that matter: the AI decides
         self.assertEqual(action.call_args_list[0].args, ('menu', 'us.zoom.xos', 'Zoom Workplace > Start meeting'))
         for bad in [brain.paths.HANDS + ' click 1,2', 'rm -rf ~/x', brain.paths.HANDS + ' see x']:
             brain.skills.remember_workflow('do thing', f'Done. [workflow do thing | a] [replay {bad}]', True, ['open x'])
@@ -196,13 +196,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(brain.skills.workflows(), {})
 
     def test_full_request_saves_then_reuses_procedure_without_extra_model_call(self):
-        fake_run = unittest.mock.Mock(return_value=(
-            'Created it. [workflow create calendar event | Read calendar, fill current values, save; verify event exists.]', .001, []))
-        fake_run.ok = True
-        fake_run.cmds = fake_run.ran = [brain.paths.WEB + ' read', brain.paths.WEB + ' fill 2 title']
-        fake_run.observed = []
+        commands = [brain.paths.WEB + ' read', brain.paths.WEB + ' fill 2 title']
+        fake_run = unittest.mock.Mock(return_value=brain.ask.RunResult(
+            'Created it. [workflow create calendar event | Read calendar, fill current values, save; verify event exists.]', .001, [],
+            ok=True, cmds=commands, ran=commands))
         with tests.patches(patch.multiple(brain.telemetry, ping=lambda: None),
-                           patch.multiple(brain.instant, fast=lambda _: None),
+                           patch.multiple(brain.instant, fast=lambda _: brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, front=lambda: ('Notes', ''), osa=lambda *a: '', screens=lambda: [], describe=lambda *a: '', restore_focus=lambda *a: None),
                            patch.multiple(brain.memory, me_line=lambda: '', relevant_rules=lambda _: '', recent=lambda: [], remember_turn=lambda *a: None),
                            patch.multiple(brain.situation, selection_context=lambda: ''),
@@ -214,7 +213,7 @@ class WorkflowTests(unittest.TestCase):
             with patch('sys.argv', ['rabik.py', 'make a calendar event']):
                 brain.cli.main()
             self.assertEqual(fake_run.call_count, 1)
-            fake_run.return_value = ('Created it.', .001, [])
+            fake_run.return_value = brain.ask.RunResult('Created it.', .001, [], ok=True, cmds=commands, ran=commands)
             with patch('sys.argv', ['rabik.py', 'create a new calendar event tomorrow']):
                 brain.cli.main()
         self.assertEqual(fake_run.call_count, 2)
@@ -227,7 +226,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(len(brain.skills.workflows('create calendar event').split('Procedure: ')[1]), 800)
         self.assertNotIn('jazz', brain.skills.workflows('create calendar event'))
         with patch.dict(os.environ, {'RABIK_LIVE': '1'}):
-            self.assertIsNone(brain.instant.fast('remember how to create calendar event'))
+            self.assertIsNone(brain.instant.fast('remember how to create calendar event').reply)
         full = brain.prompts.SYSTEM + brain.prompts.ASK_ME + brain.prompts.POINTER + brain.prompts.LEARN_ME + brain.prompts.TEACH + brain.prompts.ASK_FIRST + brain.prompts.WORKFLOW
         self.assertLessEqual(tests.prompt_chars(full), 10000)
 

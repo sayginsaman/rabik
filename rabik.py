@@ -65,9 +65,8 @@ sys.modules[__name__].__class__ = _Facade
 
 os.environ['PATH'] = f"/opt/homebrew/bin:/usr/local/bin:{HOME}/.local/bin:{HOME}/.claude/local:/usr/bin:/bin:/usr/sbin:" + os.environ.get('PATH', '')
 
-# The lower layers call up through these, set once the whole brain is loaded.
+# The lower layer calls up through this, set once the whole brain is loaded.
 brain.protocol.on_stdout_closed = lambda: brain.clients.stop_workers()   # say(): nobody reads this ask any more, so stop its workers
-brain.turn.replayed = lambda: getattr(brain.skills.replay, 'ran', [])   # log_turn: the steps the last replayed shortcut ran
 
 
 if __name__ == '__main__':
@@ -119,7 +118,7 @@ if __name__ == '__main__':
                            ('and search amazon for', None), ('search for', None),
                            ('search amazon for tablecloths and find me the best value one', None)]:
             subprocess.run = lambda *a, **k: None   # selftest: never open a browser
-            assert fast(said) == done, (said, fast(said))
+            assert fast(said).reply == done, (said, fast(said).reply)
         assert re.findall(r'--remember\s+["\']([^"\']+)', f'{REMEMBER} "open means front"') == ['open means front']
         assert label('Bash', {'command': f'{FRONT} "Google Chrome" "posthog"'}) == 'Bringing Google Chrome forward'
         assert picks()['routing'][1] and 'safe' in switches()

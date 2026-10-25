@@ -46,13 +46,13 @@ class BackgroundTests(unittest.TestCase):
             for words in ('launch fixture', 'open fixture'):
                 calls.clear()
                 with self.subTest(words=words):
-                    self.assertEqual(brain.instant.fast(words), 'Opened Fixture.')
+                    self.assertEqual(brain.instant.fast(words).reply, 'Opened Fixture.')
                     self.assertEqual(calls[-1], ['open', '-a', 'Fixture'])
                     self.assertEqual(calls[:-1], [[brain.paths.APP, '--raise', 'user']] if words.startswith('launch') else [])   # "open" was freed by allow_focus already
             calls.clear()
             with patch.object(brain.windows, 'move_target', return_value=('Fixture', 'left', 'current')), \
                  patch.object(brain.windows, 'place', return_value='Fixture window -> left of Main'):
-                self.assertEqual(brain.instant.fast('launch fixture on the left'), 'Fixture: left.')
+                self.assertEqual(brain.instant.fast('launch fixture on the left').reply, 'Fixture: left.')
             self.assertEqual(calls[:2], [[brain.paths.APP, '--raise', 'user'], ['open', '-a', 'Fixture']])   # the inner "open" must not hide that the user asked
 
     def test_settings_and_tool_hints_never_steer_to_focus(self):
@@ -381,7 +381,7 @@ class BackgroundTests(unittest.TestCase):
     def test_old_foreground_shortcuts_upgrade_to_background_open(self):
         saved={'cmds':['open -a Notes'],'reply':'Done.'}
         with patch.object(brain.skills,'skills',return_value={'study':saved}),patch.object(brain.web,'show',return_value='opened Notes in the background') as show:
-            self.assertEqual(brain.skills.replay('study'),'Done.');show.assert_called_once_with('Notes',True)
+            self.assertEqual(brain.skills.replay('study').reply,'Done.');show.assert_called_once_with('Notes',True)
 
     def test_open_preview_expands_shell_home_and_restore_uses_current_app(self):
         with patch.object(brain.macos,'preview_app') as preview:

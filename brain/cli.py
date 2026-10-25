@@ -233,15 +233,16 @@ def main():
         turn.begin_turn(' '.join(args[1:]))
         telemetry.ping()
         macos.allow_focus(' '.join(args[1:]))
-        r = instant.fast(' '.join(args[1:]))
+        fast_done = instant.fast(' '.join(args[1:]))
+        r = fast_done.reply
         if not r:
             turn.checkpoint(status='not_handled')
             sys.exit(1)
         if r.startswith('The user said no.'): turn.end_turn('cancelled', emit=False)
-        elif wording.failed_action_reply(r, bool(getattr(instant.fast, 'cmds', []))): turn.end_turn('failed', emit=False)
-        memory.remember_turn(' '.join(args[1:]), r, getattr(instant.fast, 'shortcut', None))
-        turn.log_turn(' '.join(args[1:]), r, started, model='instant',
-                 path='shortcut' if getattr(instant.fast, 'shortcut', None) else 'instant', attempt_usd=[])
+        elif wording.failed_action_reply(r, bool(fast_done.cmds)): turn.end_turn('failed', emit=False)
+        memory.remember_turn(' '.join(args[1:]), r, fast_done.shortcut)
+        turn.log_turn(' '.join(args[1:]), r, started, ran=fast_done.ran, model='instant',
+                 path='shortcut' if fast_done.shortcut else 'instant', attempt_usd=[])
         if r.startswith('The user said no.'):
             print('! ' + r, flush=True); sys.exit(1)
         return print('✓ ' + r, flush=True)
@@ -397,10 +398,12 @@ def main():
     macos.allow_focus(task)
     if prefs.pref('instant', True) and hands.hands_command(wording.plain(task)):
         if not interaction.wait_commit(): return
-    quick = not marked and (not commit or os.path.exists(commit)) and prefs.pref('instant', True) and instant.fast(remaining if remaining is not None else task)
+    instant_done = (instant.fast(remaining if remaining is not None else task) if not marked and (not commit or os.path.exists(commit))
+                    and prefs.pref('instant', True) else instant.FastResult())
+    quick = instant_done.reply
     if quick:
         quick_cancelled = quick.startswith('The user said no.')
-        quick_failed = wording.failed_action_reply(quick, bool(getattr(instant.fast, 'cmds', [])))
+        quick_failed = wording.failed_action_reply(quick, bool(instant_done.cmds))
         if reading_started: reading.join()   # the summary cannot recreate its scratch file after a fast exit
         if snap.started: atexit.register(snap.join, .3)
         quick = ' '.join(done + [quick])
@@ -408,11 +411,11 @@ def main():
             clients.stop_claude(warm)
         if quick_cancelled: turn.end_turn('cancelled', emit=False)
         elif quick_failed: turn.end_turn('failed', emit=False)
-        memory.remember_turn(task, quick, getattr(instant.fast, 'shortcut', None))
-        turn.log_turn(task, quick, t, model='instant',
-                 path='shortcut' if getattr(instant.fast, 'shortcut', None) else 'instant', attempt_usd=[])
+        memory.remember_turn(task, quick, instant_done.shortcut)
+        turn.log_turn(task, quick, t, ran=instant_done.ran, model='instant',
+                 path='shortcut' if instant_done.shortcut else 'instant', attempt_usd=[])
         return protocol.say('!' if quick.startswith('The user said no.') else '✓', quick)
-    failed_replay = None if quick or not isinstance(getattr(instant.fast, 'failed', None), dict) else instant.fast.failed
+    failed_replay = None if quick or not isinstance(instant_done.failed, dict) else instant_done.failed
     if failed_replay: protocol.say('▸', 'The shortcut did not work. Redoing it')
     if done: task += skills.INTERNAL_TASK_MARKERS[0] + ' ' + ' '.join(done) + skills.INTERNAL_TASK_MARKERS[1] + ' ' + (remaining or '') + '\nDo only the remaining goal; check before repeating completed actions.'
     if reading_started: atexit.register(reading.join, .3)
@@ -470,60 +473,63 @@ def main():
     main_only = situation.main_delivery_required() or bool(marked or drawn)
     model = prefs.main_model()
     offer_model = prefs.routing_mode() == 'balanced' and model == 'haiku' and prefs.client() == 'claude' and not prefs.server()
-    reply, cost, steps = ask.run(prompt + prompts.MODEL_OFFER if offer_model else prompt, warm, images or (), offer_model, request=confirmed_task, main_only=main_only)
+    attempt = ask.run(prompt + prompts.MODEL_OFFER if offer_model else prompt, warm, images or (), offer_model, request=confirmed_task, main_only=main_only)
+    reply, cost, steps = attempt
     attempt_usd, escalated, escalate_why = ([] if cost is None else [cost]), False, None
     if turn.TURN: turn.TURN.update(model=model, attempt_usd=attempt_usd)
     def handed_off():
-        if not isinstance(getattr(ask.run, 'handoff', None), dict): return False
-        moves = [h for h in ask.run.handoffs if not h.get('steer')]
-        steered = len(moves) < len(ask.run.handoffs)
+        if not isinstance(attempt.handoff, dict): return False
+        moves = [h for h in attempt.handoffs if not h.get('steer')]
+        steered = len(moves) < len(attempt.handoffs)
         said = ' '.join(filter(None, ['Updated a background agent.' if steered else '', 'Moved the task to a background agent.' if len(moves) == 1 and not steered
                                       else 'Started ' + ('agents: ' if len(moves) > 1 else 'an agent: ') + '; '.join(h['title'] for h in moves) + '.' if moves else '']))
-        memory.remember_turn(task, said, agents=[h['handoffId'] for h in ask.run.handoffs if h.get('handoffId')])
-        turn.log_turn(turn.TURN.get('task', task), said, t, cost, steps, ask.run.ran, model=model, escalated=escalated, escalate_why=escalate_why, attempt_usd=attempt_usd)
+        memory.remember_turn(task, said, agents=[h['handoffId'] for h in attempt.handoffs if h.get('handoffId')])
+        turn.log_turn(turn.TURN.get('task', task), said, t, cost, steps, attempt.ran or instant_done.ran, model=model, escalated=escalated, escalate_why=escalate_why, attempt_usd=attempt_usd)
         return True
     if handed_off(): return
     if not interaction.wait_commit(): return
     previous = []
     # One continuation, including CLI asks; no task classifier or second fast-path call.
-    if offer_model and (reply.rstrip().endswith('[sonnet]') or not ask.run.ok and ask.run.work):   # a trailing [sonnet]: the model stopped short of a reachable goal
+    if offer_model and (reply.rstrip().endswith('[sonnet]') or not attempt.ok and attempt.work):   # a trailing [sonnet]: the model stopped short of a reachable goal
         escalated, escalate_why = True, 'asked' if reply.strip() == '[sonnet]' else 'failed'
         model = prefs.work_model()
         protocol.say('▸', 'Continuing with ' + model.capitalize())
         turn.checkpoint(status='running', model=model, escalated=True, escalate_why=escalate_why,
                    attempt_usd=attempt_usd)   # a timed-out attempt can still have a successful continuation
-        previous = ask.run.ran[:]
-        context = situation.continuation_context(previous, getattr(ask.run, 'observed', []))
-        reason = getattr(ask.run, 'error', '')
+        previous = attempt.ran[:]
+        context = situation.continuation_context(previous, attempt.observed)
+        reason = attempt.error
         reason = reason if isinstance(reason, str) and reason else reply
-        again, more, extra = ask.run(prompt + f'\nPrevious attempt: {reason[:400]}' + context, clients.start_ai(model), images or (), request=confirmed_task, main_only=main_only)
+        attempt = ask.run(prompt + f'\nPrevious attempt: {reason[:400]}' + context, clients.start_ai(model), images or (), request=confirmed_task, main_only=main_only)
+        again, more, extra = attempt
         if more is not None: attempt_usd.append(more)
         if turn.TURN: turn.TURN['attempt_usd'] = attempt_usd
-        ask.run.ran = previous + ask.run.ran
+        attempt.ran = previous + attempt.ran
         reply, cost, steps = again or reply, None if cost is None or more is None else cost + more, steps + extra
         if handed_off(): return
-    elif not ask.run.ok and os.environ.get('RABIK_ASK'):
+    elif not attempt.ok and os.environ.get('RABIK_ASK'):
         if warm:
             os.environ['RABIK_RELAY_ACTIVE'] = str(os.getpid())
             threading.Thread(target=interaction.relay, args=(None, os.environ['RABIK_ASK']), daemon=True).start()
         answer = wording.plain(interaction.ask_user({'q': 'Couldn’t finish this', 'cmd': 'Try again with the same model.',
-                                 'retry': True, 'details': getattr(ask.run, 'error', '')}, 60) or '')
+                                 'retry': True, 'details': attempt.error}, 60) or '')
         if answer in ('r', 'retry', 'try again'):
-            previous = ask.run.ran[:]
-            context = situation.continuation_context(previous, getattr(ask.run, 'observed', []))
-            again, more, extra = ask.run(prompt + f'\nA previous try failed: {reply[:400]}' + context, clients.start_ai(model), images or (), request=confirmed_task, main_only=main_only)
+            previous = attempt.ran[:]
+            context = situation.continuation_context(previous, attempt.observed)
+            attempt = ask.run(prompt + f'\nA previous try failed: {reply[:400]}' + context, clients.start_ai(model), images or (), request=confirmed_task, main_only=main_only)
+            again, more, extra = attempt
             if more is not None: attempt_usd.append(more)
             if turn.TURN: turn.TURN['attempt_usd'] = attempt_usd
-            ask.run.ran = previous + ask.run.ran
+            attempt.ran = previous + attempt.ran
             reply, cost, steps = again or reply, None if cost is None or more is None else cost + more, steps + extra
             if handed_off(): return
-    if previous: ask.run.cmds = []   # continuation commands alone cannot replay the whole goal
+    if previous: attempt.cmds = []   # continuation commands alone cannot replay the whole goal
     failed_shortcut = failed_replay or (previous_shortcut if previous_shortcut and '[unlearn]' in reply else None)   # a replay that failed its own check goes, tag or not
     retry_key = failed_shortcut['key'] if failed_shortcut and failed_replay and failed_shortcut.get('failed_at') == 0 else ''
     name = skills.shortcut_name(task, reply)
     reply = re.sub(skills.TRIGGER, '', reply).replace('[unlearn]', '').replace('[sonnet]', '').strip()
     # a flaky step must not erase a shortcut the user taught when the redo worked; a redo that can be learned below replaces it
-    if failed_shortcut and not (failed_replay and ask.run.ok and not wording.failed_action_reply(reply, ask.run.work) and skills.skills().get(failed_shortcut['key'], {}).get('mine')):
+    if failed_shortcut and not (failed_replay and attempt.ok and not wording.failed_action_reply(reply, attempt.work) and skills.skills().get(failed_shortcut['key'], {}).get('mine')):
         skills.unlearn(failed_shortcut['key'])
     replacement, reply = situation.replacement_reply(reply, bool(selected))
     if not replacement:
@@ -533,45 +539,46 @@ def main():
     fix = turns and re.match(r"(no|nope|not that|wrong|that's wrong|i meant|i said)\b", wording.plain(task))
     if fix and not failed_shortcut:
         skills.unlearn(turns[-1]['q'])   # a learned shortcut that did the wrong thing goes
-    if procedure and not ask.run.ok:
+    if procedure and not attempt.ok:
         skills.workflows(task, None)
     workflow = False
     if not replacement:
-        reply, workflow = skills.remember_workflow(task, reply, ask.run.ok and not failed_shortcut, ask.run.cmds)
+        reply, workflow = skills.remember_workflow(task, reply, attempt.ok and not failed_shortcut, attempt.cmds)
     shortcut, learned_key, learned_say = '', '', ''
-    named_commands = [c for c in (skills.shortcut_commands(task, ask.run.cmds) or []) if not c.startswith(paths.SHORTCUT)] if name else []
-    if name and ask.run.ok and skills.learn(name, named_commands, reply, confirmed_task) is not None:
+    named_commands = [c for c in (skills.shortcut_commands(task, attempt.cmds) or []) if not c.startswith(paths.SHORTCUT)] if name else []
+    if name and attempt.ok and skills.learn(name, named_commands, reply, confirmed_task) is not None:
         workflow = True; shortcut = name; learned_key = wording.plain(shortcut)
-    if not name and prefs.pref('learn', True) and ask.run.ok and (not failed_shortcut or retry_key) and task == confirmed_task:   # after a live action, run.cmds did only the rest of the ask; a teaching sentence is not itself a shortcut
+    if not name and prefs.pref('learn', True) and attempt.ok and (not failed_shortcut or retry_key) and task == confirmed_task:   # after a live action, run.cmds did only the rest of the ask; a teaching sentence is not itself a shortcut
         learned_task = retry_key or (turns[-1]['q'] if fix else task)
-        learned = skills.learn(learned_task, ask.run.cmds, reply)
+        learned = skills.learn(learned_task, attempt.cmds, reply)
         workflow = learned or workflow
         if learned is True: learned_key, learned_say = wording.plain(learned_task), learned_task
     if (fix or failed_shortcut and not failed_replay) and turns: telemetry.report(turns[-1]['q'], '', (), 0, 'the user said it was wrong')   # the answer is the user's own content (screen, mail, files), not why it failed
-    failed = wording.failed_action_reply(reply, ask.run.work)
-    final_ran = list(failed_replay.get('output', ())) + ask.run.ran if failed_replay else ask.run.ran
-    if not ask.run.ok or failed: telemetry.report(task, reply, final_ran, time.time() - t, 'error' if not ask.run.ok else 'could not do it')
-    if not ask.run.ok: telemetry.report_error('worker_exit', worker=prefs.client(), model=model, why=getattr(ask.run, 'why', '') or 'other')
+    failed = wording.failed_action_reply(reply, attempt.work)
+    final_ran = list(failed_replay.get('output', ())) + attempt.ran if failed_replay else attempt.ran
+    if not attempt.ok or failed: telemetry.report(task, reply, final_ran, time.time() - t, 'error' if not attempt.ok else 'could not do it')
+    if not attempt.ok: telemetry.report_error('worker_exit', worker=prefs.client(), model=model, why=attempt.why or 'other')
     learned_entry = skills.skills().get(learned_key) if learned_key else None
     learned_turn = {'key': learned_key, 'commands': learned_entry['cmds'],
-                    'output': [f'{o.get("action", "")} => {str(o.get("result", ""))[:400]}' for o in ask.run.observed] or [reply[:400]]} if learned_entry else None
+                    'output': [f'{o.get("action", "")} => {str(o.get("result", ""))[:400]}' for o in attempt.observed] or [reply[:400]]} if learned_entry else None
     memory.remember_turn(task, reply, learned_turn)
-    if not ask.run.ok or failed: turn.end_turn('failed', emit=False)
-    turn.log_turn(turn.TURN.get('task', task), reply, t, cost, steps, final_ran, len(images or ()),
+    if not attempt.ok or failed: turn.end_turn('failed', emit=False)
+    turn.log_turn(turn.TURN.get('task', task), reply, t, cost, steps, final_ran or instant_done.ran, len(images or ()),
              model=model, escalated=escalated, escalate_why=escalate_why, attempt_usd=attempt_usd)
     # clicks inside an app pull it forward; give the user back the app the user was in unless the user asked to go somewhere
-    macos.restore_focus(app, task, ask.run.ran)
-    if replacement and ask.run.ok and os.environ.get('RABIK_UI') == '1':
+    macos.restore_focus(app, task, attempt.ran)
+    if replacement and attempt.ok and os.environ.get('RABIK_UI') == '1':
         print('↺ ' + json.dumps({'t': '' if replacement == 'delete' else reply, 'mode': replacement}, ensure_ascii=False), flush=True)
-    protocol.say('✓' if ask.run.ok else '!', drawing.guide_reply(getattr(ask.run, 'observed', []), reply) if ask.run.ok and not replacement else reply)
+    protocol.say('✓' if attempt.ok else '!', drawing.guide_reply(attempt.observed, reply) if attempt.ok and not replacement else reply)
     receipt = memory.memory_receipt(remembered)   # remembered or forgot something: one row under the answer that opens Settings → Memory there
     if receipt and os.environ.get('RABIK_UI') == '1':
         print('✎ ' + json.dumps(receipt, ensure_ascii=False), flush=True)
     # "When I say focus mode, …" saved: a green Learned pill
     said = shortcut or learned_say   # a new shortcut, named or learned from these words
-    tips.tip(reply, f'Learned: Say “{said}” any time.' if said else 'Learned: Procedure saved for next time.' if workflow else taught[1].strip() if taught else '')
+    tips.tip(reply, f'Learned: Say “{said}” any time.' if said else 'Learned: Procedure saved for next time.' if workflow else taught[1].strip() if taught else '',
+             work=attempt.work)
     asked = os.path.join(paths.DIR, 'improve-asked')   # people who updated never saw setup's question: ask once a day after a task that worked, until they answer
-    if ask.run.ok and not failed and telemetry.POSTHOG_KEY and not prefs.pref('improveAsked', False) and os.environ.get('RABIK_UI') == '1' \
+    if attempt.ok and not failed and telemetry.POSTHOG_KEY and not prefs.pref('improveAsked', False) and os.environ.get('RABIK_UI') == '1' \
             and not (os.path.exists(asked) and Path(asked).read_text() == time.strftime('%Y-%m-%d')):
         Path(asked).write_text(time.strftime('%Y-%m-%d')); protocol.say('!', 'improve')
     if os.environ.get('RABIK_UI') != '1':   # typed from the menu bar: no overlay, so a notification

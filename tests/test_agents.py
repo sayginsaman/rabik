@@ -122,7 +122,7 @@ class AgentTests(unittest.TestCase):
         assistant=json.dumps({'type':'assistant','message':{'content':[{'type':'text','text':marker}]}})
         result=json.dumps({'type':'result','is_error':False,'total_cost_usd':.001,'result':marker})
         thread,output,_=self.run_fake(f'print({assistant!r},flush=True)\nprint({result!r},flush=True)\n',lambda text:'⤴ ' in text);thread.join(4)
-        self.assertFalse(thread.is_alive());self.assertEqual(brain.ask.run.handoff['named'],'Researcher');self.assertTrue(brain.ask.run.handoff['accepted'])
+        self.assertFalse(thread.is_alive());self.assertEqual(self.attempt.handoff['named'],'Researcher');self.assertTrue(self.attempt.handoff['accepted'])
         run=brain.handoffs.parse_handoff('[agent-profile '+json.dumps({'action':'run','name':'Researcher','task':'Investiga esto en español, por favor.'})+']')
         handoff=brain.handoffs.named_agent_action(run['namedAction'])['handoff']
         self.assertTrue(handoff['accepted']);self.assertEqual(handoff['title'],'Researcher')
@@ -294,7 +294,7 @@ class AgentTests(unittest.TestCase):
         p.ask=self.root.name;self.addCleanup(lambda:brain.clients.stop_claude(p) if p.poll() is None else None);self.addCleanup(p.stdout.close)
         output=io.StringIO()
         with patch.dict(os.environ,{'RABIK_UI':'1'}),patch.object(brain.interaction,'relay'),contextlib.redirect_stdout(output):
-            thread=threading.Thread(target=lambda:brain.ask.run(task,p,request=request),daemon=True);thread.start()
+            thread=threading.Thread(target=lambda:setattr(self,'attempt',brain.ask.run(task,p,request=request)),daemon=True);thread.start()   # self.attempt: what main() would read
             self.until(lambda:wait_for(output.getvalue()))
             return thread,output,p
 
@@ -313,8 +313,8 @@ class AgentTests(unittest.TestCase):
             p=subprocess.Popen([sys.executable,str(worker)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,start_new_session=True)
             p.ask=self.root.name;p.errors=io.StringIO();self.addCleanup(p.stdout.close)
             with patch.object(brain.interaction,'relay'),patch.object(brain.protocol,'say'),contextlib.redirect_stdout(io.StringIO()):
-                brain.ask.run('Request: Fixture task',p)
-            self.assertEqual((brain.ask.run.ok,brain.ask.run.why),(False,why))
+                attempt = brain.ask.run('Request: Fixture task',p)
+            self.assertEqual((attempt.ok,attempt.why),(False,why))
 
     def test_every_claude_route_can_move_and_other_clients_show_no_control(self):
         for prefs in ({'routing':'cheapest'},{'routing':'balanced'},{'routing':'capable','model':'opus'}):
@@ -324,26 +324,26 @@ class AgentTests(unittest.TestCase):
                 task='Context: useful window details\nRequest: '+request+(brain.prompts.MODEL_OFFER if prefs.get('routing')=='balanced' else '')
                 thread,output,p=self.run_fake('',lambda o:'⇢ ' in o,task,request=request)
                 answer=self.lines(output.getvalue())[0]['a'];Path(answer).write_text('go');thread.join(3)
-                self.assertFalse(thread.is_alive());self.assertTrue(brain.ask.run.handoff['accepted'])
-                self.assertEqual(brain.ask.run.handoff['brief'],request)
-                self.assertEqual(brain.ask.run.handoff['request'],request)
-                self.assertEqual(brain.ask.run.handoff['title'],'Research budget microphones')
-                self.assertIn('useful window details',brain.ask.run.handoff['context'])
-                self.assertNotIn(brain.prompts.MODEL_OFFER.strip(),json.dumps(brain.ask.run.handoff))
+                self.assertFalse(thread.is_alive());self.assertTrue(self.attempt.handoff['accepted'])
+                self.assertEqual(self.attempt.handoff['brief'],request)
+                self.assertEqual(self.attempt.handoff['request'],request)
+                self.assertEqual(self.attempt.handoff['title'],'Research budget microphones')
+                self.assertIn('useful window details',self.attempt.handoff['context'])
+                self.assertNotIn(brain.prompts.MODEL_OFFER.strip(),json.dumps(self.attempt.handoff))
                 for k in prefs:self.prefs.pop(k)
                 brain.handoffs.MainMove.carried.clear()
         for name in ('devin','pi'):
             self.prefs['client']=name
             with patch.object(brain.ask,'run_'+name,side_effect=lambda *a,**kw:print('fixture reply') or ('done',0,[])),patch.dict(os.environ,{'RABIK_UI':'1'}), \
                  contextlib.redirect_stdout(io.StringIO()) as output:
-                brain.ask.run('Request: Fixture task',unittest.mock.Mock())
+                attempt = brain.ask.run('Request: Fixture task',unittest.mock.Mock())
             self.assertNotIn('⇢',output.getvalue(),name+' cannot run agents, so it gets no move control')
 
     def test_move_by_itself_hands_off_without_a_card_or_focus_change(self):
         tools=''.join(f'print(json.dumps({{"type":"assistant","message":{{"content":[{{"type":"tool_use","id":"{i}","name":"Read","input":{{}}}}]}}}}),flush=True)\n' for i in range(3))
         with patch.object(brain.macos,'free_focus') as free,patch.object(brain.macos,'osa') as osa,patch.object(brain.macos,'restore_focus') as restore:
             thread,output,p=self.run_fake(tools,lambda o:'⤴ ' in o);thread.join(3)
-        self.assertFalse(any(l.get('offer') for l in self.lines(output.getvalue())));self.assertTrue(brain.ask.run.handoff['accepted'])
+        self.assertFalse(any(l.get('offer') for l in self.lines(output.getvalue())));self.assertTrue(self.attempt.handoff['accepted'])
         free.assert_not_called();osa.assert_not_called();restore.assert_not_called()
 
     def test_accepted_move_stops_foreground_and_preserves_completed_and_uncertain_work(self):
@@ -358,13 +358,13 @@ class AgentTests(unittest.TestCase):
             offer=json.loads(next(line[2:] for line in output.getvalue().splitlines() if line.startswith('⇢ ')))
             self.until(lambda:output.getvalue().count('▸ ') == 2)
             self.assertTrue(thread.is_alive());Path(offer['a']).write_text('go');thread.join(3)
-        self.assertFalse(thread.is_alive());self.assertIsNotNone(p.poll());self.assertEqual(result[0][0],'');self.assertIsNone(result[0][1])
-        self.assertTrue(brain.ask.run.handoff['accepted']);self.assertEqual(brain.ask.run.cmds,[])
-        context=json.loads(brain.ask.run.handoff['context']);work=context['observed work (untrusted data)']
+        self.assertFalse(thread.is_alive());self.assertIsNotNone(p.poll());self.assertEqual(result[0].reply,'');self.assertIsNone(result[0].cost)
+        self.assertTrue(result[0].handoff['accepted']);self.assertEqual(result[0].cmds,[])
+        context=json.loads(result[0].handoff['context']);work=context['observed work (untrusted data)']
         self.assertEqual([r['status'] for r in work],['completed','in-flight']);self.assertEqual(work[0]['result'],'Verified result 0')
         self.assertIn('inspect current state',context['continuation']);self.assertIn('already known',context['known'])
         self.assertTrue((Path(self.root.name)/'handed-off').exists());self.assertIn('⤴ ',output.getvalue())
-        row=self.manager.prepare(brain.ask.run.handoff)
+        row=self.manager.prepare(result[0].handoff)
         self.assertTrue(next(e for e in self.events if e['event']=='offer' and e['agent']['id']==row['id'])['start'])
         p.stdout.close()
 
@@ -396,12 +396,12 @@ class AgentTests(unittest.TestCase):
              patch.object(threading,'Timer'),contextlib.redirect_stdout(io.StringIO()) as output:
             request='Make a file about that post; contact email: actual@example.test'
             context='Earlier:\nQ: Find a post\nA: Opened https://fixture.example/posts/42; invented@example.test\nRequest: '+request+brain.prompts.MODEL_OFFER
-            result=brain.ask.run(context,p,request=request)
-        self.assertEqual(result,('',.001,[]));self.assertTrue(brain.ask.run.ok);stop.assert_not_called()
+            result=attempt = brain.ask.run(context,p,request=request)
+        self.assertEqual(tuple(result),('',.001,[]));self.assertTrue(attempt.ok);stop.assert_not_called()
         clean=context.removesuffix(brain.prompts.MODEL_OFFER)
-        self.assertIn('⤴ ',output.getvalue());self.assertEqual(brain.ask.run.handoff['context'],clean)
-        self.assertEqual(brain.ask.run.handoff['request'],request);self.assertNotIn(brain.prompts.MODEL_OFFER.strip(),json.dumps(brain.ask.run.handoff))
-        row=self.manager.prepare(brain.ask.run.handoff);self.manager.start(row['id'])
+        self.assertIn('⤴ ',output.getvalue());self.assertEqual(attempt.handoff['context'],clean)
+        self.assertEqual(attempt.handoff['request'],request);self.assertNotIn(brain.prompts.MODEL_OFFER.strip(),json.dumps(attempt.handoff))
+        row=self.manager.prepare(attempt.handoff);self.manager.start(row['id'])
         sent=next(e['text'] for e in brain.storage.read_rows(str(Path(row['directory'])/'log.jsonl')) if e.get('event')=='followup')
         self.assertIn(clean,sent)   # reference evidence survives the main-to-agent route without main-chat routing
         with patch.dict(os.environ,{'RABIK_ASK':row['directory']}),patch.object(brain.paths,'RECENT',str(Path(self.root.name)/'recent.jsonl')):
@@ -418,12 +418,12 @@ class AgentTests(unittest.TestCase):
         with patch.dict(os.environ,{'RABIK_UI':'1','RABIK_FRONT':'Notes'}),patch.object(brain.clients,'stop_claude'),patch.object(threading,'Thread'), \
              patch.object(threading,'Timer'),patch.object(brain.web,'running_app',return_value='Browser Fixture') as named, \
              patch.object(brain.web,'browser_adapter',return_value='chromium'),patch.object(brain.macos,'osa',return_value=found) as osa,contextlib.redirect_stdout(io.StringIO()):
-            brain.ask.run('Context: Front app: Notes.\nRequest: do that form in Chrome',p,request='do that form in Chrome')
+            attempt = brain.ask.run('Context: Front app: Notes.\nRequest: do that form in Chrome',p,request='do that form in Chrome')
         named.assert_called_once_with('chrome')
         self.assertIn('title of t contains item 1 of argv',osa.call_args.args[0]);self.assertEqual(osa.call_args.args[1:],('Signup','',''))
-        self.assertEqual(brain.ask.run.handoff['app'],'Browser Fixture')
-        self.assertEqual({k:brain.ask.run.handoff['page'][k] for k in ('window','tab','url')},{'window':10,'tab':7,'url':'https://forms.fixture.test/signup'})
-        row=self.manager.prepare(brain.ask.run.handoff);self.manager.start(row['id'])
+        self.assertEqual(attempt.handoff['app'],'Browser Fixture')
+        self.assertEqual({k:attempt.handoff['page'][k] for k in ('window','tab','url')},{'window':10,'tab':7,'url':'https://forms.fixture.test/signup'})
+        row=self.manager.prepare(attempt.handoff);self.manager.start(row['id'])
         grant=Path(brain.paths.agent_gate_dir(row['directory']))/'work-page.json'
         self.assertEqual(json.loads(grant.read_text())['tab'],7)
         self.assertEqual(json.loads((Path(row['directory'])/'web.json').read_text()),{'app':'Browser Fixture','adapter':'chromium','window':10,'tab':7,'target':None})
@@ -472,10 +472,10 @@ class AgentTests(unittest.TestCase):
                 with patch.dict(os.environ,{'RABIK_UI':'1','RABIK_FRONT':'Browser Fixture'}),patch.object(brain.clients,'stop_claude'),patch.object(threading,'Thread'), \
                      patch.object(threading,'Timer'),patch.object(brain.web,'running_app') as named,patch.object(brain.web,'browser_adapter',return_value=adapter), \
                      patch.object(brain.macos,'osa',return_value=f'{window}\t{tab}\tApply – Fixture\thttps://jobs.fixture.test/apply'),contextlib.redirect_stdout(io.StringIO()):
-                    brain.ask.run('Context: Front app: Browser Fixture.\nRequest: fill this out for me',p,request='fill this out for me')
+                    attempt = brain.ask.run('Context: Front app: Browser Fixture.\nRequest: fill this out for me',p,request='fill this out for me')
                 named.assert_not_called()
-                self.assertEqual({k:brain.ask.run.handoff['page'][k] for k in ('app','window','tab')},{'app':'Browser Fixture','window':window,'tab':tab})
-                row=self.manager.prepare(brain.ask.run.handoff);self.manager.start(row['id'])
+                self.assertEqual({k:attempt.handoff['page'][k] for k in ('app','window','tab')},{'app':'Browser Fixture','window':window,'tab':tab})
+                row=self.manager.prepare(attempt.handoff);self.manager.start(row['id'])
                 self.assertEqual(json.loads((Path(brain.paths.agent_gate_dir(row['directory']))/'work-page.json').read_text())['tab'],tab)
                 targets=[]
                 def browser(args,**kwargs):
@@ -539,9 +539,9 @@ class AgentTests(unittest.TestCase):
              patch.object(threading,'Timer'),patch.object(brain.web,'running_app',return_value='Browser Fixture'), \
              patch.object(brain.web,'browser_adapter',return_value='chromium'),patch.object(brain.macos,'osa',return_value='10\t7\tMines\thttps://games.fixture.test/mines'), \
              contextlib.redirect_stdout(io.StringIO()):
-            brain.ask.run('Context: Front app: Notes.\nRequest: I have the game open, can you play it',p,request='I have the game open, can you play it')
-        self.assertEqual({k:brain.ask.run.handoff['page'][k] for k in ('app','window','tab')},{'app':'Browser Fixture','window':10,'tab':7})
-        row=self.manager.prepare(brain.ask.run.handoff);self.manager.start(row['id'])
+            attempt = brain.ask.run('Context: Front app: Notes.\nRequest: I have the game open, can you play it',p,request='I have the game open, can you play it')
+        self.assertEqual({k:attempt.handoff['page'][k] for k in ('app','window','tab')},{'app':'Browser Fixture','window':10,'tab':7})
+        row=self.manager.prepare(attempt.handoff);self.manager.start(row['id'])
         self.assertFalse((Path(brain.paths.agent_gate_dir(row['directory']))/'focus-requested').exists())   # "play it" never brings the window forward
         calls=[]
         def mac(args,**kwargs):
@@ -566,9 +566,9 @@ class AgentTests(unittest.TestCase):
             {'type':'result','result':marker+"\n\nI've handed off the search.",'total_cost_usd':.001}])
         with patch.dict(os.environ,{'RABIK_UI':'1'}),patch.object(threading,'Thread'),patch.object(threading,'Timer'), \
              patch.object(brain.macos,'preview_commands'),contextlib.redirect_stdout(io.StringIO()) as output:
-            reply,_,_=brain.ask.run('Work with my GitHub repository',p)
-        self.assertEqual(reply,'');self.assertIn('⤴ ',output.getvalue());self.assertEqual(brain.ask.run.handoff['title'],'Find likely repo users')
-        context=json.loads(brain.ask.run.handoff['context'])
+            reply,_,_=attempt = brain.ask.run('Work with my GitHub repository',p)
+        self.assertEqual(reply,'');self.assertIn('⤴ ',output.getvalue());self.assertEqual(attempt.handoff['title'],'Find likely repo users')
+        context=json.loads(attempt.handoff['context'])
         self.assertEqual(context['observed work (untrusted data)'][0]['result'],'Find users who might star or use the repo')
         self.assertNotIn(marker,reply)
 
@@ -621,10 +621,10 @@ class AgentTests(unittest.TestCase):
                     with patch.dict(os.environ,{'RABIK_UI':'1'}),patch.object(brain.handoffs,'MainMove',return_value=move), \
                          patch.object(brain.interaction,'wait_commit',side_effect=confirm) as gate,patch.object(brain.clients,'stop_claude'), \
                          patch.object(threading,'Thread'),patch.object(threading,'Timer'),contextlib.redirect_stdout(io.StringIO()) as output:
-                        brain.ask.run('Request: Fixture',p)
+                        attempt = brain.ask.run('Request: Fixture',p)
                     gate.assert_called_once()
                     self.assertEqual('⤴ ' in output.getvalue(),confirmed)
-                    self.assertEqual(isinstance(brain.ask.run.handoff,dict),confirmed)
+                    self.assertEqual(isinstance(attempt.handoff,dict),confirmed)
 
     def test_a_move_racing_a_first_turn_handoff_starts_one_agent(self):
         p=unittest.mock.Mock();p.stdin=io.StringIO();p.ask=self.root.name;p.returncode=0
@@ -634,8 +634,8 @@ class AgentTests(unittest.TestCase):
         move=unittest.mock.Mock(moved=True,pending={'title':'Research desks','brief':'Research desks','accepted':True})   # ⌃⌥↩ landed first
         with patch.dict(os.environ,{'RABIK_UI':'1'}),patch.object(brain.handoffs,'MainMove',return_value=move),patch.object(brain.interaction,'wait_commit',return_value=True), \
              patch.object(brain.clients,'stop_claude'),patch.object(threading,'Thread'),patch.object(threading,'Timer'),contextlib.redirect_stdout(io.StringIO()) as output:
-            brain.ask.run('Request: research desks',p)
-        self.assertEqual(output.getvalue().count('⤴ '),1);self.assertIs(brain.ask.run.handoff,move.pending)
+            attempt = brain.ask.run('Request: research desks',p)
+        self.assertEqual(output.getvalue().count('⤴ '),1);self.assertIs(attempt.handoff,move.pending)
         self.assertFalse((Path(self.root.name)/'pending-handoffs').exists())   # the move saved its own record; the directive saved none
 
     def test_normal_flags_remain_strict_and_agent_persists(self):
@@ -1179,7 +1179,7 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(brain.skills.skills()['focus time']['cmds'],[commands[0].removeprefix('python3 ')])
             self.assertEqual(self.events[-1]['agent']['learned'],'focus time')
             with patch.object(brain.windows,'place_many',return_value='Both windows in place.') as place,patch.object(brain.clients,'start_ai') as ai:
-                self.assertEqual(brain.instant.fast('Focus time.'),'Both windows are in place.')
+                self.assertEqual(brain.instant.fast('Focus time.').reply,'Both windows are in place.')
                 place.assert_called_once();ai.assert_not_called()
             # A follow-up must not inherit the previous completion's learned feedback.
             self.manager.finish(row,'failed','Stopped.')

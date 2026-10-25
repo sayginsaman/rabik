@@ -135,10 +135,10 @@ class NightTests(unittest.TestCase):
              patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)), patch.object(brain.macos, 'cached_hands', return_value=None), \
              patch.dict(os.environ, {'RABIK_UI': '1'}), patch('sys.stdout', new_callable=io.StringIO) as out:
             with patch.dict(os.environ, {'RABIK_LIVE': '1'}):
-                self.assertIsNone(brain.instant.fast('When I say quiet time, open fixture on the left'))
+                self.assertIsNone(brain.instant.fast('When I say quiet time, open fixture on the left').reply)
                 place.assert_not_called()
                 self.assertEqual(brain.skills.skills(), {})
-            self.assertEqual(brain.instant.fast('When I say quiet time, open fixture on the left'), 'Fixture: left.')
+            self.assertEqual(brain.instant.fast('When I say quiet time, open fixture on the left').reply, 'Fixture: left.')
             saved = brain.skills.skills()['quiet time']
             self.assertTrue(saved['mine'])
             self.assertIn('--place Fixture left current', ' '.join(saved['cmds']))
@@ -146,7 +146,7 @@ class NightTests(unittest.TestCase):
 
     def test_remaining_words_keep_fast_path_and_complete_context_for_fallback(self):
         request = {'front': 'Fixture', 'task': 'Fixture left, Other right', 'remaining': ', Other right', 'done': ['Fixture: left.']}
-        fake_run = Mock(return_value=('Handled remainder.', 0, [])); fake_run.ok = True; fake_run.cmds = fake_run.ran = []; fake_run.observed = []
+        fake_run = Mock(return_value=brain.ask.RunResult('Handled remainder.', 0, [], ok=True))
         with tests.patches(patch.multiple(brain.clients, start_ai=lambda: None),
                            patch.multiple(brain.telemetry, ping=lambda: None),
                            patch.multiple(brain.macos, front=lambda: ('Fixture', ''), osa=lambda *a: '', screens=lambda: [], describe=lambda *a: '', restore_focus=lambda *a: None),
@@ -157,14 +157,14 @@ class NightTests(unittest.TestCase):
                            patch.multiple(brain.interaction, wait_commit=lambda: True),
                            patch.multiple(brain.ask, run=fake_run),
                            patch.multiple(brain.turn, log_turn=lambda *a, **k: None),
-                           patch.multiple(brain.tips, tip=lambda *a: None)), \
+                           patch.multiple(brain.tips, tip=lambda *a, **k: None)), \
              patch.object(threading, 'Thread'), patch('sys.argv', ['rabik.py', '--wait']), \
-             patch('sys.stdout', new_callable=io.StringIO) as out, patch.object(brain.instant, 'fast', return_value='Other: right.') as fast:
+             patch('sys.stdout', new_callable=io.StringIO) as out, patch.object(brain.instant, 'fast', return_value=brain.instant.FastResult('Other: right.')) as fast:
             with patch('sys.stdin', io.StringIO(json.dumps(request) + '\n')): brain.cli.main()
             fast.assert_called_once_with(', Other right')
             fake_run.assert_not_called()
             self.assertIn('Fixture: left. Other: right.', out.getvalue())
-            fast.return_value = None
+            fast.return_value = brain.instant.FastResult(None)
             with patch('sys.stdin', io.StringIO(json.dumps(request) + '\n')), patch.object(brain.skills, 'learn') as learn: brain.cli.main()
             learn.assert_not_called()   # its commands did only the rest: never a shortcut, and never under the "Already completed" words
             prompt = fake_run.call_args.args[0]
@@ -178,19 +178,19 @@ class NightTests(unittest.TestCase):
     def test_parallel_moves_share_request_display_and_explicit_screen_wins(self):
         with patch.object(brain.apps, 'app_named', side_effect=lambda t: {'fixture': 'Fixture', 'other': 'Other'}.get(t)), \
              patch.object(brain.apps, 'proc_of', side_effect=lambda s: s), patch.object(brain.windows, 'place', return_value='Moved') as place:
-            self.assertIsNotNone(brain.instant.fast('Fixture on the left, Other on the right'))
+            self.assertIsNotNone(brain.instant.fast('Fixture on the left, Other on the right').reply)
             self.assertEqual({c.args[2] for c in place.call_args_list}, {'Request display'})
             place.reset_mock()
-            self.assertIsNotNone(brain.instant.fast('Fixture left laptop, Other right monitor'))
+            self.assertIsNotNone(brain.instant.fast('Fixture left laptop, Other right monitor').reply)
             self.assertEqual({c.args[2] for c in place.call_args_list}, {'laptop', 'monitor'})
             place.reset_mock()
-            self.assertIsNotNone(brain.instant.fast(', Other on the right'))
+            self.assertIsNotNone(brain.instant.fast(', Other on the right').reply)
             place.assert_called_once_with('Other', 'right', 'current')
 
     def test_continuation_punctuation_does_not_block_other_simple_actions(self):
         with patch.object(brain.apps, 'app_named', side_effect=lambda t: 'Fixture' if t == 'fixture' else None), \
              patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)) as open_:
-            self.assertEqual(brain.instant.fast(', and open fixture'), 'Opened Fixture.')
+            self.assertEqual(brain.instant.fast(', and open fixture').reply, 'Opened Fixture.')
             open_.assert_called_once_with(['open', '-a', 'Fixture'])
         self.assertEqual(brain.wording.plain('; then search example.test for reports'), 'search example.test for reports')
 
@@ -198,7 +198,7 @@ class NightTests(unittest.TestCase):
         brain.skills.save_skills({'quiet time': {'cmds': [brain.paths.PLACE + ' Fixture left current'], 'reply': 'Moved.', 'mine': True}})
         with patch.object(brain.windows, 'place', return_value='Fixture window -> left of Request display') as place, \
              patch.object(subprocess, 'run') as shell, patch.object(brain.macos, 'preview_commands') as preview:
-            self.assertEqual(brain.skills.replay('quiet time'), 'Moved.')
+            self.assertEqual(brain.skills.replay('quiet time').reply, 'Moved.')
             place.assert_called_once_with('Fixture', 'left', 'Request display')
             shell.assert_not_called(); preview.assert_not_called()
 
@@ -210,7 +210,7 @@ class NightTests(unittest.TestCase):
                 # Old explicit shortcuts also need repair when loaded, independent of cwd.
                 brain.skills.save_skills({'quiet time':{'cmds':[command],'reply':'Placed.','mine':True}})
                 with patch.object(brain.windows,'place_many',return_value='Placed.') as place,patch.object(subprocess,'run') as shell:
-                    self.assertEqual(brain.instant.fast('Quiet time.'),'Placed.')
+                    self.assertEqual(brain.instant.fast('Quiet time.').reply,'Placed.')
                     place.assert_called_once_with(['Fixture','fullscreen','monitor']);shell.assert_not_called()
         self.assertIsNone(brain.skills.learn('other setup',['python3 /tmp/rabik.py --place Fixture full laptop'],'Placed.'))
 
@@ -218,7 +218,7 @@ class NightTests(unittest.TestCase):
         for request in ('Okay, when I say quiet time, open fixture on the left', 'Um, can you, when I say quiet time, open fixture on the left'):
             with patch.object(brain.apps,'app_named',side_effect=lambda s:'Fixture' if s=='fixture' else None),patch.object(brain.apps,'proc_of',side_effect=lambda s:s), \
                  patch.object(brain.windows,'place',return_value='Placed.'),patch.object(subprocess,'run',return_value=subprocess.CompletedProcess([],0)),patch.object(brain.macos,'cached_hands',return_value=None):
-                self.assertEqual(brain.instant.fast(request),'Fixture: left.')
+                self.assertEqual(brain.instant.fast(request).reply,'Fixture: left.')
                 self.assertIn('quiet time',brain.skills.skills())
         self.assertIsNone(brain.skills.named_shortcut('Do not save when I say quiet time, open fixture'))
 
@@ -234,10 +234,10 @@ class NightTests(unittest.TestCase):
     def test_fullscreen_and_maximize_teach_their_distinct_native_actions(self):
         with patch.object(brain.apps,'app_named',side_effect=lambda s:'Fixture' if s=='fixture' else None),patch.object(brain.apps,'proc_of',side_effect=lambda s:s), \
              patch.object(brain.windows,'place',return_value='Placed.') as place,patch.object(brain.macos,'cached_hands',return_value=None):
-            self.assertEqual(brain.instant.fast('Okay, when I say quiet time, full screen fixture on my monitor'),'Fixture: full screen on monitor.')
+            self.assertEqual(brain.instant.fast('Okay, when I say quiet time, full screen fixture on my monitor').reply,'Fixture: full screen on monitor.')
             place.assert_called_with('Fixture','fullscreen','monitor')
             self.assertEqual(brain.skills.skills()['quiet time']['cmds'],[brain.paths.PLACE+' Fixture fullscreen monitor'])
-            self.assertEqual(brain.instant.fast('maximize fixture'),'Fixture: full.')
+            self.assertEqual(brain.instant.fast('maximize fixture').reply,'Fixture: full.')
             place.assert_called_with('Fixture','full','current')
 
     def test_native_fullscreen_targets_standard_window_and_checks_success(self):

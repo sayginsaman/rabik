@@ -420,17 +420,16 @@ print("Clicked Export")
 
     def test_request_contains_bounded_summary_before_first_tool_and_omits_pictures(self):
         def answer(*args, **_):
-            brain.ask.run.ok = True; brain.ask.run.ran = brain.ask.run.cmds = []
-            return 'Export opened.',0,[]
+            return brain.ask.RunResult('Export opened.',0,[],ok=True)
         with tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
                            patch.multiple(brain.screen, look=lambda:[], window_summary=lambda *_:{'app':'Fixture','window':'Window','text':'Worksheet question and answers. ' * 10}),
-                           patch.multiple(brain.instant, fast=lambda _:None),
+                           patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, front=lambda:('Fixture','Window'), osa=lambda *_:'', screens=lambda:[], describe=lambda *_:'Fixture display', restore_focus=lambda *_:None),
                            patch.multiple(brain.memory, me_line=lambda:'', relevant_rules=lambda _: '', recent=lambda:[], remember_turn=lambda *_:None),
                            patch.multiple(brain.situation, selection_context=lambda:''),
                            patch.multiple(brain.skills, workflows=lambda *args:'', learn=lambda *_:None),
                            patch.multiple(brain.turn, log_turn=lambda *_, **__:None),
-                           patch.multiple(brain.tips, tip=lambda *_:None)), \
+                           patch.multiple(brain.tips, tip=lambda *_, **k: None)), \
              patch.object(brain.ask,'run',side_effect=answer) as run, patch.object(brain.protocol,'say'), \
              patch('sys.argv',['rabik.py','click Export in this window']), patch.dict(os.environ,{'RABIK_UI':'1'}):
             brain.cli.main()
@@ -453,17 +452,16 @@ print("Clicked Export")
         def answer(*args, **_):
             started.append(time.monotonic() - began)
             prompts.append(args[0])
-            brain.ask.run.ok = True; brain.ask.run.ran = brain.ask.run.cmds = []
-            return 'Done.',0,[]
+            return brain.ask.RunResult('Done.',0,[],ok=True)
         with tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
                            patch.multiple(brain.screen, look=slow_capture, window_summary=slow_summary),
-                           patch.multiple(brain.instant, fast=lambda _:None),
+                           patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult(None)),
                            patch.multiple(brain.macos, front=lambda:('Fixture','Window'), osa=lambda *_:'', screens=lambda:[], describe=lambda *_:'Fixture display', restore_focus=lambda *_:None),
                            patch.multiple(brain.memory, me_line=lambda:'', relevant_rules=lambda _: '', recent=lambda:[], remember_turn=lambda *_:None),
                            patch.multiple(brain.situation, selection_context=lambda:''),
                            patch.multiple(brain.skills, workflows=lambda *args:'', learn=lambda *_:None),
                            patch.multiple(brain.turn, log_turn=lambda *_, **__:None),
-                           patch.multiple(brain.tips, tip=lambda *_:None)), \
+                           patch.multiple(brain.tips, tip=lambda *_, **k: None)), \
              patch.object(brain.ask,'run',side_effect=answer), patch.object(brain.protocol,'say'), \
              patch('sys.argv',['rabik.py','answer an unrelated fact']), patch.dict(os.environ,{'RABIK_UI':'1'}):
             brain.cli.main()
@@ -483,7 +481,7 @@ print("Clicked Export")
             return {'app': 'Fixture', 'window': 'Window', 'text': 'Context'}
         with tests.patches(patch.multiple(brain.telemetry, ping=lambda:None),
                            patch.multiple(brain.screen, look=lambda:[], window_summary=summary),
-                           patch.multiple(brain.instant, fast=lambda _:'Done.'),
+                           patch.multiple(brain.instant, fast=lambda _:brain.instant.FastResult('Done.')),
                            patch.multiple(brain.situation, selection_context=lambda:''),
                            patch.multiple(brain.memory, remember_turn=lambda *_:None),
                            patch.multiple(brain.turn, log_turn=lambda *_, **__:None)), \
