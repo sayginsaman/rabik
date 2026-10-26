@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""README screenshots (docs/screens/*.png): Rabik's real pages with demo data, drawn offscreen by scripts/shot.swift. No Mac,
+"""README images (docs/hero.png and docs/screens/*.png): Rabik's real pages with demo data, drawn offscreen by scripts/shot.swift. No Mac,
 account or user data is read; run it after a UI change: python3 scripts/readme-shots.py"""
 import base64
 import json
@@ -17,7 +17,7 @@ SCENES = {
     'answer': ('ui/ui.html', 'c,h', 440, 700, '#card', 'box', 1, f"""
 ui.listen(); ui.words('What did we decide about pricing last week, and what do I owe Sam?'); ui.think();
 ui.line('▸ Reading your meetings'); ui.line('▸ Checking About you'); {WAIT}
-ui.line('✓ In **Pricing review** (Thu) you agreed to raise Pro to **$24/month** from May 1 and keep the yearly plan at $199.\\u2028\\u2028You owe Sam two things:\\u2028\\u2028- The updated pricing deck by **Friday**\\u2028- A note to existing customers before the change');
+ui.line('✓ In **Pricing review** (Thu) you agreed to raise Pro to **$24/month** from May 1 and keep the yearly plan at $199.\\n\\nYou owe Sam two things:\\n\\n- The updated pricing deck by **Friday**\\n- A note to existing customers before the change');
 ui.line('⌖ ' + JSON.stringify([{{kind:'meeting',id:'m1',label:'Pricing review · Oct 22'}},{{kind:'person',id:'sam',label:'Sam Lee'}},{{kind:'fact',id:'f',label:'People · Sam is head of sales'}}]));"""),
     'recap': ('ui/ui.html', 'c,h', 440, 1400, '#card', 'box', 1, """
 const open=document.createElement('style');open.textContent='.agent-card.recap-card .a,#thread{max-height:none!important;overflow:visible!important}';document.head.append(open);
@@ -66,7 +66,18 @@ def main():
         subprocess.run(['xcrun', 'swiftc', '-O', str(ROOT / 'scripts' / 'shot.swift'), '-o', str(tool)], check=True)
         for name, (page, handlers, w, h, sel, panel, dark, script) in SCENES.items():
             subprocess.run([str(tool), str(ROOT / page), handlers, str(w), str(h), sel, panel, str(dark), script, str(OUT / f'{name}.png')], check=True)
+            subprocess.run(['sips', '-Z', '1200', str(OUT / f'{name}.png')], check=True, capture_output=True)
             print('wrote', OUT / f'{name}.png')
+        # The hero (docs/hero.png): the same box answer, unframed, beside Rabik's name on its own page
+        page, handlers, w, h, sel, _, dark, script = SCENES['answer']
+        box = Path(tmp) / 'box.png'
+        subprocess.run([str(tool), str(ROOT / page), handlers, str(w), str(h), sel, 'none', str(dark), script, str(box)], check=True)
+        hero = Path(tmp) / 'hero.html'
+        hero.write_text((ROOT / 'scripts' / 'hero.html').read_text().replace('{{ICON}}', ICON)
+                        .replace('{{BOX}}', 'data:image/png;base64,' + base64.b64encode(box.read_bytes()).decode()))
+        subprocess.run([str(tool), str(hero), 'none', '1200', '560', '', 'none', '1', '', str(ROOT / 'docs' / 'hero.png')], check=True)
+        subprocess.run(['sips', '-Z', '2400', str(ROOT / 'docs' / 'hero.png')], check=True, capture_output=True)   # 2x is plenty for a README
+        print('wrote', ROOT / 'docs' / 'hero.png')
 
 
 if __name__ == '__main__':

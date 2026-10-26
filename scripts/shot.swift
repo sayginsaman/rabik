@@ -1,6 +1,6 @@
 // README screenshots: one of Rabik's real pages (ui/*.html) in an offscreen WKWebView with demo data, framed like the app
 // draws it (the box's dark glass, the Settings window, the meeting panel), on a soft backdrop. scripts/readme-shots.py runs it.
-// shot <page.html> <handlers,comma> <width> <height> <selector|""> <panel: box|window|meeting> <dark 0|1> <script> <out.png>
+// shot <page.html> <handlers,comma> <width> <height> <selector|""> <panel: box|window|meeting|none> <dark 0|1> <script> <out.png>
 import Cocoa
 import WebKit
 
@@ -10,7 +10,7 @@ final class Sink: NSObject, WKScriptMessageHandler { func userContentController(
 final class Shot: NSObject, WKNavigationDelegate {
     func webView(_ v: WKWebView, didFinish n: WKNavigation!) {
         let still = "const s=document.createElement('style');s.textContent='*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition:none!important}';document.head.append(s);"
-        v.callAsyncJavaScript(still + "for(let i=0;i<300&&!(window.ui||window.st||window.meeting);i++)await new Promise(r=>setTimeout(r,20));\n" + script + "\nawait new Promise(r=>setTimeout(r,900));const e=" + (selector.isEmpty ? "document.body" : "document.querySelector('\(selector)')") + ";const r=e.getBoundingClientRect();return [r.x,r.y,r.width,r.height];", arguments: [:], in: nil, in: .page) { result in
+        v.callAsyncJavaScript(still + "for(let i=0;i<300&&document.querySelector('script[type=module]')&&!(window.ui||window.st||window.meeting);i++)await new Promise(r=>setTimeout(r,20));\n" + script + "\nawait new Promise(r=>setTimeout(r,900));const e=" + (selector.isEmpty ? "document.body" : "document.querySelector('\(selector)')") + ";const r=e.getBoundingClientRect();return [r.x,r.y,r.width,r.height];", arguments: [:], in: nil, in: .page) { result in
             guard case .success(let value) = result, let r = value as? [Double] else { print("script failed: \(result)"); exit(1) }
             let c = WKSnapshotConfiguration(); c.rect = NSRect(x: r[0], y: r[1], width: r[2], height: r[3]); c.snapshotWidth = NSNumber(value: r[2] * 2)
             v.takeSnapshot(with: c) { image, error in
@@ -21,6 +21,10 @@ final class Shot: NSObject, WKNavigationDelegate {
     }
 }
 func frame(_ shot: NSImage, size: NSSize) {
+    if panel == "none" {   // the page as drawn, transparent where it is (the README hero composes it itself)
+        let rep = NSBitmapImageRep(data: shot.tiffRepresentation!)!
+        try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out)); return
+    }
     let pad: CGFloat = 56, radius: CGFloat = panel == "window" ? 12 : 18
     let canvas = NSSize(width: size.width + pad * 2, height: size.height + pad * 2), scale: CGFloat = 2
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(canvas.width * scale), pixelsHigh: Int(canvas.height * scale), bitsPerSample: 8,

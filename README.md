@@ -1,252 +1,186 @@
-<p align="center"><img src="docs/banner.png" alt="Rabik. Your whole Mac, one sentence away." width="100%"></p>
+<img src="docs/hero.png" alt="Rabik: talk to your Mac. It remembers. Beside it, Rabik's box answering a question from a saved meeting, with source chips under the answer." width="100%">
 
-<p align="center">
-  Hold <kbd>⌃ control</kbd> <kbd>⌥ option</kbd> <kbd>space</kbd>, say what you need, let go.<br>
-  Rabik moves your windows, finds your files, reads your screen and gets it done.
-</p>
+**Rabik is a Mac assistant you talk to.** Hold <kbd>⌃</kbd><kbd>⌥</kbd><kbd>Space</kbd>, say what you want and let go. Rabik works your apps, your screen and the web, sits in on your calls, and keeps a private memory of your days, so it can answer *"what did we decide last week?"* as easily as *"open Spotify"*.
 
-<p align="center">
-  <b>🧠 Learns as you use it</b> &nbsp;·&nbsp; <b>⚡ Fast</b> &nbsp;·&nbsp; <b>🔑 No API key</b> &nbsp;·&nbsp; <b>Free and open source</b>
-</p>
+[**Download for Mac**](https://github.com/sayginsaman/rabik/releases/latest) · macOS 26 or later · free and open source (MIT) · [Install notes](#install)
 
-## Quick install
+---
 
-Download `Rabik-<version>.dmg` from the [Releases page](https://github.com/sayginsaman/rabik/releases), open it and drag Rabik to Applications.
+## A day with Rabik
 
-Needs macOS 26 and an AI client: Claude Code on a Claude plan, Devin, Pi or a local model. [Full install steps](#install)
+<table>
+<tr>
+<td width="50%"><img src="docs/screens/meeting.png" alt="Meeting Copilot answering a question asked during a call"><br><b>During a call</b>, it answers the question someone just asked, from your notes.</td>
+<td width="50%"><img src="docs/screens/transcript.png" alt="A meeting transcript with speaker names and a Turkish line translated under it"><br><b>In any language</b>, with speaker names and live translation, on your Mac.</td>
+</tr>
+<tr>
+<td><img src="docs/screens/recap.png" alt="The daily recap card"><br><b>In the evening</b>, one card: what got done, to-dos for Reminders, your goals and where the time went.</td>
+<td><img src="docs/screens/people.png" alt="Settings, People: a person's meetings and what Rabik knows"><br><b>Any time</b>, ask about a person, a meeting or that page you had open on Tuesday.</td>
+</tr>
+</table>
+
+## Things to say
+
+| Say | What happens |
+|---|---|
+| *"Open Spotify."* · *"Terminal on the left."* | Done at once. Simple commands never touch the AI. |
+| *"Code on my big screen, Chrome and Terminal on the laptop."* | Three windows arranged across two displays. |
+| *"What's wrong with this code?"* | Rabik looks at your screen and answers in a line. |
+| *"Where do I turn on Night Shift?"* | A ring appears on the exact spot. |
+| *"Explain the Pythagorean theorem and draw it."* | A step-by-step drawing builds up over your screen. |
+| *"Reply to this. Thursday works, send me a time."* | A draft of the reply, ready to insert. It never sends by itself. |
+| *"Move my dentist appointment to 4."* | A card shows the old and new time. Adding is immediate; moving or deleting asks first. |
+| *"Find me a desk lamp under $30 on Amazon."* | Rabik shops in Chrome behind your apps; a mini screen shows it. |
+| *"Tell me when the build is done."* | Rabik watches for free and pings you. |
+| *"When I say focus mode, close Slack and open my to-do list."* | Learned. Two words do it from now on. |
+| *"When did I last talk to Sam?"* | An answer from your meetings, with chips that open them. |
+| *"Summarize my day."* · *"My goal is to ship the beta by Friday."* | The daily recap, and a goal it keeps track of. |
 
 ## What it does
 
-- **Learns.** Ask for something new once and it works out the steps. Ask again and it runs in a blink, with no AI.
-- **Instant commands.** Opens apps, moves windows, plays music and searches the web with no AI at all.
-- **Sees your screen.** Ask about anything on screen. Ask "where do I click?" and it points at the spot.
-- **Draws to explain.** "Explain this and draw it" builds a labeled diagram on your screen.
-- **Dictate anywhere.** Hold fn, talk, let go. Your words land in any text field, cleaned up.
-- **Background agents.** Big jobs run behind your apps while you keep working.
-- **Meeting Copilot.** Answers and notes during calls, saved on your Mac.
-- **Remembers you.** Say "remember…" and every ask after that knows it.
-- **Your plan, no API key.** Runs on Claude, Devin, Pi or a local model.
-- **Private and safe.** Your voice stays on your Mac. Deletes, sends and purchases ask first.
+### Acts on your Mac
+Rabik opens apps, places windows, plays music, searches the web, fills in forms, reads documents and types where your cursor is. The simplest commands run instantly with no AI. Anything new is worked out once by the AI; ask again and Rabik replays what worked, in a blink.
 
-<p align="center">
-  <img alt="macOS" src="https://img.shields.io/badge/macOS-1d1d1f?style=for-the-badge&logo=apple&logoColor=white">
-  <img alt="Swift" src="https://img.shields.io/badge/Swift-1d1d1f?style=for-the-badge&logo=swift&logoColor=white">
-  <img alt="Claude" src="https://img.shields.io/badge/Claude_Haiku-1d1d1f?style=for-the-badge&logo=anthropic&logoColor=white">
-  <img alt="Cost" src="https://img.shields.io/badge/~0.18%C2%A2_per_ask-1d1d1f?style=for-the-badge">
-</p>
+### Shows you, and lets you show it
+**Point at your screen:** click the pointer button next to the mic, then click, circle or scribble on anything and ask about it. **Draw on screen** is the other direction: Rabik draws boxes, arrows and labels over your apps and walks you through, one step at a time. Ask it to explain something and the drawing builds up like a whiteboard.
 
-<br>
+<details><summary>More about pointing and drawing</summary>
 
-## Just ask
-
-| You say | Rabik |
-|---|---|
-| *"Code on my big screen, Chrome and Terminal on the laptop."* | Arranges three windows across two displays. |
-| *"Open Spotify."* · *"Terminal on the left."* | Runs instantly, with no AI at all. |
-| *"Find my notes about the Tokyo trip."* | Searches your files by what's inside them, opens the match on your other screen. |
-| *"What's wrong with this code?"* | Looks at your screen and answers in a line. |
-| *"Reply to this. Thursday works, send me a time."* | Reads the email on screen and writes the reply. Insert puts it at your cursor. It never sends. |
-| *"Move my dentist appointment to 4."* | Shows the old and new time on a card and moves it when you approve. Adding is immediate; moving or deleting asks first. |
-| *"Tell the agent in my terminal to also run the tests."* | Types it into that window in the background while you keep working. If it can't confirm the send, it leaves the text there and asks for the window. |
-| *"Find me a desk lamp under $30 on Amazon."* | Works in Chrome behind your apps; a live mini screen shows it. |
-| *"Where do I turn on Night Shift?"* | A ring lights up the exact spot on your screen (Show me where). |
-| *"Summarize this article in three bullets."* | Reads the page for you. |
-| *"Play my late night coding playlist on Spotify."* | Plays it in a second, no clicks. Any song, artist or playlist. |
-| *"When I say focus mode, close Slack and open my to-do list."* | Remembers it. Next time, two words do it all. |
-
-<p align="center"><img src="docs/screens/answer.png" alt="Rabik's box answering from a saved meeting, with source chips under the answer" width="520"></p>
-
-<table>
-<tr><td><img src="docs/screens/recap.png" alt="The daily recap: what got done, decisions, to-dos for Reminders, goals and where the time went"></td>
-<td><img src="docs/screens/transcript.png" alt="Meeting Copilot's transcript with speaker names and a Turkish line translated under it"></td></tr>
-<tr><td><img src="docs/screens/people.png" alt="Settings → People: a person's meetings and what Rabik knows"></td>
-<td><img src="docs/screens/activity.png" alt="Settings → Memory: rules and Activity history"></td></tr>
-</table>
-
-## Safe by default
-
-Safe mode runs the AI's commands in Claude Code's sandbox, so they can only write to a scratch folder; Rabik's own helpers, opening apps and sites, and plain reads run outside it. Before anything deletes, sends, buys, changes a file or leaves the sandbox, Rabik asks you first. <code>rm</code>, <code>sudo</code>, disk tools and shutdown are always blocked. Every exact command is in the ask log. Apple's on-device speech turns your voice into text, and audio never leaves your Mac.
-
-<details>
-<summary><b>How the shortcut and the box work</b></summary>
-<br>
-
-The box opens at the top center of the display your pointer is on; pick another spot (top or bottom; left, center or right) in Settings → General → Box position. Choose **Hold to talk** or **Press to toggle** in Settings → General → Shortcut behavior. Hold mode sends when you release. Toggle mode starts on the first press and sends on the second; pauses keep listening. Pressing the shortcut while Rabik answers stops it; during spoken playback it stops the voice. Esc cancels listening without sending. Toggle recordings reach a review screen after 60 seconds, rather than sending automatically. Closing the overlay or pausing Rabik stops its microphone, workers and voice.
-
-Click any answer to copy it, including earlier answers still shown in the box. Click your request to edit and ask again, or press ↑ in an empty typing box to recall the latest request. The overlay stays within your display when resized and respects Reduce Motion. While Rabik works in a covered window, another Space, or another display, a live mini screen shows that window; the steps below show the action. The finished view stays until the next ask, typing, or a click on it. Click it to open that exact window. The preview stays on your Mac, is never sent to the AI or saved, and stops streaming when the task ends. Without Screen Recording permission, the same card shows the app icon and window title.
-
-Apple's final transcript confirms each voice request before AI tools or learned shortcuts run. AI reasoning can start during a pause, but its tools wait for confirmation. If speech finalization takes too long, Rabik offers the partial text for review. Instant commands still skip the AI entirely. Supported built-in commands run mid-sentence, before you send. Learned shortcuts wait for confirmed words.
-
-When Rabik acts but can't see the result, it says so ("…but I couldn't confirm the result") and doesn't learn that shortcut. Try again checks what already happened before it acts again.
+- Another stroke near your mark replaces it; move away and your clicks reach your apps again. A small picture of the mark waits in the box until you send; Esc clears it.
+- A guide moves on when you click the highlighted spot, change that value or say "next". Explanations step through by themselves, with every caption kept on a card in the opposite corner.
+- Rabik works from what you have open: with a video, page or problem on screen, it marks up that figure and uses its numbers.
+- Click any drawn mark and ask "how does this work?" to ask about that mark. Drawings never take focus; clicks pass through everywhere except on a mark. Esc clears them.
+- Turn drawings off in Settings → General → Draw on screen to show you.
 
 </details>
 
-## Dictate anywhere
+### Dictation anywhere
+Hold <kbd>fn</kbd>, talk, let go: your words land in any text field. Double-tap to keep it on hands-free. **Verbatim** types Apple's on-device transcript as is; **Clean up** makes one quick AI pass that drops fillers and slips ("four, actually five" leaves five), turns spoken lists into lists and fixes words it clearly misheard, without ever answering what you said.
 
-Hold fn to talk. Double-tap to lock. In any text field, hold the fn (🌐) key, speak, then let go. Double-tap it to lock dictation on for hands-free talking; an orange ring circles the pill, and one more press inserts. fn is the shortcut until you record another in Settings → Dictation (a key combo, an F-key, or a modifier chord like fn+Control); a shortcut you already set stays. If macOS's "Press 🌐 key to" setting opens emoji, switches input source or starts Apple dictation, Settings and setup show "Set Press 🌐 key to Do Nothing" with a button to Keyboard settings. fn with another key (fn+Delete, fn+←) stays that key's shortcut. While you talk, a small pill shows a sound wave. The Dictation tab shows your words today and all time, time saved, sessions, your dictionary and history. **Verbatim** types Apple's on-device transcript with no AI. **Clean up** makes one quick AI pass that keeps your words, fixes words it clearly misheard ("talk it and it' type" becomes "talk to it and it'll type"), and drops the slips: "um" and "you know" go, "scratch that" removes the thought before it, "four, actually five" leaves five, a spoken list becomes a list, and "new line" or "question mark" become formatting. It types what you dictate and never answers or acts on it. To spell names and terms it uses your Dictionary and the text just before your cursor. It starts while you talk, so the text lands soon after you let go; if the AI's version adds or drops too much, Rabik types your words with only the obvious fillers removed. Highlight text first and Clean up tidies that text in place. Esc cancels. When the words land, the pill turns into a green check and fades. With no text field selected, it says "Nothing selected to insert — saved to History." Dictation never leaves your words on the clipboard: if a field only takes a paste, Rabik borrows the clipboard for that one paste and puts back what you had copied. If the field changes or Rabik can't confirm the words landed, it saves them to Dictation History and says "Saved to History" instead of typing twice; with History off, the words stay in the pill.
+<details><summary>More about dictation</summary>
 
-## Point at your screen
+- Record another shortcut in Settings → Dictation: a key combo, an F-key or a chord like fn+Control. If macOS uses 🌐 for emoji or input sources, Settings offers a button to change that.
+- Clean up spells names from your Dictionary and the text before your cursor, and starts while you talk so the text lands soon after you let go. Select text first and it tidies that text in place.
+- Your clipboard stays yours: when a field only takes a paste, Rabik borrows the clipboard for that paste and puts back what you had copied. If it can't confirm the words landed, they go to Dictation History instead of being typed twice.
+- The Dictation tab shows words today and all time, time saved, your dictionary and history.
 
-This is how you show Rabik something; [Draw on screen](#draw-on-screen) is how Rabik shows you. Click the pointer button, **Point at your screen**, next to the mic in the ask box. The cursor becomes a crosshair and the box says "Click, circle or scribble on anything, then ask". Mark the spot, then type or say your question and send. Another stroke near the mark replaces it; move away and your clicks reach your apps again, with the mark still showing. Rabik's own box and cards always take their clicks, so you can type while pointing. Click the pointer button again to stop or to mark somewhere else. A small picture of what you marked waits in the box; its × removes it, and Esc clears everything. Rabik gets a crop of that spot with your question, and the mark stays until you send. While a mark is waiting, instant commands and early thinking wait too.
+</details>
 
-## Draw on screen
+### Works in the background
+Big jobs go to **agents** that work behind your apps: a chip in the corner shows live steps and a mini screen, and a card shows the result when you stop typing. Steer one by talking to it ("tell the hub agent to check HDMI too"). Save **named agents** ("make an agent called Researcher that…"), schedule **routines** ("every weekday at 8, summarize my calendar") and set **watches** ("tell me when Codex is done") that check on your Mac for free.
 
-Ask where to click or how to do something and Rabik shows you instead of only telling you: it draws boxes, circles, arrows and labels over your screen, with a pointer that moves to each spot. It goes one step at a time and moves on when you click the highlighted spot, change that value, or say "next".
+<details><summary>More about agents, routines and watches</summary>
 
-Ask it to explain something and draw it ("explain the Pythagorean theorem and draw it on my screen") and the drawing builds up like a whiteboard: each step adds to the last, and a card in the opposite corner keeps every caption so far. It moves through the steps by itself. It works from what you have open: with a video, page or problem on screen, it marks up that figure and uses its numbers, unless you ask for a fresh example. Drawings go on the screen where you asked (the one with the Rabik box) unless you name another. Worked examples and practice problems are written line by line in large text on one panel, readable from your chair on a laptop or a monitor.
+- Agents click, type and scroll straight into the app they work in, so your pointer, front app and Space stay put. Web work happens in the agent's own window in your signed-in Chrome profile, and closes when the task ends.
+- A long ask in the box moves to an agent by itself; ⌃⌥↩ moves one sooner from any app. When an agent asks for something, **Always allow for this task** covers that kind of action until it ends.
+- Routines are woken by macOS on time, cost nothing while they wait, run on Cheapest unless you choose otherwise and report back with a notification. Manage them in Settings → General → Scheduled routines.
+- Watches poll a window or a coding agent's log every 5 seconds with no AI. A window must stay open on this desktop (covered is fine). Say "stop watching" to cancel.
+- Agents and routines need Claude Code. With Pi or Devin, asks run in the foreground; Pi has no sandbox, so Safe mode asks before every shell command.
 
-The drawing stays while you keep asking about it, and Rabik can add to it; it changes only when an answer draws something new. Click any mark (a box, an arrow, a label, a line of text) to select it, then ask "how does this work?": like Point at your screen, the question carries that mark and a picture of it. While a drawing is up, the Rabik box moves out of its way and comes back when it's gone. Close the card or press Esc to clear it. Steps are spoken only when Read answers aloud is on. The drawings never take focus, and clicks pass through everywhere except on a mark. Turn it off in Settings → General → Draw on screen to show you.
+</details>
 
-## Model choice
+### Meeting Copilot
+Turn it on in Settings → Meetings. When a call app starts using your mic, Rabik offers to listen. It transcribes both sides on your Mac, answers questions someone asks from your notes and files, and ends with a recap and action items you can share or send to Reminders.
 
-In Settings → Intelligence, choose **Cheapest**, **Balanced** (the default) or **Most capable**. Cheapest keeps every ask, meeting question and new agent on Haiku. Balanced keeps questions and quick commands on Haiku and gives real work to your work model; if a task turns multi-step, fails, or ends without a confirmed result, it continues once on the work model. Most capable uses the work model for every AI ask and agent. Instant commands skip the AI in every mode. **Work model** picks Sonnet or Opus; Opus is stronger and uses more of your plan.
+<details><summary>More about meetings</summary>
 
-With a custom server connected, Rabik uses that server's model. Under **Custom server**, choose an **Agent model** from its model list, or leave it empty to use the main model. Running agents keep their current model.
+- **Language:** pick what the call is in, or Automatic for your Mac's language; languages Apple's transcription model lacks (Turkish, for one) use its dictation model. **Translate the call** puts the other side's lines, in your language, under each line.
+- **Names:** a calendar call with one other person uses their name. In group calls, every few lines Haiku names only the lines the conversation makes clear; guesses show in italics and the rest stay "Them".
+- **Saving:** transcripts, notes and answers save as you go under `~/.config/rabik/meetings/` (folders `0700`, files `0600`). Audio is never saved. Settings → Meetings searches, exports Markdown and deletes.
+- **AI meeting summaries** (on by default) let Claude read the transcript once after the call. Off keeps transcripts entirely on your Mac with a simpler local recap, and turns off speaker guessing.
+- **Share recap…** opens the Share menu with the title, summary and action items, never the transcript. Or ask Rabik to send it to Slack, Notion or email. **Remind me before calls** (off by default) shows a card about two minutes before a calendar call.
+- Ask "what did we decide about pricing?" and Rabik searches the archive (`--meeting-history "<words, weekday or date>"`).
 
-## Use a local model
+</details>
 
-Rabik can send Claude Code to a local server that implements the Anthropic Messages API. Claude Code must be installed, but you do not need a Claude account.
+### Remembers, privately
+Say "remember…" or let Rabik keep lasting facts about you; your **rules** apply to every ask. Answers that come from Rabik's records show **source chips** you can click. Everything below stays on your Mac.
 
-1. Start a server and load a model:
+- **Daily recap:** a notification every evening (21:00 unless you pick another time) with your asks, finished agents, meeting decisions, tomorrow's calendar and to-dos you can tick into Reminders. One Haiku call; a quiet day costs nothing.
+- **Goals:** up to five ("my goal is…" or Settings → General → Goals). The recap says when your day moved one forward.
+- **People** (Settings → People): who you met in saved meetings and what About you says about them, one person however their name was spelled.
+- **Activity history** (Settings → Memory, off until you turn it on): the window in front, its file or page address, so "open the Figma file I had yesterday" works. No screenshots; private windows, Tor, password managers and your Don't record list are skipped. Kept 30 days.
 
-   | Server | Version with `/v1/messages` | Default address |
-   |---|---:|---|
-   | Ollama | 0.14.0+ | `http://localhost:11434` |
-   | LM Studio | 0.4.1+ | `http://localhost:1234` |
-   | llama.cpp `llama-server` | builds after Nov 28, 2025 | `http://localhost:8080` |
-   | vLLM | 0.11.1+ | `http://localhost:8000` |
+### Talks back
+With **Read answers aloud** on, Rabik reads each sentence as the answer streams, in the Siri voice or any Premium or Enhanced voice on your Mac, switching to the right voice for another language. **Stop when I talk** listens only while it speaks, with Apple's echo cancellation, and stops when you start talking. Esc or the shortcut stops it too.
 
-   Ollama starts with `ollama serve`; LM Studio uses `lms server start --port 1234`; llama.cpp uses `llama-server -m /path/to/model.gguf`; vLLM uses `vllm serve <model>`.
-2. Open setup → **Change provider** → **Custom server**, or Settings → Intelligence → **Custom server**. If a server is on a default port, Rabik offers **Use Ollama**, **Use LM Studio**, **Use llama.cpp**, or **Use vLLM**.
-3. Leave Key empty for an unauthenticated local server. Pick a model from the list Rabik reads from `GET /v1/models`, then ask normally.
+### Works with Claude Code and ChatGPT
+Settings → Account & Access → **Add to Claude Code** or **Add to ChatGPT** gives those apps read-only access to Rabik's memory, meetings, people, goals, recaps and Activity history through an MCP server (`rabik.py --mcp`); **Copy for Claude Desktop** copies the same config. Open Notion, Slack, Linear, Figma, Asana or ClickUp while its Claude connector isn't connected and Rabik offers it once (Settings → Account & Access → Offer connectors).
 
-Small local models are usually weaker at reliable tool use and following long screen context. Screen reading also needs a vision-capable model; text-only models can still use accessible window and page text.
+## Privacy and safety
 
-## Agents
+- **Your voice stays on your Mac.** Apple's on-device speech turns it into text; audio is never saved or sent.
+- **Safe mode is on by default.** The AI's commands run in Claude Code's sandbox and can only write to a scratch folder. Deleting, sending, buying, changing a file or leaving the sandbox asks you first; `rm`, `sudo`, disk tools and shutdown are always blocked. Every command is in the ask log.
+- **Nothing runs while it waits.** Watches, routines and the recap cost nothing until they act.
+- **Telemetry is off** in release builds. If a build sets a PostHog key, Rabik sends only a random ID with counts and timings, never task text, dictated words, files or screen content. **Help improve Rabik** (asked once, off until you agree) sends a failed task's steps with emails, numbers, paths and typed text removed first. Both switch off in Settings → Account & Access.
 
-Ask for something big ("find me USB-C hubs") and Rabik hands it to a background agent. A chip shows up in the corner while you keep working. The box, the dictation pill, the chips and the done card show up on the display your mouse is on. Hover it to see the live steps and a mini screen of the work. To change course, just talk: "tell the hub agent to check HDMI too" steers the running agent instead of starting a new one. When it finishes, a card shows the result once you stop typing. During a meeting or screen share, you get a quiet notification instead. If an agent needs a permission or a connector, it asks on its chip, then carries on. Turn on agents and their connectors in Settings → Agents (or the setup step).
+<details><summary>How the shortcut and the box behave</summary>
 
-A long ask in the box moves to an agent by itself, with no card, and agents Rabik offers start right away. To move one sooner, press ⌃⌥↩ from any app while it runs.
+- The box opens at the top center of the display your pointer is on; move it in Settings → General → Box position. **Hold to talk** sends on release; **Press to toggle** sends on the second press.
+- Pressing the shortcut while Rabik answers stops it. Esc cancels listening without sending. Long toggle recordings go to a review screen instead of sending.
+- Apple's final transcript confirms each voice request before tools or learned shortcuts run; reasoning may start during a pause, but actions wait.
+- Click an answer to copy it; click your request to edit and ask again; ↑ in an empty box recalls the last request.
+- When Rabik works in a covered window or another Space, a live mini screen shows it; click it to open that window. The preview never leaves your Mac.
+- If Rabik acts but can't see the result, it says so and doesn't learn that shortcut; Try again checks what already happened first.
 
-Agents work behind you. Their clicks, typing, scrolling and keys go straight to the app they work in, so your pointer, your front app, your windows and your Space stay where they are. Web work happens in the agent's own browser window, in your signed-in profile; your tabs are left alone, and the window closes when the task ends. If an agent's process stops mid-task, Rabik restarts it once and it picks up where it was. When an agent asks to do something, **Always allow for this task** approves that same kind of action until the task ends; the next task asks again.
+</details>
 
-### Named agents
+## Models and cost
 
-Say “make an agent called Researcher that finds sources and writes a short brief” to save reusable instructions, then “ask Researcher to…” to start it. Saved agents can include a folder or files and can be listed, renamed, or deleted by voice or in the Agents view.
+Settings → Intelligence picks how hard Rabik thinks: **Cheapest** keeps everything on Haiku, **Balanced** (default) uses Haiku for questions and quick commands and your work model (Sonnet or Opus) for real tasks, and **Most capable** uses the work model throughout. Rabik runs on your own Claude plan through Claude Code, so there is no API key; Devin, Pi and local models work too.
 
-Background agents currently require Claude Code. Pi and Devin handle foreground asks; their meeting transcripts and recaps stay local. Pi has no built-in sandbox, so Rabik disables its direct file-edit and MCP tools and Safe mode asks before every shell command; its read tools still have your account’s file access.
+Rabik is built to stay fast and nearly free: instant commands cost $0, AI asks aim for a median under $0.002 and 6 seconds (`python3 rabik.py --budget` checks), the system prompt stays under 10,000 characters, and anything that waits costs $0 until it acts.
 
-## Meeting Copilot
+<details><summary>Use a local model</summary>
 
-Enable Meeting Copilot in Settings → Meetings → Meeting Copilot settings, then open it for a call or try the demo. Drag its header or empty background in any state; the minimized pill also drags. Positions and expanded sizes are remembered per display. Double-click the header to return to the default spot. Frames stay inside the display’s usable area, including after a display change.
+Point Claude Code at a local server that speaks the Anthropic Messages API; no Claude account is needed.
 
-**Save meeting transcripts** is on by default. While listening, a quiet indicator shows when saving is active. Text, speaker labels, timestamps, notes and copilot answers save incrementally under `$RABIK_DIR/meetings/<meeting-id>/` (normally `~/.config/rabik/meetings/`). Each folder is private (`0700`), with `metadata.json` and an append-only `events.jsonl` (`0600`). Unfinished speech is checkpointed every two seconds; interrupted calls remain readable. Audio is never saved.
+| Server | Version with `/v1/messages` | Default address |
+|---|---:|---|
+| Ollama | 0.14.0+ | `http://localhost:11434` |
+| LM Studio | 0.4.1+ | `http://localhost:1234` |
+| llama.cpp `llama-server` | builds after Nov 28, 2025 | `http://localhost:8080` |
+| vLLM | 0.11.1+ | `http://localhost:8000` |
 
-Settings → **Meetings**, or **See all meetings** after a call, opens the local archive. Search titles and transcripts, use ↑/↓ and Return to browse, ⌘F to search and Esc to go back. Each meeting shows its recap, action items, notes, answers and timestamped transcript. Copy, export Markdown, or delete with confirmation. Turning saving off stops the current archive and asks whether to keep or delete past meetings.
+Start the server (`ollama serve`, `lms server start --port 1234`, `llama-server -m model.gguf` or `vllm serve <model>`), then choose **Custom server** in setup or Settings → Intelligence. Rabik offers servers it finds on their default ports and lists models from `GET /v1/models`. Leave Key empty for a local server. Small models are weaker at tool use, and reading the screen needs a vision model. With a custom server, choose an **Agent model** from its list or leave it empty to use the main one.
 
-With **AI meeting summaries** on (the default), Claude reads the transcript once after each ended session and writes a summary and action items, on your own Claude plan. Turn it off to keep transcripts entirely on your Mac; you still get a simpler local recap that quotes decisions and opening/closing speech. A failed AI recap leaves the local transcript intact. Resuming cancels a pending recap and the next End summarizes the full transcript. Closing or pausing stops recap work; already saved text stays on your Mac. Asking Rabik about a past meeting lets it search that archive with `--meeting-history "<keywords, weekday or YYYY-MM-DD>"`. Live question answering retains the selected Meeting Copilot answer policy.
-
-**Language** in Meeting Copilot settings picks what the call is in; Automatic uses your Mac's language. Speech stays on your Mac: Apple's transcription model where it knows the language, its dictation model otherwise (Turkish, for one). **Translate the call** puts the other side's lines, in your Mac's language, under each line, also on your Mac. If a language pair is missing, Rabik says to add it in System Settings → General → Language & Region → Translation Languages. Summaries keep the meeting's language.
-
-Their lines get names when Rabik can tell. A call whose calendar event has one other person uses that name. In a group call, every few lines Haiku names only the lines the conversation makes clear (someone says their name, or answers to it); guessed names show in italics and the rest stay "Them". Names carry into the saved transcript and its summary. With AI meeting summaries off, nothing is guessed.
-
-**Share recap…** on the end-of-call panel and **Share…** on a meeting's page in Settings open the Mac's Share menu with the title, time, summary and action items, never the transcript. You can also ask Rabik to send a meeting's recap to Slack, Notion or email; it hands that to an agent with your connectors. **Remind me before calls** (off until you turn it on) shows a small card about two minutes before a calendar call with a link or other people.
-
-## Feedback
-
-Choose **Report Feedback…** in the menu bar, **Report feedback** in Settings, or say/type “report feedback” or “report a bug”. Review the exact text before opening a GitHub issue draft. It contains a short template, version/commit, macOS and Mac model, model, safe mode and input settings. **Include my last ask** starts off; answers, screen content and command logs are never attached. Submit the draft yourself on GitHub.
+</details>
 
 ## Install
 
-You need:
-- **macOS 26** or later (Rabik uses Apple's new on-device speech)
-- **An AI client:** a paid Claude plan (Pro or Max) and [Claude Code](https://claude.com/claude-code), the [Devin CLI](https://docs.devin.ai/cli) signed in to a Devin plan, [Pi](https://pi.dev) with your chosen provider/model, or a custom server through Claude Code with no Claude account. Pick one in setup (“Change provider”) or Settings → Intelligence.
-- Python comes inside the app on Apple silicon. Intel Macs and builds from source need Apple's command line tools: `xcode-select --install`
-- Accessibility permission enables native clicks, scrolling, menus, keys, dragging and field typing.
+1. Download `Rabik-<version>.dmg` from [Releases](https://github.com/sayginsaman/rabik/releases/latest), open it and drag Rabik to Applications.
+2. Open Rabik. Setup checks your AI client, then asks for each macOS permission (Accessibility lets it click, type and use menus for you).
+3. Hold <kbd>⌃</kbd><kbd>⌥</kbd><kbd>Space</kbd> and ask.
 
-Download the signed and notarized `Rabik-<version>.dmg` from the [Releases page](https://github.com/sayginsaman/rabik/releases), open it, drag Rabik to Applications and open it. It opens at login (Settings → General → Open at login) and updates itself through Sparkle, checking the signed releases there (Settings → About & Updates).
+**You need** macOS 26 or later and one AI client: [Claude Code](https://claude.com/claude-code) with a Claude Pro or Max plan, the [Devin CLI](https://docs.devin.ai/cli), [Pi](https://pi.dev), or a custom server through Claude Code. Python comes inside the app on Apple silicon; Intel Macs need Apple's command line tools (`xcode-select --install`).
 
-### Nix
+Rabik is signed and notarized, opens at login (Settings → General → Open at login) and updates itself through Sparkle from the signed releases here (Settings → About & Updates). It lives in the menu bar; find Settings from there or with Spotlight (⌘Space, "Rabik"). If you sign out of your AI client, setup comes back.
 
-On macOS with Nix flakes enabled:
+**Remove:** quit Rabik from the menu bar, delete `Rabik.app`, and delete `~/.config/rabik` to remove your settings and history.
 
-```bash
-nix run github:sayginsaman/rabik
-```
+<details><summary>Nix, building from source, and tests</summary>
 
-The flake installs its packaged Rabik version, so macOS 26+ and Apple's command line tools are still required. Run that command again to update. `nix profile add github:sayginsaman/rabik` installs an `rabik` launcher; update it with `nix profile upgrade rabik`, then run `rabik`. Nix installations show this update path in Settings instead of using Rabik's Git updater.
+**Nix** (flakes enabled): `nix run github:sayginsaman/rabik`, or `nix profile add github:sayginsaman/rabik` for a `rabik` launcher (update with `nix profile upgrade rabik`). macOS 26 and the command line tools are still required. Nix installations show this update path in Settings instead of Rabik's own updater.
 
-Working on the code instead? Clone the repo and run `./build.sh` after each change: it builds `~/Applications/Rabik.app` with a local signing identity, starts it at login and restarts it. Release builds are described in [docs/NOTARIZATION.md](docs/NOTARIZATION.md). A Devbox environment is included for Python regression tests; run `devbox shell`, then `devbox run test`.
+**From source:** clone the repo and run `./build.sh` after each change. It builds `~/Applications/Rabik.app` with a local signing identity, starts it at login through a LaunchAgent and restarts it; a source build updates itself from its git checkout. Release builds (Python and Sparkle inside, notarized) are described in [docs/NOTARIZATION.md](docs/NOTARIZATION.md). To remove a source build's LaunchAgent: `launchctl bootout gui/$(id -u)/com.rabik.app` and delete `~/Library/LaunchAgents/com.rabik.app.plist`.
 
-The first launch opens a setup window. It checks your AI plan, then asks for each macOS permission.
-After that, Rabik lives in the menu bar. Open it from Spotlight (⌘Space, "Rabik") for Settings: shortcut, voice, model, privacy, memory and usage. Settings and setup follow your Mac's light or dark appearance.
-If you sign out of your AI client later, the setup window comes back by itself.
-To see it again: `defaults delete com.rabik.app onboarded`, then restart the app.
+**Tests:** `python3 -m unittest discover -s tests` for the offline suite (use a scratch `RABIK_DIR`), `python3 rabik.py --selftest` on macOS, and `~/Applications/Rabik.app/Contents/MacOS/Rabik --selftest` for native transcript matching. `tests/ui.html` and `tests/settings.html` check the UI against a mock bridge (`python3 -m http.server 8765 --bind 127.0.0.1`, then open them). `devbox shell` then `devbox run test` gives a pinned Python. README images come from `python3 scripts/readme-shots.py`.
 
-Test: `python3 rabik.py --selftest` on macOS, plus `python3 -m unittest discover -s tests -v` for offline regressions. After building, `~/Applications/Rabik.app/Contents/MacOS/Rabik --selftest` checks native transcript matching without opening the app. Node, when installed, also checks embedded JavaScript syntax. For the UI interaction checks, run `python3 -m http.server 8765 --bind 127.0.0.1` from the repo and open `http://127.0.0.1:8765/tests/ui.html`; it uses a mock native bridge and makes no Mac actions or AI calls.
+**Feedback:** Report Feedback… in the menu bar (or say "report a bug") drafts a GitHub issue you review first; your last ask is left out unless you include it.
 
-Remove: quit Rabik from the menu bar, then delete `Rabik.app` and `~/.config/rabik` (your settings and history). A developer build also leaves `~/Library/LaunchAgents/com.rabik.app.plist`: run `launchctl bootout gui/$(id -u)/com.rabik.app` and delete it.
+</details>
 
-## Watch for me
+## How it's built
 
-Say "tell me when Codex is done" or "watch this page until it says shipped". Rabik sets it up once, then checks every 5 seconds on your Mac with no AI, so waiting is free. When it fires you get a notification, and it runs a follow-up if you asked for one. A window must stay open on this desktop (covered is fine). Coding agents like Codex are watched through their own log, with no screen at all. Say "stop watching" to cancel.
+| Part | Where |
+|---|---|
+| The app: shortcut, speech, the box, Settings, meetings, agents' windows | `Sources/Rabik/` (one Swift module; `main.swift` starts it) |
+| The brain: asks, safety gate, hands, memory, meetings, recap, MCP | `rabik.py` (entry point) and `brain/` (one module per job) |
+| The pages | `ui/ui.html` (the box), `ui/settings.html`, `ui/onboarding.html`, `ui/meeting.html` |
+| Release tooling | `build.sh`, `docs/NOTARIZATION.md`, `scripts/` |
 
-## Daily recap
+Keep personal settings, credentials and runtime state out of commits, and run tests with a scratch `RABIK_DIR`.
 
-Every evening (21:00 unless you pick another time in Settings → General → Daily recap) Rabik sends one notification with your day: what you asked, what your agents finished, what your meetings decided, and tomorrow's calendar. Click it to open the recap in the box. Its to-dos come from your meetings and agents; tick the ones that are yours and choose Add to Reminders. Nothing is added until you do, and an added to-do stays marked so it is never added twice. A meeting's action items have the same Add to Reminders on its end-of-call panel and its page in Settings → Meetings. Say "summarize my day" any time.
+## Credits and license
 
-A recap costs one Haiku call, and a day with nothing in it costs nothing. With AI meeting summaries off, your meetings never go to the AI for it; their own action items still show. Recaps stay on your Mac for a month.
-
-**Goals.** Say "my goal is to ship the beta by Friday" (or "hedefim: …"), or add one in Settings → General → Goals; up to five at a time. The recap's same AI call adds a line when your day moved a goal forward, and only for goals you have. "I finished the beta goal" ticks it off.
-
-## Memory, people and where things were
-
-**Sources.** When an answer comes from Rabik's own records (a saved meeting, a fact in About you, a page from Activity history, a person), chips under it show which, and a click opens that record. Only records Rabik actually read become chips.
-
-**Activity history** (Settings → Memory, off until you turn it on) notes the window in front: its app, title, and the document's file or the browser's page address. Then "open the Figma file I had yesterday" or "what was that pricing page on Tuesday?" works, and the daily recap lists where your time went. It takes no screenshots. Windows under 10 seconds, private and incognito windows, Tor, password managers, apps on your Don't record list, and time while the Mac is locked or idle are never written. It stays on your Mac for 30 days; Clear history deletes it.
-
-**People** (Settings → People) lists who you met in saved meetings (their calendar names and emails, and speaker names) and the People facts in About you, one person however they were spelled. Ask "when did I last talk to Sam?" Hide keeps someone off the list. Nothing new is stored.
-
-**Spoken answers.** With Read answers aloud on, Rabik reads each sentence as the answer streams. Automatic uses the Siri voice; Voice picks one of your Mac's Premium or Enhanced voices, and an answer in another language uses the best voice installed for it. With Stop when I talk on, the mic listens only while Rabik speaks, with Apple's echo cancellation, and your voice stops it. Nothing is recorded.
-
-**Connector offers.** Open Notion, Slack, Linear, Figma, Asana or ClickUp while its Claude connector isn't connected, and the box offers it once, saying what Rabik would read: Connect, Not now (a week) or Don't ask again. It never shows during a call, an ask or dictation. Turn it off in Settings → Account & Access.
-
-**Rabik in Claude Code.** Settings → Account & Access → Add to Claude Code runs `claude mcp add` so Claude Code can read Rabik's memory, meetings, people, goals, recaps and Activity history through a read-only MCP server (`rabik.py --mcp`). Copy for Claude Desktop copies the same config to paste into Claude Desktop. With AI meeting summaries off, meetings give their recap but never the transcript. **Add to ChatGPT** does the same for the ChatGPT Mac app, through the `codex mcp add` tool it ships with (ChatGPT on the web can't reach a server on your Mac).
-
-## Routines
-
-Say "every weekday at 8, summarize my calendar" or "every 30 minutes, check my inbox". Rabik saves a routine and macOS wakes it on time, so it costs nothing while it waits. Each run starts a background agent on Cheapest unless you chose another mode, and you get a notification with the result. Runs are skipped while Rabik is paused, and a restart never repeats one. See and remove routines in Settings → General → Scheduled routines, or ask Rabik to remove one. Like other agents, routines need Claude Code.
-
-## Budget
-
-Rabik has to stay fast and nearly free, so new features must fit under these limits:
-
-- Instant commands: no AI, $0.
-- AI asks: median under $0.002 and 6 s over the last 50 (Oct 10, 2026: $0.00095, 5.0 s). Check with `python3 rabik.py --budget`.
-- System prompt: under 10,000 characters in source and at most 10,050 with the installed helper path. Every ask pays for it, and tests enforce both limits.
-- Anything that waits or runs in the background: $0 while it waits. AI only to set it up and to act at the end.
-
-## Anonymous usage
-
-Telemetry is off unless the build sets a PostHog capture token (`POSTHOG_KEY` in `rabik.py`, or `RABIK_POSTHOG_KEY`). When it is on, Rabik sends a random ID (made on your Mac, not tied to you) with daily use, ask outcomes, feature names, timings, dictation outcomes, and code locations for errors. It never sends task text, dictated words, file contents, paths, or screen content. Turn it off in Settings → Account & Access → Count me as a user.
-
-If you say yes to **Help improve Rabik** (asked once, off until you do), a task that fails sends what you asked, the steps Rabik took and why it failed, under the same random ID. Emails, numbers, file paths, link details and anything typed for you are removed on your Mac first. Turn it off in Settings → Account & Access → Help improve Rabik.
-
-## Files
-
-- `Sources/Rabik/`: the app (hotkey, speech, overlay, onboarding window), one Swift module: `main.swift` starts it, each area has its folder
-- `rabik.py`: the brain's entry script; the AI, its tool hook and Rabik.app call it, so its path never changes
-- `brain/`: the brain itself, one module per job, lowest layer first: paths, settings and storage; the safety gate (`policy.py`); the Mac, apps, windows, hands, screen and web; skills, instant commands and the AI clients; agents; the ask (`ask.py`) and the command line (`cli.py`)
-- `ui/ui.html`, `ui/onboarding.html`, `ui/settings.html`: the overlay, the welcome flow, and Settings
-- `ui/AppIcon.icns`: the app icon
-- `ui/orbs.js`: the [thinking-orbs](https://github.com/Jakubantalik/thinking-orbs) engine (MIT, Jakub Antalik)
-
-## License
-
-MIT. See `LICENSE`. Rabik is based on [Atticus](https://github.com/SaarthurR/atticus-mac) by SaarthurR (MIT). `ui/orbs.js` is from [thinking-orbs](https://github.com/Jakubantalik/thinking-orbs), also MIT.
-
-## Contributing
-
-Run regressions with a scratch `RABIK_DIR` and use `tests/ui.html` and `tests/settings.html` for mock-bridge UI checks. Keep personal agent settings, credentials and runtime state out of commits. Anonymous usage telemetry is off by default. Set `RABIK_POSTHOG_KEY` to your PostHog project's public capture token to turn it on, or turn off Count me as a user in Settings.
-
-Hands: ideas and some logic adapted from Plip (github.com/hussainn7/plip-oss, MIT). Background key authentication and menu-shortcut presses follow Cua Driver (github.com/trycua/cua, MIT).
+MIT; see `LICENSE`. Rabik started from [Atticus](https://github.com/SaarthurR/atticus-mac) by SaarthurR (MIT). The orb animation is [thinking-orbs](https://github.com/Jakubantalik/thinking-orbs) by Jakub Antalik (MIT). Background input ideas come from [Plip](https://github.com/hussainn7/plip-oss) (MIT) and [Cua Driver](https://github.com/trycua/cua) (MIT). Python on Apple silicon is [python-build-standalone](https://github.com/astral-sh/python-build-standalone); updates use [Sparkle](https://sparkle-project.org).
