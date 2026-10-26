@@ -1,5 +1,5 @@
 #!/bin/sh
-"exec" "python3" "-c" "import importlib.util as u,os,sys;sys.argv=sys.argv[1:];sys.path[0]=os.path.dirname(os.path.abspath(sys.argv[0]));sys.pycache_prefix=os.path.expanduser('~/Library/Caches/Rabik');s=u.spec_from_file_location('__main__',sys.argv[0]);m=sys.modules['__main__']=u.module_from_spec(s);s.loader.exec_module(m)" "$0" "$@"   # sh: run from cached bytecode (a plain run recompiles this file, ~70 ms per helper call); Python: a no-op string
+"exec" "$(p=${0%/*}/python/bin/python3; [ -x $p ] && echo $p || echo python3)" "-c" "import importlib.util as u,os,sys;sys.argv=sys.argv[1:];sys.path[0]=os.path.dirname(os.path.abspath(sys.argv[0]));sys.pycache_prefix=os.path.expanduser('~/Library/Caches/Rabik');s=u.spec_from_file_location('__main__',sys.argv[0]);m=sys.modules['__main__']=u.module_from_spec(s);s.loader.exec_module(m)" "$0" "$@"   # sh: the Python inside Rabik.app when there is one, else python3; run from cached bytecode (a plain run recompiles this file, ~70 ms per helper call); Python: a no-op string
 """Rabik: a small Mac helper run by an AI client (Claude Code by default, Devin, or Pi). Based on Atticus (github.com/SaarthurR/atticus-mac, MIT),
 whose idea came from Caleb Writes Code's "Atticus".
 

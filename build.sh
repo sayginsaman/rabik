@@ -37,6 +37,21 @@ rm -rf "$APP/Contents/Resources/brain"; mkdir "$APP/Contents/Resources/brain"
 cp brain/*.py "$APP/Contents/Resources/brain/"   # the modules rabik.py imports; never a __pycache__ into the signed bundle
 cp ui/*.html ui/*.js ui/*.png "$APP/Contents/Resources/ui/"
 cp ui/AppIcon.icns "$APP/Contents/Resources/"
+if [ -n "$RELEASE" ]; then
+  # Python inside the app (python-build-standalone, checksum pinned), so Apple silicon Macs need no Command Line Tools; rabik.py
+  # runs it when it is there. Intel Macs keep their own python3. Downloaded once into ~/Library/Caches/Rabik-build.
+  PY_TAR=cpython-3.13.16+20261009-aarch64-apple-darwin-install_only_stripped.tar.gz
+  PY_SHA=11785155d0f70e634178219c20925d8f20be00a3da4684fc4f5019dd15602ef7
+  CACHE=~/Library/Caches/Rabik-build; mkdir -p "$CACHE"
+  [ -f "$CACHE/$PY_TAR" ] || curl -fsSL -o "$CACHE/$PY_TAR" "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/${PY_TAR/+/%2B}"
+  echo "$PY_SHA  $CACHE/$PY_TAR" | shasum -a 256 -c - >/dev/null || { rm -f "$CACHE/$PY_TAR"; echo "The Python download did not match its checksum."; exit 1; }
+  tar -xzf "$CACHE/$PY_TAR" -C "$APP/Contents/Resources"
+  PY="$APP/Contents/Resources/python"; L="$PY/lib/python3.13"
+  rm -rf "$PY/include" "$PY/share" "$PY/lib/pkgconfig" "$PY/lib/"*tcl* "$PY/lib/"*tk* "$PY/lib/"itcl* "$PY/lib/"thread* "$L/"config-3.13-* \
+         "$L/"{test,idlelib,tkinter,turtledemo,ensurepip,site-packages,lib2to3} "$L/lib-dynload/"_tkinter*
+  find "$PY/bin" -mindepth 1 ! -name python3 ! -name python3.13 -delete
+  find "$PY" -name __pycache__ -type d -prune -exec rm -rf {} +   # compiled on first use into ~/Library/Caches/Rabik, never into the signed bundle
+fi
 # The in-app Git updater pulls and rebuilds this source folder; a release has none, so its updater stays off.
 SOURCE=$([ -n "$RELEASE" ] || printf '<key>RabikSource</key><string>%s</string>' "$(pwd)")
 cat > "$APP/Contents/Info.plist" <<P
@@ -63,6 +78,10 @@ P
 mv "$STAGE/Rabik" "$APP/Contents/MacOS/Rabik"
 if [ -n "$RELEASE" ]; then
   # Hardened Runtime and a secure timestamp are what notarization requires; the entitlements keep mic, calendar and Apple Events.
+  # Every Mach-O inside first (the bundled Python and its modules), then the app around them: notarization checks each one.
+  find "$APP/Contents/Resources" -type f -print0 | while IFS= read -r -d '' f; do
+    file -b "$f" | grep -q Mach-O && codesign --force --options runtime --timestamp --sign "$RABIK_SIGN_ID" "$f"
+  done
   codesign --force --options runtime --timestamp --entitlements Rabik.entitlements --sign "$RABIK_SIGN_ID" "$APP"
   codesign --verify --strict --verbose=2 "$APP"
   notarize() {   # waits for Apple's verdict; anything but Accepted stops the release

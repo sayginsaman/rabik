@@ -672,6 +672,8 @@ activity.sync()
 let connectorOffer = ConnectorOffer()   // Settings → Agents → Offer connectors
 connectorOffer.start()
 let onboarding = Onboarding()
+LoginItem.firstLaunch()
+if let on = LoginItem.current(), on != Prefs.bool("login") { Prefs.set("login", on) }   // changed in System Settings
 if !UserDefaults.standard.bool(forKey: "onboarded") { DispatchQueue.main.async { onboarding.open() } }
 else { Onboarding.plan { c in if c["ok"] as? Bool != true { onboarding.open() } } }   // set up once, but Claude signed out since
 var specs = [EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
@@ -790,3 +792,4 @@ NSApplication.shared.run()
 // final class Speaker lives in Overlay/Speaker.swift
 // final class Activity lives in App/Activity.swift
 // final class ConnectorOffer lives in App/ConnectorOffer.swift
+// enum LoginItem lives in App/LoginItem.swift

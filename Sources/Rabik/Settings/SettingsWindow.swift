@@ -246,10 +246,12 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         if k == "menuIcon" { bar.item.isVisible = v as? Bool == true }
         if k == "paused" { if v as? Bool == true { meeting.stop(paused: true); app.close(clear: false); agentsUI.stopAll() }; bar.paint() }
         if k == "safe" { app.js("mode", v as? Bool == true) }
-        if k == "login" {   // the LaunchAgent build.sh installed: enabled = starts at login
+        if k == "login" {   // App/LoginItem.swift: a login item in a release, build.sh's LaunchAgent from source
             if ProcessInfo.processInfo.environment["RABIK_DIR"] != nil { Prefs.set("login",false); push(); return }
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            p.arguments = [v as? Bool == true ? "enable" : "disable", "gui/\(getuid())/com.rabik.app"]; try? p.run()
+            if !LoginItem.set(v as? Bool == true) {
+                Prefs.set("login", LoginItem.current() ?? false); push()
+                send("notice", ["text": "macOS didn’t allow that. Check System Settings → General → Login Items."])
+            }
         }
     }
 
