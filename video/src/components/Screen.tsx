@@ -36,9 +36,11 @@ export const RegionImage: React.FC<{ src: string; panel: Box; rect: Rect; scroll
   </div>
 );
 
-/** Paints over a band of a panel with one of its own empty rows, stretched: the element under it is gone, the glass stays. */
+/** Paints over a band of a panel with one of its own empty rows, stretched: the element under it is gone, the glass stays.
+ *  The wallpaper goes underneath first, since a panel's glass is translucent and would otherwise be laid on twice. */
 export const Patch: React.FC<{ src: string; panel: Box; rect: Rect; rowY: number; opacity?: number }> = ({ src, panel, rect: r, rowY, opacity = 1 }) => (
   <div style={{ position: 'absolute', left: r[0], top: r[1], width: r[2], height: r[3], overflow: 'hidden', opacity }}>
+    <Img src={staticFile(CAPTURE.desktop.wallpaper)} style={{ position: 'absolute', left: -r[0], top: -r[1], width: DESK_W, height: DESK_H, maxWidth: 'none' }} />
     <div style={{ position: 'absolute', left: 0, top: 0, width: r[2], height: 1, overflow: 'hidden', transformOrigin: '0 0', transform: `scaleY(${r[3]})` }}>
       {img(src, panel, panel.x - r[0], -(rowY - panel.y))}
     </div>

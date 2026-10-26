@@ -10,7 +10,9 @@
     "studio": "remotion studio src/index.ts",
     "draft": "remotion render src/index.ts Showcase out/draft_720p.mp4 --scale=0.6667 --codec=h264 --crf=23 --muted",
     "qa": "tsx scripts/qa.ts",
-    "storyboard": "tsx scripts/storyboard.ts"
+    "storyboard": "tsx scripts/storyboard.ts",
+    "render": "tsx scripts/render.ts",
+    "thumbs": "tsx scripts/thumbs.ts"
   },
   "dependencies": {
     "@remotion/cli": "4.0.535",
