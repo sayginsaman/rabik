@@ -53,7 +53,7 @@ def routine_job_path(identifier):
 
 def routine_install(row):
     path = routine_job_path(row['id']); os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-    job = {'Label': f"com.rabik.routine.{row['id']}", 'ProgramArguments': [sys.executable, paths.ME, '--routine-fire', row['id']],
+    job = {'Label': f"com.rabik.routine.{row['id']}", 'ProgramArguments': ['/bin/sh', paths.ME, '--routine-fire', row['id']],   # rabik.py picks the Python inside Rabik.app
            'ProcessType': 'Background', 'StandardOutPath': '/dev/null', 'StandardErrorPath': '/dev/null'}
     if row['kind'] == 'interval':
         job['StartInterval'] = row['every']
@@ -94,17 +94,18 @@ def routine_recap_sync():
 
 
 def routine_repair():
-    """Replace weekday jobs written with the old Tuesday-Saturday values; keep the daily recap's job in step with Settings."""
+    """Rewrite jobs written the old way: weekday jobs with Tuesday-Saturday values, and jobs that named a Python of their own
+    instead of starting rabik.py (which picks the one inside Rabik.app); keep the daily recap's job in step with Settings."""
     try: routine_recap_sync()
     except (OSError, ValueError): pass
     for row in routines():
-        if row.get('kind') != 'time' or row.get('days') != 'weekdays': continue
         try:
             with open(routine_job_path(row['id']), 'rb') as f: job = plistlib.load(f)
             days = [value.get('Weekday') for value in job.get('StartCalendarInterval', [])]
+            started = job.get('ProgramArguments', [])
         except (OSError, ValueError, TypeError, AttributeError):
-            days = []
-        if days != list(range(1, 6)):
+            days, started = [], []
+        if (row.get('kind') == 'time' and row.get('days') == 'weekdays' and days != list(range(1, 6))) or started[:1] != ['/bin/sh']:
             try: routine_install(row)
             except (OSError, ValueError, KeyError, TypeError): pass
 

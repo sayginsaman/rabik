@@ -54,5 +54,18 @@ class ReleaseTests(unittest.TestCase):
         self.assertFalse(list(ROOT.rglob('sparkle_ed25519_key')))   # the private key never enters the repo
 
 
+    def test_routine_jobs_start_rabik_py_so_they_get_the_bundled_python(self):
+        import plistlib, brain.routine
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            job = Path(tmp) / 'job.plist'
+            job.write_bytes(plistlib.dumps({'Label': 'com.rabik.routine.r1', 'ProgramArguments': ['/opt/homebrew/bin/python3.14', 'rabik.py', '--routine-fire', 'r1']}))
+            row = {'id': 'r1', 'kind': 'interval', 'every': 3600, 'ask': 'Check'}
+            with patch.object(brain.routine, 'routine_job_path', return_value=str(job)), patch.object(brain.routine, 'routines', return_value=[row]), \
+                 patch.object(brain.routine, 'routine_recap_sync'), patch.object(brain.routine.subprocess, 'run'):
+                brain.routine.routine_repair()
+            self.assertEqual(plistlib.loads(job.read_bytes())['ProgramArguments'], ['/bin/sh', brain.routine.paths.ME, '--routine-fire', 'r1'])
+
+
 if __name__ == '__main__':
     unittest.main()
