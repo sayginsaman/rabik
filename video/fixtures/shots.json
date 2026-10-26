@@ -104,9 +104,9 @@
  {
   "id": "agent",
   "page": "ui/agents.html",
-  "width": 300,
+  "width": 348,
   "height": 640,
-  "root": "#shelf",
+  "root": "body",
   "panel": "none",
   "dark": true,
   "scale": 2.5,
@@ -122,9 +122,9 @@
  {
   "id": "agent_done",
   "page": "ui/agents.html",
-  "width": 300,
+  "width": 348,
   "height": 640,
-  "root": "#shelf",
+  "root": "body",
   "panel": "none",
   "dark": true,
   "scale": 2.5,
@@ -134,7 +134,8 @@
    "summary": ".chip .current",
    "mini": ".chip [data-mini]",
    "step": ".chip .step",
-   "thumb": ".chip .head > :first-child"
+   "thumb": ".chip .head > :first-child",
+   "badge": ".chip .badge"
   }
  },
  {
