@@ -65,6 +65,11 @@ class ReleaseTests(unittest.TestCase):
                  patch.object(brain.routine, 'routine_recap_sync'), patch.object(brain.routine.subprocess, 'run'):
                 brain.routine.routine_repair()
             self.assertEqual(plistlib.loads(job.read_bytes())['ProgramArguments'], ['/bin/sh', brain.routine.paths.ME, '--routine-fire', 'r1'])
+            recap = Path(tmp) / 'recap.plist'
+            recap.write_bytes(plistlib.dumps({'Label': 'com.rabik.routine.recap', 'StartCalendarInterval': {'Hour': 21, 'Minute': 0}, 'ProgramArguments': ['/opt/homebrew/bin/python3.14', 'rabik.py']}))
+            with patch.object(brain.routine, 'routine_job_path', return_value=str(recap)), patch.object(brain.routine.subprocess, 'run'):
+                self.assertTrue(brain.routine.routine_recap_sync())   # same time, old start: rewritten
+            self.assertEqual(plistlib.loads(recap.read_bytes())['ProgramArguments'][0], '/bin/sh')
 
 
 if __name__ == '__main__':

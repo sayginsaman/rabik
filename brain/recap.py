@@ -208,7 +208,9 @@ def recap_remind(source, keys):
 def recap_command(args):
     """--recap [YYYY-MM-DD] [--force] | catch-up | schedule | read <day> | items <source> | remind <source> '<json keys>'; prints JSON.
     catch-up: the evening recap if it is due (the job, a launch or a wake), else {}; schedule: the job follows Settings."""
-    if args[:1] == ['catch-up']: return recap_make(evening=True) if recap_due() else {}
+    if args[:1] == ['catch-up']:   # at launch and wake: jobs written by an older Rabik are rewritten first
+        routine.routine_repair()
+        return recap_make(evening=True) if recap_due() else {}
     if args[:1] == ['schedule']: return {'scheduled': routine.routine_recap_sync()}
     if args[:1] == ['read'] and len(args) == 2 and re.fullmatch(r'\d{4}-\d{2}-\d{2}', args[1]): return recap_read(args[1]) or {}
     if args[:1] == ['items'] and len(args) == 2:

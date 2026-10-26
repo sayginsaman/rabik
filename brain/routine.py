@@ -82,7 +82,8 @@ def routine_recap_sync():
     if prefs.pref('recap', True) and re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d', at):
         try:
             with open(path, 'rb') as f:
-                if plistlib.load(f).get('StartCalendarInterval') == {'Hour': int(at[:2]), 'Minute': int(at[3:])}: return True
+                job = plistlib.load(f)
+                if job.get('StartCalendarInterval') == {'Hour': int(at[:2]), 'Minute': int(at[3:])} and job.get('ProgramArguments', [])[:1] == ['/bin/sh']: return True
         except (OSError, ValueError, AttributeError): pass
         routine_install({'id': 'recap', 'kind': 'time', 'at': at, 'days': 'daily'})
         return True
