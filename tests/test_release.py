@@ -27,7 +27,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('PY_SHA=11785155d0f70e634178219c20925d8f20be00a3da4684fc4f5019dd15602ef7', BUILD)
         self.assertIn('shasum -a 256 -c -', BUILD)
         self.assertIn('find "$PY" -name __pycache__ -type d -prune -exec rm -rf {} +', BUILD)
-        sign_inside, sign_app = BUILD.index('file -b "$f" | grep -q Mach-O && codesign --force --options runtime --timestamp'), BUILD.index('--entitlements Rabik.entitlements --sign "$RABIK_SIGN_ID" "$APP"')
+        sign_inside, sign_app = BUILD.index('if file -b "$f" | grep -q Mach-O; then codesign --force --options runtime --timestamp'), BUILD.index('--entitlements Rabik.entitlements --sign "$RABIK_SIGN_ID" "$APP"')
         self.assertLess(sign_inside, sign_app)   # inside out
 
     def test_rabik_py_prefers_the_python_beside_it(self):
@@ -41,6 +41,17 @@ class ReleaseTests(unittest.TestCase):
             fake.unlink()
         first = (ROOT / 'rabik.py').read_text().splitlines()[1]
         self.assertTrue(first.startswith('"exec" "$(p=${0%/*}/python/bin/python3; [ -x $p ] && echo $p || echo python3)" "-c"'))   # else python3, as before
+
+
+    def test_a_release_updates_through_sparkle_and_writes_a_signed_appcast(self):
+        updates = (ROOT / 'Sources/Rabik/App/ReleaseUpdates.swift').read_text()
+        self.assertIn('#if canImport(Sparkle)', updates)   # a build from source and the checks compile without it
+        self.assertIn('SPUStandardUpdaterController(startingUpdater: true', updates)
+        self.assertIn('fetch Sparkle-2.10.0.tar.xz https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c', BUILD)
+        self.assertIn('SU_FEED=https://github.com/sayginsaman/rabik/releases/latest/download/appcast.xml', BUILD)
+        self.assertIn('SIG=$("$SPK/bin/sign_update" --ed-key-file "$KEY" "$DMG")', BUILD)
+        self.assertIn('if src.isEmpty && ReleaseUpdates.available { ReleaseUpdates.check()', (ROOT / 'Sources/Rabik/App/Updater.swift').read_text())
+        self.assertFalse(list(ROOT.rglob('sparkle_ed25519_key')))   # the private key never enters the repo
 
 
 if __name__ == '__main__':

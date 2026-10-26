@@ -23,8 +23,19 @@ trap 'rm -rf "$STAGE"' EXIT
 # A compiler error must leave the installed app and its resources alone.
 # xcrun picks the Xcode or Command Line Tools compiler with its macOS SDK, never another swiftc first on PATH.
 SWIFT=(Sources/Rabik/*.swift Sources/Rabik/*/*.swift)   # one module; main.swift holds the startup code
+CACHE=~/Library/Caches/Rabik-build; mkdir -p "$CACHE"
+fetch() {   # fetch <file> <url> <sha256>: downloaded once, used only when its checksum matches
+  [ -f "$CACHE/$1" ] || curl -fsSL -o "$CACHE/$1" "$2"
+  echo "$3  $CACHE/$1" | shasum -a 256 -c - >/dev/null || { rm -f "$CACHE/$1"; echo "$1 did not match its checksum."; exit 1; }
+}
 if [ -n "$RELEASE" ]; then
-  for ARCH in arm64 x86_64; do xcrun swiftc -O -module-name Rabik -target "$ARCH-apple-macos26.0" "${SWIFT[@]}" -o "$STAGE/Rabik-$ARCH"; done
+  # Sparkle 2.10.0 for signed updates (App/ReleaseUpdates.swift); a build from source compiles without it.
+  fetch Sparkle-2.10.0.tar.xz https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c
+  SPK="$CACHE/Sparkle-2.10.0"; [ -d "$SPK/Sparkle.framework" ] || { mkdir -p "$SPK"; tar -xJf "$CACHE/Sparkle-2.10.0.tar.xz" -C "$SPK"; }
+  KEY="${RABIK_SPARKLE_KEY:-$HOME/Library/Application Support/Rabik Release/sparkle_ed25519_key}"
+  [ -f "$KEY" ] || { echo "The Sparkle signing key is missing: $KEY (see docs/NOTARIZATION.md)."; exit 1; }
+  for ARCH in arm64 x86_64; do xcrun swiftc -O -module-name Rabik -target "$ARCH-apple-macos26.0" -F "$SPK" -framework Sparkle \
+    -Xlinker -rpath -Xlinker @executable_path/../Frameworks "${SWIFT[@]}" -o "$STAGE/Rabik-$ARCH"; done
   lipo -create "$STAGE/Rabik-arm64" "$STAGE/Rabik-x86_64" -output "$STAGE/Rabik"
   APP=dist/Rabik.app; rm -rf "$APP"
 else
@@ -42,18 +53,20 @@ if [ -n "$RELEASE" ]; then
   # runs it when it is there. Intel Macs keep their own python3. Downloaded once into ~/Library/Caches/Rabik-build.
   PY_TAR=cpython-3.13.16+20261009-aarch64-apple-darwin-install_only_stripped.tar.gz
   PY_SHA=11785155d0f70e634178219c20925d8f20be00a3da4684fc4f5019dd15602ef7
-  CACHE=~/Library/Caches/Rabik-build; mkdir -p "$CACHE"
-  [ -f "$CACHE/$PY_TAR" ] || curl -fsSL -o "$CACHE/$PY_TAR" "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/${PY_TAR/+/%2B}"
-  echo "$PY_SHA  $CACHE/$PY_TAR" | shasum -a 256 -c - >/dev/null || { rm -f "$CACHE/$PY_TAR"; echo "The Python download did not match its checksum."; exit 1; }
+  fetch "$PY_TAR" "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/${PY_TAR/+/%2B}" "$PY_SHA"
   tar -xzf "$CACHE/$PY_TAR" -C "$APP/Contents/Resources"
   PY="$APP/Contents/Resources/python"; L="$PY/lib/python3.13"
   rm -rf "$PY/include" "$PY/share" "$PY/lib/pkgconfig" "$PY/lib/"*tcl* "$PY/lib/"*tk* "$PY/lib/"itcl* "$PY/lib/"thread* "$L/"config-3.13-* \
          "$L/"{test,idlelib,tkinter,turtledemo,ensurepip,site-packages,lib2to3} "$L/lib-dynload/"_tkinter*
   find "$PY/bin" -mindepth 1 ! -name python3 ! -name python3.13 -delete
   find "$PY" -name __pycache__ -type d -prune -exec rm -rf {} +   # compiled on first use into ~/Library/Caches/Rabik, never into the signed bundle
+  mkdir -p "$APP/Contents/Frameworks"; ditto "$SPK/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 fi
 # The in-app Git updater pulls and rebuilds this source folder; a release has none, so its updater stays off.
 SOURCE=$([ -n "$RELEASE" ] || printf '<key>RabikSource</key><string>%s</string>' "$(pwd)")
+# A release updates through Sparkle: the appcast on GitHub, and the public half of the key that signs each disk image.
+SU_FEED=https://github.com/sayginsaman/rabik/releases/latest/download/appcast.xml SU_PUBLIC=Lhxtsn30LgzE7qPUgJWDoGP8h2dLgAz/Pgzs4Egxmc4=
+SPARKLE=$([ -z "$RELEASE" ] || printf '<key>SUFeedURL</key><string>%s</string><key>SUPublicEDKey</key><string>%s</string><key>SUEnableAutomaticChecks</key><true/><key>SUScheduledCheckInterval</key><integer>21600</integer>' "$SU_FEED" "$SU_PUBLIC")
 cat > "$APP/Contents/Info.plist" <<P
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -66,7 +79,7 @@ cat > "$APP/Contents/Info.plist" <<P
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>LSMinimumSystemVersion</key><string>26.0</string>
-$SOURCE
+$SOURCE$SPARKLE
 <key>LSUIElement</key><true/>
 <key>NSMicrophoneUsageDescription</key><string>Rabik listens when you use its shortcut or microphone button.</string>
 <key>NSAppleEventsUsageDescription</key><string>Rabik controls apps like Finder, Chrome and Music when you ask it to.</string>
@@ -80,8 +93,12 @@ if [ -n "$RELEASE" ]; then
   # Hardened Runtime and a secure timestamp are what notarization requires; the entitlements keep mic, calendar and Apple Events.
   # Every Mach-O inside first (the bundled Python and its modules), then the app around them: notarization checks each one.
   find "$APP/Contents/Resources" -type f -print0 | while IFS= read -r -d '' f; do
-    file -b "$f" | grep -q Mach-O && codesign --force --options runtime --timestamp --sign "$RABIK_SIGN_ID" "$f"
+    if file -b "$f" | grep -q Mach-O; then codesign --force --options runtime --timestamp --sign "$RABIK_SIGN_ID" "$f"; fi
   done
+  F="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"   # Sparkle's helpers, then the framework (Sparkle's documented order)
+  codesign --force --options runtime --timestamp --sign "$RABIK_SIGN_ID" "$F/XPCServices/Installer.xpc"
+  codesign --force --options runtime --timestamp --preserve-metadata=entitlements --sign "$RABIK_SIGN_ID" "$F/XPCServices/Downloader.xpc"
+  codesign --force --options runtime --timestamp --sign "$RABIK_SIGN_ID" "$F/Autoupdate" "$F/Updater.app" "$APP/Contents/Frameworks/Sparkle.framework"
   codesign --force --options runtime --timestamp --entitlements Rabik.entitlements --sign "$RABIK_SIGN_ID" "$APP"
   codesign --verify --strict --verbose=2 "$APP"
   notarize() {   # waits for Apple's verdict; anything but Accepted stops the release
@@ -107,6 +124,18 @@ if [ -n "$RELEASE" ]; then
   else
     echo "Built $DMG, signed but not notarized: set RABIK_NOTARY_PROFILE to notarize it."
   fi
+  # The appcast Sparkle reads: upload it with the disk image to the GitHub release v$VERSION.
+  SIG=$("$SPK/bin/sign_update" --ed-key-file "$KEY" "$DMG")
+  cat > dist/appcast.xml <<X
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+<channel><title>Rabik</title>
+<item><title>Rabik $VERSION</title><pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
+<sparkle:version>$BUILD</sparkle:version><sparkle:shortVersionString>$VERSION</sparkle:shortVersionString><sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+<enclosure url="https://github.com/sayginsaman/rabik/releases/download/v$VERSION/Rabik-$VERSION.dmg" $SIG type="application/octet-stream"/>
+</item></channel></rss>
+X
+  echo "Wrote dist/appcast.xml: upload it and $DMG to the GitHub release v$VERSION."
   exit 0
 fi
 # With a code-signing identity named "Rabik Local Signing" in the keychain, macOS keeps permissions across

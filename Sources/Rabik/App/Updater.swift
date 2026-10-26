@@ -32,6 +32,7 @@ enum Updater {
         return sh(#"cd "$0" 2>/dev/null && git log -1 --format='%h · %cd' --date=format:'%b %-d, %Y'"#).out.trimmingCharacters(in: .whitespacesAndNewlines)
     }()
     static func check(_ done: @escaping () -> Void = {}) {
+        if src.isEmpty && ReleaseUpdates.available { ReleaseUpdates.check(); status = "Sparkle is checking GitHub for a new version."; done(); return }   // a release
         if managedByNix { status = "Run nix profile upgrade or nix run again."; done(); return }
         if src.isEmpty || ProcessInfo.processInfo.environment["RABIK_DIR"] != nil { status = "Preview build"; done(); return }
         guard !checking else { done(); return }
@@ -63,6 +64,7 @@ enum Updater {
         } else { relaunchSoon() }
     }
     static func schedule() {   // a minute after launch, then every 6 hours
+        if src.isEmpty && ReleaseUpdates.available { ReleaseUpdates.automatic(Prefs.bool("autoUpdate")); return }   // Sparkle keeps its own schedule
         if managedByNix { status = "Run nix profile upgrade or nix run again."; return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 60) { if Prefs.bool("autoUpdate") { check() } }
         Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in if Prefs.bool("autoUpdate") { check() } }

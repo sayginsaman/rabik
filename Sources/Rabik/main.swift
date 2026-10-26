@@ -793,3 +793,4 @@ NSApplication.shared.run()
 // final class Activity lives in App/Activity.swift
 // final class ConnectorOffer lives in App/ConnectorOffer.swift
 // enum LoginItem lives in App/LoginItem.swift
+// enum ReleaseUpdates lives in App/ReleaseUpdates.swift
