@@ -44,13 +44,13 @@ L(6,'Then I will send the updated deck by Friday.',751,{name:'Sam Lee'});
 meeting.speakers({'2':'Priya Shah','4':'Deniz Kaya'}); meeting.translated({id:4,text:'The budget is fine; we can start in May.'});
 document.querySelector('#tabs [data-tab=transcript]').click();"""),
     'people': ('ui/settings.html', 'st', 780, 560, '', 'window', 0, f"""
-st.load({{prefs:{{hotkeyLabel:'⌃⌥Space',meeting:true}},icon:'{ICON}',version:'1.5.2'}}); st.tab('people');
+st.load({{prefs:{{hotkeyLabel:'⌃⌥Space',meeting:true}},icon:'{ICON}',version:'1.0.0'}}); st.tab('people');
 st.people({{people:{json.dumps([
     {'id': 'sam@acme.com', 'name': 'Sam Lee', 'email': 'sam@acme.com', 'last': DAY - 2 * 86400 + 50400, 'meetings': [{'id': 'm2', 'title': 'Pricing review', 'started': DAY - 2 * 86400 + 50400}, {'id': 'm1', 'title': 'Q4 planning', 'started': DAY - 9 * 86400 + 36000}], 'facts': ['Sam Lee: head of sales at Acme', 'Prefers short decks']},
     {'id': 'priya@acme.com', 'name': 'Priya Shah', 'email': 'priya@acme.com', 'last': DAY - 2 * 86400, 'meetings': [], 'facts': []}])}}});
 document.querySelector('#peoplelist .meetingrow').click();"""),
     'activity': ('ui/settings.html', 'st', 780, 560, '', 'window', 0, f"""
-st.load({{prefs:{{hotkeyLabel:'⌃⌥Space',activity:true,activityExclude:[{{id:'com.apple.MobileSMS',name:'Messages'}}],learnMe:true}},icon:'{ICON}',version:'1.5.2'}}); st.tab('memory');
+st.load({{prefs:{{hotkeyLabel:'⌃⌥Space',activity:true,activityExclude:[{{id:'com.apple.MobileSMS',name:'Messages'}}],learnMe:true}},icon:'{ICON}',version:'1.0.0'}}); st.tab('memory');
 const use={{asks:0,usd:0,secs:0}};
 st.state({{today:use,week:use,all:use,rules:['Keep answers to three lines','Use metric units'],skills:[{{say:'focus mode',reply:'Closed Slack, opened Things'}}],
   me:{{facts:[{{id:'f1',category:'basics',kind:'name',value:'Alex',source:'you',date:''}},{{id:'f2',category:'school_work',kind:'company',value:'Acme',source:'you',date:''}},

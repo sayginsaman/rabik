@@ -37,10 +37,6 @@ Needs macOS 26 and an AI client: Claude Code on a Claude plan, Devin, Pi or a lo
 
 <br>
 
-https://github.com/user-attachments/assets/26822ad2-6281-477d-b676-2f490a4a207b
-
-<br>
-
 ## Just ask
 
 | You say | Rabik |
