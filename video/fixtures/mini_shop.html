@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- Stand-in for what the agent's Chrome window shows inside the native mini screen: a plain, unbranded results page. -->
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1072px; height: 900px; background: #fff; font: 15px -apple-system, system-ui, sans-serif; color: #1D1D21; }
+  .bar { height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid #E9E7E3; background: #F5F3F0; }
+  .dots { display: flex; gap: 8px; } .dots i { width: 12px; height: 12px; border-radius: 50%; background: #D9D6D1; display: block; }
+  .url { flex: 1; height: 32px; border-radius: 16px; background: #fff; border: 1px solid #E9E7E3; display: flex; align-items: center; padding: 0 16px; color: #686D78; }
+  h1 { font-size: 26px; margin: 28px 32px 6px; letter-spacing: -.01em; } p.sub { margin: 0 32px 22px; color: #686D78; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; padding: 0 32px; }
+  .card { border: 1px solid #E9E7E3; border-radius: 16px; padding: 18px; }
+  .pic { height: 210px; border-radius: 12px; background: linear-gradient(#F5F3F0, #E9E7E3); position: relative; overflow: hidden; }
+  .pic svg { position: absolute; inset: 0; margin: auto; width: 150px; height: 170px; }
+  .name { font-weight: 600; margin: 14px 0 4px; } .price { font-size: 22px; font-weight: 700; } .stars { color: #955800; font-size: 13px; margin-top: 4px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; padding: 26px 32px; }
+  .row div { height: 120px; border-radius: 14px; background: #F5F3F0; }
+</style>
+<div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="url">desk lamp under $30</div></div>
+<h1>Desk lamps under $30</h1><p class="sub">3 picks, sorted by rating</p>
+<div class="grid">
+  <div class="card"><div class="pic"><svg viewBox="0 0 150 170"><path d="M40 30 L110 30 L95 70 L55 70 Z" fill="#1D1D21"/><rect x="72" y="70" width="6" height="80" fill="#686D78"/><rect x="45" y="150" width="60" height="10" rx="5" fill="#1D1D21"/></svg></div><div class="name">Slim LED lamp</div><div class="price">$22.99</div><div class="stars">★★★★★ 4.7</div></div>
+  <div class="card"><div class="pic"><svg viewBox="0 0 150 170"><path d="M30 40 L80 20 L92 50 L45 68 Z" fill="#6989D3"/><path d="M78 40 L110 120" stroke="#686D78" stroke-width="6"/><path d="M110 120 L70 150" stroke="#686D78" stroke-width="6"/><rect x="50" y="148" width="50" height="10" rx="5" fill="#1D1D21"/></svg></div><div class="name">Clamp arm lamp</div><div class="price">$27.50</div><div class="stars">★★★★☆ 4.5</div></div>
+  <div class="card"><div class="pic"><svg viewBox="0 0 150 170"><ellipse cx="75" cy="50" rx="45" ry="26" fill="#CBD2E2"/><rect x="72" y="70" width="6" height="78" fill="#686D78"/><ellipse cx="75" cy="152" rx="34" ry="8" fill="#1D1D21"/></svg></div><div class="name">Dimmable task lamp</div><div class="price">$29.00</div><div class="stars">★★★★☆ 4.4</div></div>
+</div>
+<div class="row"><div></div><div></div><div></div></div>

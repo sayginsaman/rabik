@@ -1,0 +1,27 @@
+{
+  "name": "rabik-showcase-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "theme": "tsx scripts/gen-theme.ts",
+    "capture": "xcrun swiftc -O scripts/capture.swift -o out/capture && ./out/capture fixtures/shots.json assets/screens/raw",
+    "normalize": "tsx scripts/normalize.ts",
+    "studio": "remotion studio src/index.ts",
+    "draft": "remotion render src/index.ts Showcase out/draft_720p.mp4 --scale=0.6667 --codec=h264 --crf=23 --muted",
+    "qa": "tsx scripts/qa.ts",
+    "storyboard": "tsx scripts/storyboard.ts"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.535",
+    "@remotion/google-fonts": "4.0.535",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "sharp": "0.34.4",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  }
+}

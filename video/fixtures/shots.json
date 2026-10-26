@@ -1,0 +1,213 @@
+[
+ {
+  "id": "ask",
+  "page": "ui/ui.html",
+  "width": 440,
+  "height": 700,
+  "root": "#card",
+  "panel": "box",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "ask.js",
+  "regions": {
+   "box": "#card",
+   "input": "#thread .turn:last-child .q",
+   "status": "#head"
+  },
+  "styles": {
+   "input": "#thread .turn:last-child .q"
+  }
+ },
+ {
+  "id": "ask_full",
+  "page": "ui/ui.html",
+  "width": 440,
+  "height": 700,
+  "root": "#card",
+  "panel": "box",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "ask_full.js",
+  "regions": {
+   "box": "#card",
+   "input": "#thread .turn:last-child .q"
+  }
+ },
+ {
+  "id": "summary",
+  "page": "ui/ui.html",
+  "width": 440,
+  "height": 900,
+  "root": "#card",
+  "panel": "box",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "summary.js",
+  "regions": {
+   "summaryCard": "#thread .turn:last-child .a",
+   "sections[]": "#thread .turn:last-child .a > *",
+   "chips[]": "#thread .turn:last-child .srcs .src",
+   "sourceChip": "#thread .turn:last-child .srcs .src"
+  }
+ },
+ {
+  "id": "confirm",
+  "page": "ui/ui.html",
+  "width": 440,
+  "height": 700,
+  "root": "#card",
+  "panel": "box",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "confirm.js",
+  "regions": {
+   "confirmCard": ".ok",
+   "primaryButton": ".ok button.go",
+   "secondaryButton": ".ok > div > button:not(.go)"
+  }
+ },
+ {
+  "id": "recap",
+  "page": "ui/ui.html",
+  "width": 440,
+  "height": 1600,
+  "root": "#card",
+  "panel": "box",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "recap.js",
+  "regions": {
+   "card": ".recap-card",
+   "todos[]": ".recap-card .todo",
+   "add": ".recap-card button.go"
+  }
+ },
+ {
+  "id": "recap_ticked",
+  "page": "ui/ui.html",
+  "width": 440,
+  "height": 1600,
+  "root": "#card",
+  "panel": "box",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "recap_ticked.js",
+  "regions": {
+   "card": ".recap-card",
+   "todos[]": ".recap-card .todo",
+   "add": ".recap-card button.go"
+  }
+ },
+ {
+  "id": "agent",
+  "page": "ui/agents.html",
+  "width": 300,
+  "height": 640,
+  "root": "#shelf",
+  "panel": "none",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "agent.js",
+  "regions": {
+   "chip": ".chip",
+   "steps[]": ".chip .steps li",
+   "mini": ".chip [data-mini]",
+   "step": ".chip .step",
+   "thumb": ".chip .head > :first-child"
+  }
+ },
+ {
+  "id": "agent_done",
+  "page": "ui/agents.html",
+  "width": 300,
+  "height": 640,
+  "root": "#shelf",
+  "panel": "none",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "agent_done.js",
+  "regions": {
+   "chip": ".chip",
+   "summary": ".chip .current",
+   "mini": ".chip [data-mini]",
+   "step": ".chip .step",
+   "thumb": ".chip .head > :first-child"
+  }
+ },
+ {
+  "id": "meeting_transcript",
+  "page": "ui/meeting.html",
+  "width": 340,
+  "height": 1100,
+  "root": "body",
+  "panel": "meeting",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "meeting_transcript.js",
+  "regions": {
+   "lines": "#lines",
+   "header": "header",
+   "transcript": "#live",
+   "lineRows[]": "#lines .line",
+   "footer": "#askbar"
+  }
+ },
+ {
+  "id": "meeting_recap",
+  "page": "ui/meeting.html",
+  "width": 340,
+  "height": 640,
+  "root": "body",
+  "panel": "meeting",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "meeting_recap.js",
+  "regions": {
+   "ended": "#ended",
+   "recap": "#recap",
+   "todos[]": "#todolist .todo",
+   "remind": "#remind"
+  }
+ },
+ {
+  "id": "meeting_recap_ticked",
+  "page": "ui/meeting.html",
+  "width": 340,
+  "height": 640,
+  "root": "body",
+  "panel": "meeting",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "meeting_recap_ticked.js",
+  "regions": {
+   "todos[]": "#todolist .todo",
+   "remind": "#remind"
+  }
+ },
+ {
+  "id": "dictate_pill",
+  "page": "ui/ui.html",
+  "width": 440,
+  "height": 200,
+  "root": "#card",
+  "panel": "box",
+  "dark": true,
+  "scale": 2.5,
+  "fixture": "dictate_pill.js",
+  "regions": {
+   "pill": "#card"
+  }
+ },
+ {
+  "id": "mini_shop",
+  "page": "video/fixtures/mini_shop.html",
+  "width": 1072,
+  "height": 900,
+  "root": "body",
+  "panel": "none",
+  "dark": false,
+  "scale": 1,
+  "fixture": "mini_shop.js",
+  "regions": {}
+ }
+]

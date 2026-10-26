@@ -1,0 +1,406 @@
+{
+  "version": "v1",
+  "project": "Rabik showcase",
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "audio": false,
+  "timing": {
+    "targetSeconds": 45,
+    "minTargetSeconds": 30,
+    "maxTargetSeconds": 60,
+    "transition": { "durationFrames": 18, "easing": "easeInOutCubic", "style": "crossfade+slide24", "fixed": true },
+    "rules": "Each scene gets targetSeconds*weight/sum(weights), clamped to min/max, remainder spread, rounded to frames. Animations with fixed=true keep their frame counts; others scale with the scene. Negative start = frames before scene end."
+  },
+  "easing": {
+    "easeOutQuad": [0.25, 0.46, 0.45, 0.94],
+    "easeInOutCubic": [0.65, 0, 0.35, 1],
+    "easeOutExpo": [0.16, 1, 0.3, 1],
+    "easeOutBackSoft": [0.34, 1.3, 0.64, 1],
+    "linear": [0, 0, 1, 1]
+  },
+  "brand": {
+    "kitPath": "ui/brand/",
+    "tokens": "ui/brand/05_Brand_Tokens/rabik-design-system-tokens.json",
+    "fallbackTokens": "ui/brand/05_Brand_Tokens/rabik-brand-tokens.json",
+    "fonts": {
+      "display": ["Figtree", "SF Pro Rounded", "system-ui"],
+      "sans": ["Figtree", "system-ui"],
+      "mono": ["JetBrains Mono", "SF Mono", "Menlo"]
+    },
+    "colorsUsed": {
+      "bg": "#FCFBFA",
+      "surface": "#F5F3F0",
+      "border": "#E9E7E3",
+      "ink": "#1D1D21",
+      "muted": "#686D78",
+      "haze": "#CBD2E2",
+      "accent": "#6989D3",
+      "accent-text": "#4063B5",
+      "night": "#101114"
+    }
+  },
+  "presets": {
+    "device": {
+      "stage": { "fill": "token:bg", "glow": { "color": "token:haze", "opacity": 0.4, "radius": 900 } },
+      "frame": {
+        "style": "mac-window",
+        "altStyle": "macbook",
+        "maxSize": [1440, 900],
+        "radius": 22,
+        "border": "1px token:border",
+        "shadow": "0 1px 2px rgba(29,29,33,.06), 0 24px 64px rgba(105,137,211,.22)"
+      },
+      "caption": { "font": "display", "size": 44, "weight": 600, "color": "token:ink", "x": 120, "baseline": 1000, "maxWords": 8 },
+      "parallax": { "background": 6, "frame": 12, "overlay": 18, "periodSeconds": 6 },
+      "tilt": "hero and close only"
+    },
+    "fullbleed": {
+      "screen": { "fit": "cover", "respectFocus": true, "radius": 0 },
+      "scrim": { "type": "linear", "height": 360, "from": "rgba(16,17,20,0)", "to": "rgba(16,17,20,0.72)" },
+      "caption": { "font": "display", "size": 52, "weight": 600, "color": "#FFFFFF", "x": 120, "baseline": 1000, "maxWords": 8 },
+      "parallax": { "background": 0, "frame": 8, "overlay": 14, "periodSeconds": 6 },
+      "tilt": "none"
+    }
+  },
+  "safeArea": { "left": 120, "right": 120, "top": 80, "bottom": 80 },
+  "hud": {
+    "progressDots": { "position": "bottom-right", "size": 8, "gap": 10, "active": "token:accent", "inactive": "rgba(29,29,33,0.2)" },
+    "stepNumber": { "position": "top-left", "font": "mono", "size": 14, "color": "token:muted", "format": "{nn} / {total}" }
+  },
+  "typing": {
+    "msPerCharMin": 35,
+    "msPerCharMax": 70,
+    "punctuationPauseMs": 180,
+    "spacePauseMs": 90,
+    "spacePauseChance": 0.2,
+    "caret": { "width": 2, "color": "token:ink", "blinkMs": 530 }
+  },
+  "reducedMotion": {
+    "camera": false,
+    "parallax": false,
+    "tilt": false,
+    "ripple": false,
+    "transition": { "style": "crossfade", "durationFrames": 24 },
+    "typing": "instant+fade12"
+  },
+  "limits": { "maxPxPerSecond": 1200, "maxLoopHz": 2, "maxLumaChange3f": 0.2 },
+  "scenes": [
+    {
+      "id": "hero",
+      "index": 0,
+      "defaultSeconds": 3.5,
+      "weight": 3.5,
+      "minSeconds": 2.5,
+      "maxSeconds": 5,
+      "screen": null,
+      "layers": [
+        { "id": "bg", "type": "stage", "fill": "token:bg", "glow": { "color": "token:haze", "opacity": 0.4, "radius": 900, "center": [960, 560] } },
+        { "id": "icon", "type": "image", "src": "ui/brand/01_App_Icon/Rabik_icon_1024.png", "size": [220, 220], "position": [850, 260], "depth": "overlay" },
+        { "id": "face", "type": "face", "src": "ui/brand/02_Face_Mark/Rabik_face_ink.svg", "bindTo": "icon", "note": "animate over the icon's own face: align to the icon's face bounds" },
+        { "id": "wordmark", "type": "text", "text": "Rabik", "font": "display", "size": 112, "weight": 800, "tracking": "-0.03em", "color": "token:ink", "align": "center", "position": [960, 620] },
+        { "id": "line", "type": "text", "text": "Talk to your Mac. It remembers.", "font": "sans", "size": 36, "weight": 500, "color": "token:muted", "align": "center", "position": [960, 700] }
+      ],
+      "animations": [
+        { "target": "icon", "property": "scale", "from": 0.6, "to": 1.0, "start": 0, "duration": 18, "easing": "easeOutBackSoft", "fixed": false },
+        { "target": "icon", "property": "opacity", "from": 0, "to": 1, "start": 0, "duration": 10, "easing": "easeOutQuad", "fixed": false },
+        { "target": "face", "property": "blink", "from": null, "to": null, "start": 24, "duration": 4, "easing": "easeInOutCubic", "fixed": true, "note": "eyes scaleY 1 to 0.1 to 1 over 4 frames" },
+        { "target": "wordmark", "property": "translateY", "from": 16, "to": 0, "start": 10, "duration": 14, "easing": "easeOutQuad", "fixed": false },
+        { "target": "wordmark", "property": "opacity", "from": 0, "to": 1, "start": 10, "duration": 14, "easing": "easeOutQuad", "fixed": false },
+        { "target": "line", "property": "translateY", "from": 12, "to": 0, "start": 18, "duration": 14, "easing": "easeOutQuad", "fixed": false },
+        { "target": "line", "property": "opacity", "from": 0, "to": 1, "start": 18, "duration": 14, "easing": "easeOutQuad", "fixed": false },
+        { "target": "stage", "property": "tilt", "from": { "rx": 3, "ry": -4 }, "to": { "rx": 0, "ry": 0 }, "start": 0, "duration": 60, "easing": "easeOutExpo", "fixed": false, "presetOnly": "device" }
+      ],
+      "caption": null,
+      "hud": { "show": false }
+    },
+    {
+      "id": "ask",
+      "index": 1,
+      "defaultSeconds": 4.5,
+      "weight": 4.5,
+      "minSeconds": 3,
+      "maxSeconds": 6,
+      "screen": "video/assets/screens/ask.png",
+      "screenNote": "Rabik's box at the top center over a clean demo desktop; capture empty box and the box with the typed ask",
+      "focus": "box",
+      "layers": [
+        { "id": "screen", "type": "screenshot", "src": "video/assets/screens/ask.png", "fit": "preset" },
+        { "id": "keycaps", "type": "keycaps", "keys": ["⌃", "⌥", "Space"], "position": "above-caption", "style": { "radius": "token:radius-sm", "fill": "token:surface", "border": "token:border", "font": "mono" } },
+        { "id": "typing", "type": "typingText", "text": "Code on my Studio Display, Chrome and Terminal on the vertical screen.", "anchor": "focus:box.input", "font": "sans", "size": "match-screenshot", "seed": "ask" },
+        { "id": "focusRing", "type": "focusRing", "anchor": "focus:box.input", "color": "token:accent", "width": 3 }
+      ],
+      "animations": [
+        { "target": "keycaps", "property": "pressSequence", "from": null, "to": null, "start": 4, "duration": 12, "easing": "easeOutQuad", "fixed": true, "note": "each key scales 1 to 0.92 over 3f, 2f apart, held while typing" },
+        { "target": "screen", "property": "opacity", "from": 0, "to": 1, "start": 8, "duration": 12, "easing": "easeOutQuad", "fixed": false },
+        { "target": "focusRing", "property": "opacity", "from": 0, "to": 1, "start": 16, "duration": 8, "easing": "easeOutQuad", "fixed": true },
+        { "target": "typing", "property": "type", "from": null, "to": null, "start": 20, "duration": 75, "easing": "linear", "fixed": false, "note": "variable 35-70 ms/char, seeded" },
+        { "target": "camera", "property": "pushIn", "from": 1.0, "to": 1.12, "start": 20, "duration": 60, "easing": "easeOutExpo", "fixed": false, "toward": "focus:box" }
+      ],
+      "caption": {
+        "text": "Hold ⌃⌥Space and just ask.",
+        "start": 6,
+        "endOffset": -9,
+        "in": { "duration": 14, "easing": "easeOutQuad", "rise": 12, "wordStagger": 2, "fixed": true },
+        "out": { "duration": 9, "easing": "easeInOutCubic", "rise": 6, "fixed": true },
+        "position": "bottom-left"
+      },
+      "hud": { "show": true, "step": 1 }
+    },
+    {
+      "id": "summary",
+      "index": 2,
+      "defaultSeconds": 5,
+      "weight": 5,
+      "minSeconds": 3,
+      "maxSeconds": 6,
+      "screen": "video/assets/screens/summary.png",
+      "screenNote": "The chat summary screen with a finished answer; sections must be real UI from ui/",
+      "focus": "summaryCard",
+      "layers": [
+        { "id": "screen", "type": "screenshot", "src": "video/assets/screens/summary.png", "fit": "preset" },
+        { "id": "spot", "type": "spotlight", "anchor": "focus:summaryCard", "radius": "token:radius-lg", "dim": 0.55 }
+      ],
+      "animations": [
+        { "target": "camera", "property": "pushIn", "from": 1.0, "to": 1.1, "start": 0, "duration": 54, "easing": "easeOutExpo", "fixed": false, "toward": "focus:summaryCard" },
+        { "target": "spot", "property": "lift", "from": null, "to": null, "start": 20, "duration": 12, "easing": "easeOutQuad", "fixed": true, "note": "element scale 1 to 1.03, shadow-float grows" },
+        { "target": "summarySections", "property": "expandStagger", "from": null, "to": null, "start": 34, "duration": 48, "easing": "easeOutExpo", "fixed": false, "note": "reveal each section region from capture-map in order, 16f each, 2f stagger" },
+        { "target": "spot", "property": "fadeOut", "from": null, "to": null, "start": -22, "duration": 10, "easing": "easeInOutCubic", "fixed": true }
+      ],
+      "caption": {
+        "text": "Answers in one clean summary.",
+        "start": 6,
+        "endOffset": -9,
+        "in": { "duration": 14, "easing": "easeOutQuad", "rise": 12, "wordStagger": 2, "fixed": true },
+        "out": { "duration": 9, "easing": "easeInOutCubic", "rise": 6, "fixed": true },
+        "position": "bottom-left"
+      },
+      "hud": { "show": true, "step": 2 }
+    },
+    {
+      "id": "guide",
+      "index": 3,
+      "defaultSeconds": 5,
+      "weight": 5,
+      "minSeconds": 3,
+      "maxSeconds": 6,
+      "screen": "video/assets/screens/guide.png",
+      "screenNote": "System Settings with Rabik's ring on the Night Shift control and its step caption card",
+      "focus": "ring",
+      "layers": [
+        { "id": "screen", "type": "screenshot", "src": "video/assets/screens/guide.png", "fit": "preset" },
+        { "id": "ringPulse", "type": "ring", "anchor": "focus:ring", "color": "token:accent" },
+        { "id": "pointer", "type": "pointer", "from": "focus:ring.offset(-220,140)", "to": "focus:ring" }
+      ],
+      "animations": [
+        { "target": "camera", "property": "pan", "from": [0, 0], "to": "toward:focus:ring", "start": 0, "duration": 60, "easing": "easeInOutCubic", "fixed": false, "maxTravel": 160 },
+        { "target": "ringPulse", "property": "pulse", "from": 0.9, "to": 1.1, "start": 12, "duration": 48, "easing": "easeOutQuad", "fixed": false, "loops": 2 },
+        { "target": "stepCaptions", "property": "slideIn", "from": null, "to": null, "start": 30, "duration": 14, "easing": "easeOutQuad", "fixed": false, "note": "step cards from capture-map slide in 10 px, one per 24f" },
+        { "target": "pointer", "property": "travel", "from": null, "to": null, "start": 70, "duration": 18, "easing": "easeInOutCubic", "fixed": false },
+        { "target": "pointer", "property": "tap", "from": null, "to": null, "start": 88, "duration": 13, "easing": "easeOutQuad", "fixed": true }
+      ],
+      "caption": {
+        "text": "Points to the exact spot.",
+        "start": 6,
+        "endOffset": -9,
+        "in": { "duration": 14, "easing": "easeOutQuad", "rise": 12, "wordStagger": 2, "fixed": true },
+        "out": { "duration": 9, "easing": "easeInOutCubic", "rise": 6, "fixed": true },
+        "position": "bottom-left"
+      },
+      "hud": { "show": true, "step": 3 }
+    },
+    {
+      "id": "dictate",
+      "index": 4,
+      "defaultSeconds": 2.5,
+      "weight": 2.5,
+      "minSeconds": 1.5,
+      "maxSeconds": 3,
+      "screen": "video/assets/screens/dictate.png",
+      "screenNote": "A Mail compose field with the dictation indicator showing; final cleaned text",
+      "focus": "textField",
+      "layers": [
+        { "id": "screen", "type": "screenshot", "src": "video/assets/screens/dictate.png", "fit": "preset" },
+        { "id": "typing", "type": "typingText", "text": "Sounds good, um, let's meet Thursday at 2.", "cleanTo": "Sounds good, let's meet Thursday at 2.", "anchor": "focus:textField", "seed": "dictate" },
+        { "id": "fnKey", "type": "keycaps", "keys": ["fn"], "position": "above-caption" }
+      ],
+      "animations": [
+        { "target": "fnKey", "property": "press", "from": null, "to": null, "start": 0, "duration": 6, "easing": "easeOutQuad", "fixed": true },
+        { "target": "typing", "property": "type", "from": null, "to": null, "start": 4, "duration": 40, "easing": "linear", "fixed": false },
+        { "target": "typing", "property": "removeFiller", "from": null, "to": null, "start": 48, "duration": 12, "easing": "easeInOutCubic", "fixed": false, "note": "strike 'um, ' then collapse the gap" }
+      ],
+      "caption": {
+        "text": "Hold fn to type by voice.",
+        "start": 2,
+        "endOffset": -6,
+        "in": { "duration": 14, "easing": "easeOutQuad", "rise": 12, "wordStagger": 2, "fixed": true },
+        "out": { "duration": 9, "easing": "easeInOutCubic", "rise": 6, "fixed": true },
+        "position": "bottom-left"
+      },
+      "hud": { "show": true, "step": 4 }
+    },
+    {
+      "id": "agent",
+      "index": 5,
+      "defaultSeconds": 5,
+      "weight": 5,
+      "minSeconds": 3,
+      "maxSeconds": 6,
+      "screen": "video/assets/screens/agent.png",
+      "screenNote": "Corner agent chip with live steps and mini screen while another app is in front; plus agent_done.png",
+      "focus": "chip",
+      "layers": [
+        { "id": "screen", "type": "screenshot", "src": "video/assets/screens/agent.png", "fit": "preset" },
+        { "id": "done", "type": "screenshot", "src": "video/assets/screens/agent_done.png", "fit": "preset", "optional": true }
+      ],
+      "animations": [
+        { "target": "chip", "property": "scaleIn", "from": 0.85, "to": 1.0, "start": 6, "duration": 16, "easing": "easeOutBackSoft", "fixed": false },
+        { "target": "camera", "property": "pushIn", "from": 1.0, "to": 1.15, "start": 6, "duration": 48, "easing": "easeOutExpo", "fixed": false, "toward": "focus:chip" },
+        { "target": "steps", "property": "tickStagger", "from": null, "to": null, "start": 24, "duration": 60, "easing": "easeOutQuad", "fixed": false, "note": "step rows from capture-map tick in, 18f apart" },
+        { "target": "done", "property": "crossfade", "from": 0, "to": 1, "start": -36, "duration": 12, "easing": "easeInOutCubic", "fixed": false },
+        { "target": "doneCheck", "property": "pop", "from": 0.6, "to": 1.0, "start": -24, "duration": 10, "easing": "easeOutBackSoft", "fixed": true }
+      ],
+      "caption": {
+        "text": "Errands run behind your apps.",
+        "start": 6,
+        "endOffset": -9,
+        "in": { "duration": 14, "easing": "easeOutQuad", "rise": 12, "wordStagger": 2, "fixed": true },
+        "out": { "duration": 9, "easing": "easeInOutCubic", "rise": 6, "fixed": true },
+        "position": "bottom-left"
+      },
+      "hud": { "show": true, "step": 5 }
+    },
+    {
+      "id": "meeting",
+      "index": 6,
+      "defaultSeconds": 5.5,
+      "weight": 5.5,
+      "minSeconds": 3.5,
+      "maxSeconds": 6,
+      "screen": "video/assets/screens/meeting_transcript.png",
+      "screenNote": "Meeting view with live transcript (tall capture for scrolling) and meeting_recap.png with action items",
+      "focus": "transcript",
+      "layers": [
+        { "id": "transcript", "type": "screenshot", "src": "video/assets/screens/meeting_transcript.png", "fit": "preset", "scrollable": true },
+        { "id": "recap", "type": "screenshot", "src": "video/assets/screens/meeting_recap.png", "fit": "preset" }
+      ],
+      "animations": [
+        { "target": "transcript", "property": "scroll", "from": 0, "to": "1.2screen", "start": 0, "duration": 72, "easing": "easeInOutCubic", "fixed": false },
+        { "target": "transcript->recap", "property": "transition", "from": null, "to": null, "start": 78, "duration": 18, "easing": "easeInOutCubic", "fixed": false, "style": "slide-left" },
+        { "target": "actionItems", "property": "tickStagger", "from": null, "to": null, "start": 100, "duration": 48, "easing": "easeOutQuad", "fixed": false, "note": "checkbox ticks 10f apart with small pop" }
+      ],
+      "caption": {
+        "text": "Live transcript, then a tidy recap.",
+        "start": 6,
+        "endOffset": -9,
+        "in": { "duration": 14, "easing": "easeOutQuad", "rise": 12, "wordStagger": 2, "fixed": true },
+        "out": { "duration": 9, "easing": "easeInOutCubic", "rise": 6, "fixed": true },
+        "position": "bottom-left"
+      },
+      "hud": { "show": true, "step": 6 }
+    },
+    {
+      "id": "safe",
+      "index": 7,
+      "defaultSeconds": 3,
+      "weight": 3,
+      "minSeconds": 2,
+      "maxSeconds": 4,
+      "screen": "video/assets/screens/confirm.png",
+      "screenNote": "Rabik's confirm card for 'Move Dentist to 16:00?' with its buttons",
+      "focus": "confirmCard",
+      "layers": [
+        { "id": "screen", "type": "screenshot", "src": "video/assets/screens/confirm.png", "fit": "preset" },
+        { "id": "spot", "type": "spotlight", "anchor": "focus:confirmCard", "radius": "token:radius-lg", "dim": 0.55 },
+        { "id": "pointer", "type": "pointer", "from": "focus:confirmCard.offset(180,160)", "to": "focus:confirmCard.primaryButton" }
+      ],
+      "animations": [
+        { "target": "spot", "property": "lift", "from": null, "to": null, "start": 4, "duration": 12, "easing": "easeOutQuad", "fixed": true },
+        { "target": "pointer", "property": "travel", "from": null, "to": null, "start": 30, "duration": 18, "easing": "easeInOutCubic", "fixed": false },
+        { "target": "primaryButton", "property": "press", "from": null, "to": null, "start": 56, "duration": 10, "easing": "easeOutQuad", "fixed": true },
+        { "target": "spot", "property": "fadeOut", "from": null, "to": null, "start": -14, "duration": 10, "easing": "easeInOutCubic", "fixed": true }
+      ],
+      "caption": {
+        "text": "Asks before it changes things.",
+        "start": 6,
+        "endOffset": -9,
+        "in": { "duration": 14, "easing": "easeOutQuad", "rise": 12, "wordStagger": 2, "fixed": true },
+        "out": { "duration": 9, "easing": "easeInOutCubic", "rise": 6, "fixed": true },
+        "position": "bottom-left"
+      },
+      "hud": { "show": true, "step": 7 }
+    },
+    {
+      "id": "recap",
+      "index": 8,
+      "defaultSeconds": 6,
+      "weight": 6,
+      "minSeconds": 4,
+      "maxSeconds": 6,
+      "screen": "video/assets/screens/evening_recap.png",
+      "screenNote": "21:00 evening recap (tall capture) with asks, finished errand, meeting decisions, tomorrow, to-dos; an answer with a source chip",
+      "focus": "sourceChip",
+      "layers": [
+        { "id": "screen", "type": "screenshot", "src": "video/assets/screens/evening_recap.png", "fit": "preset", "scrollable": true },
+        { "id": "spot", "type": "spotlight", "anchor": "focus:sourceChip", "radius": "token:radius-pill", "dim": 0.55 }
+      ],
+      "animations": [
+        { "target": "screen", "property": "scroll", "from": 0, "to": "0.8screen", "start": 0, "duration": 60, "easing": "easeInOutCubic", "fixed": false },
+        { "target": "spot", "property": "lift", "from": null, "to": null, "start": 72, "duration": 12, "easing": "easeOutQuad", "fixed": true },
+        { "target": "sourceCard", "property": "expand", "from": null, "to": null, "start": 96, "duration": 16, "easing": "easeOutExpo", "fixed": false },
+        { "target": "spot", "property": "fadeOut", "from": null, "to": null, "start": -16, "duration": 10, "easing": "easeInOutCubic", "fixed": true }
+      ],
+      "caption": {
+        "text": "Your day, recapped at nine.",
+        "start": 6,
+        "endOffset": -9,
+        "in": { "duration": 14, "easing": "easeOutQuad", "rise": 12, "wordStagger": 2, "fixed": true },
+        "out": { "duration": 9, "easing": "easeInOutCubic", "rise": 6, "fixed": true },
+        "position": "bottom-left"
+      },
+      "hud": { "show": true, "step": 8 }
+    },
+    {
+      "id": "close",
+      "index": 9,
+      "defaultSeconds": 5,
+      "weight": 5,
+      "minSeconds": 3,
+      "maxSeconds": 6,
+      "screen": null,
+      "layers": [
+        { "id": "bg", "type": "stage", "fill": "token:bg", "glow": { "color": "token:haze", "opacity": 0.4, "radius": 900, "center": [960, 500] } },
+        { "id": "lockup", "type": "image", "src": "ui/brand/03_Logo_Lockups/Rabik_stacked_ink_transparent.png", "height": 360, "position": [960, 430], "anchor": "center" },
+        { "id": "face", "type": "face", "src": "ui/brand/02_Face_Mark/Rabik_face_ink.svg", "bindTo": "lockup.icon" },
+        { "id": "shortcut", "type": "text", "text": "Hold ⌃⌥Space and ask.", "font": "mono", "size": 30, "weight": 500, "color": "token:ink", "align": "center", "position": [960, 700] },
+        { "id": "url", "type": "text", "text": "github.com/sayginsaman/rabik", "font": "sans", "size": 24, "weight": 500, "color": "token:accent-text", "align": "center", "position": [960, 760] }
+      ],
+      "animations": [
+        { "target": "lockup", "property": "scale", "from": 0.94, "to": 1.0, "start": 0, "duration": 24, "easing": "easeOutExpo", "fixed": false },
+        { "target": "lockup", "property": "opacity", "from": 0, "to": 1, "start": 0, "duration": 14, "easing": "easeOutQuad", "fixed": false },
+        { "target": "face", "property": "doneBlink", "from": null, "to": null, "start": 30, "duration": 6, "easing": "easeInOutCubic", "fixed": true, "note": "blink plus smile widens 6%" },
+        { "target": "shortcut", "property": "opacity", "from": 0, "to": 1, "start": 36, "duration": 14, "easing": "easeOutQuad", "fixed": false },
+        { "target": "url", "property": "opacity", "from": 0, "to": 1, "start": 48, "duration": 14, "easing": "easeOutQuad", "fixed": false },
+        { "target": "stage", "property": "tilt", "from": { "rx": 0, "ry": 0 }, "to": { "rx": 2, "ry": 3 }, "start": 0, "duration": 150, "easing": "easeInOutCubic", "fixed": false, "presetOnly": "device" }
+      ],
+      "caption": null,
+      "hud": { "show": false }
+    }
+  ],
+  "markers": [
+    { "time": 0.0, "type": "music", "note": "Soft intro, airy pad" },
+    { "time": 0.8, "type": "sfx", "note": "Gentle pop as the icon lands" },
+    { "time": 3.5, "type": "music", "note": "Beat starts on the first keycap press" },
+    { "time": 3.7, "type": "vo", "note": "Hold Control, Option, Space, and ask." },
+    { "time": 8.0, "type": "vo", "note": "Get the answer in one clean summary." },
+    { "time": 13.0, "type": "vo", "note": "Lost in Settings? It points to the spot." },
+    { "time": 18.0, "type": "sfx", "note": "Soft typing ticks under the dictation" },
+    { "time": 20.5, "type": "vo", "note": "Hand off errands. Keep working." },
+    { "time": 25.5, "type": "vo", "note": "It listens to calls and writes the recap." },
+    { "time": 31.0, "type": "sfx", "note": "Light click on Confirm" },
+    { "time": 34.0, "type": "music", "note": "Lift into the final section" },
+    { "time": 34.2, "type": "vo", "note": "And every evening, your day in one recap." },
+    { "time": 40.0, "type": "music", "note": "Resolve; hit on the logo" },
+    { "time": 41.0, "type": "vo", "note": "Rabik. Talk to your Mac." }
+  ]
+}
