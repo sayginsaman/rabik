@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "theme": "tsx scripts/gen-theme.ts",
+    "fonts": "tsx scripts/check-fonts.ts",
     "capture": "xcrun swiftc -O scripts/capture.swift -o out/capture && ./out/capture fixtures/shots.json assets/screens/raw",
     "normalize": "tsx scripts/normalize.ts",
     "studio": "remotion studio src/index.ts",
