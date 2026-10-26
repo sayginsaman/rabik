@@ -1,7 +1,7 @@
 // The feature scenes: Rabik's real panels on the demo desktop, moved only in ways scene.v1.json describes.
 import { Img, staticFile } from 'remotion';
 import { Keycaps } from '../components/Keycaps';
-import { Pointer, pointerPath, rectCenter } from '../components/Pointer';
+import { Pointer, rectCenter } from '../components/Pointer';
 import { Patch, PanelImage, RegionImage } from '../components/Screen';
 import { Spotlight } from '../components/Spotlight';
 import { TypingText } from '../components/TypingText';
@@ -138,22 +138,12 @@ export const MeetingScene: React.FC = () => {
   );
 };
 
-/** The pointer's from/to from a layer like "focus:confirmCard.offset(180,160)" or "focus:confirmCard.primaryButton". */
-const anchor = (cap: Capture, spec: string): [number, number] => {
-  const m = spec.match(/^focus:(\w+)(?:\.offset\((-?\d+),(-?\d+)\)|\.(\w+))?$/);
-  if (!m) throw new Error(`Bad anchor ${spec}`);
-  if (m[4]) return rectCenter(rect(cap, m[4]));
-  const [x, y] = rectCenter(rect(cap, m[1]));
-  return [x + Number(m[2] ?? 0), y + Number(m[3] ?? 0)];
-};
-
 // 7 · Safe mode: the confirm card lifts, the pointer comes to Allow and presses it
 export const SafeScene: React.FC = () => {
   const s = useScene(), cap = s.cap!, geo = geometry(s, s.frame), panel = cap.panels[0];
-  const card = rect(cap, 'confirmCard'), button = rect(cap, 'primaryButton'), pl = layerOf(s, 'pointer');
+  const card = rect(cap, 'confirmCard'), button = rect(cap, 'primaryButton');
   const lift = anim(s, 'spot', 'lift'), fade = anim(s, 'spot', 'fadeOut'), travel = anim(s, 'pointer', 'travel'), press = anim(s, 'primaryButton', 'press');
   const down = span(s.t, press.start, 4, 'easeOutQuad') * (1 - span(s.t, press.start + 4, 6, 'easeOutQuad'));
-  const at = pointerPath(anchor(cap, pl.from as string), anchor(cap, pl.to as string), travel.p);
   const pressed = <RegionImage src={panel.src} panel={panel} rect={button} radius={radius.sm} scale={1 - 0.03 * down} />;
   return (
     <Shell geo={geo}>
@@ -163,7 +153,7 @@ export const SafeScene: React.FC = () => {
         <RegionImage src={panel.src} panel={panel} rect={card} />
         {down > 0 && pressed}
       </Spotlight>
-      <Pointer at={at} press={down / 1} ripple={s.reduced ? 0 : span(s.t, press.start + 3, 10, 'easeOutQuad')} pxPerPt={usePxPerPt(geo.cam.s)}
+      <Pointer at={geo.pointer!} press={down} ripple={s.reduced ? 0 : span(s.t, press.start + 3, 10, 'easeOutQuad')} pxPerPt={usePxPerPt(geo.cam.s)}
         opacity={span(s.t, travel.start - 8, 8, 'easeOutQuad')} />
     </Shell>
   );
@@ -211,7 +201,7 @@ export const LiveScene: React.FC = () => {
           border: `${3 / ppt}px solid ${color.accent}`, opacity: lerp(1, 0.4, pulse), transform: `scale(${lerp(0.9, 1.1, pulse)})` }} />
       )}
       {travel && (
-        <Pointer at={pointerPath([fx - 220 / ppt, fy + 140 / ppt], [fx, fy], travel.p)} press={tap ? span(s.t, tap.start, 3) * (1 - span(s.t, tap.start + 3, 3)) : 0}
+        <Pointer at={geo.pointer ?? [fx, fy]} press={tap ? span(s.t, tap.start, 3) * (1 - span(s.t, tap.start + 3, 3)) : 0}
           ripple={tap && !s.reduced ? span(s.t, tap.start + 3, 10, 'easeOutQuad') : 0} pxPerPt={ppt} opacity={span(s.t, travel.start - 8, 8)} />
       )}
     </Shell>

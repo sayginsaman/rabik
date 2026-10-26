@@ -1,1 +1,8 @@
-{ "google": true, "checked": "never: run npm run fonts" }
+{
+ "google": true,
+ "checked": "2026-10-26T22:34:53.260Z",
+ "families": {
+  "Figtree": "ok",
+  "JetBrains Mono": "ok"
+ }
+}

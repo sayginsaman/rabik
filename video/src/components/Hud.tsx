@@ -3,7 +3,7 @@ import { useCurrentFrame } from 'remotion';
 import { SCENE } from '../data';
 import { span } from '../motion/easing';
 import type { Plan } from '../timing';
-import { color, font } from '../theme';
+import { color, font, radius } from '../theme';
 
 export const Hud: React.FC<{ plan: Plan; preset: 'device' | 'fullbleed'; transition: number }> = ({ plan, preset, transition: T }) => {
   const frame = useCurrentFrame(), h = SCENE.hud, p = SCENE.presets[preset].caption;
@@ -19,7 +19,9 @@ export const Hud: React.FC<{ plan: Plan; preset: 'device' | 'fullbleed'; transit
       {steps.map(s => {
         const o = span(frame, s.from - T / 2, T) * (1 - span(frame, s.from + s.frames - T / 2, T));
         return o > 0 && (
-          <div key={s.def.id} style={{ position: 'absolute', left: 120, top: 80, fontFamily: font.mono, fontSize: h.stepNumber.size, lineHeight: 1, color: color.muted, opacity: o * shown, letterSpacing: '0.04em' }}>
+          <div key={s.def.id} style={{ position: 'absolute', left: 120, top: 80, fontFamily: font.mono, fontSize: h.stepNumber.size, lineHeight: 1, color: color.muted, opacity: o * shown, letterSpacing: '0.04em',
+            // full-bleed: the number sits on the screenshot, which a spotlight dims, so it gets a Cloud backing of its own
+            ...(preset === 'fullbleed' ? { background: color.bg, padding: '6px 9px', margin: '-6px -9px', borderRadius: radius.sm } : {}) }}>
             {h.stepNumber.format.replace('{nn}', String(s.hudStep).padStart(2, '0')).replace('{total}', String(plan.hudTotal).padStart(2, '0'))}
           </div>
         );

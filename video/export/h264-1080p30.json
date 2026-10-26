@@ -1,0 +1,14 @@
+{
+  "name": "H.264 1080p30, no audio",
+  "container": "mp4",
+  "codec": "h264",
+  "crf": 16,
+  "pixelFormat": "yuv420p",
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "audio": false,
+  "faststart": true,
+  "remotion": ["--codec=h264", "--crf=16", "--pixel-format=yuv420p", "--muted"],
+  "post": "ffmpeg -i in.mp4 -c copy -an -movflags +faststart out.mp4 (scripts/render.ts does this)"
+}

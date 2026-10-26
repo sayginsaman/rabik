@@ -2,7 +2,7 @@
 import { SCENE, type CaptionDef } from '../data';
 import { span } from '../motion/easing';
 import { useScene } from '../scenes/context';
-import { font } from '../theme';
+import { color, font } from '../theme';
 import { tok } from '../tokens';
 
 const ASCENT = 0.95;   // Figtree's ascender (em), with line-height 1.2 the baseline sits this far below the box top
@@ -16,7 +16,9 @@ export const Caption: React.FC<{ caption: CaptionDef }> = ({ caption: c }) => {
   return (
     <div style={{ position: 'absolute', left: p.x, top: captionTop(p.size), maxWidth: 1920 - p.x * 2, whiteSpace: 'nowrap', fontFamily: font.display, fontSize: p.size,
       fontWeight: p.weight, lineHeight: 1.2, letterSpacing: '-0.01em', color: tok(p.color),
-      opacity: 1 - out, transform: `translateY(${-c.out.rise * out * rise}px)` }}>
+      opacity: 1 - out, transform: `translateY(${-c.out.rise * out * rise}px)`,
+      // full-bleed: white over the scrim, plus a soft shadow so a light screenshot behind the scrim can't wash it out
+      textShadow: s.preset === 'fullbleed' ? `0 1px 14px ${color.night}8C, 0 0 2px ${color.night}66` : 'none' }}>
       {c.text.split(' ').map((w, i) => {
         const q = span(s.t, c.start + i * c.in.wordStagger, c.in.duration, c.in.easing);
         return <span key={i} style={{ display: 'inline-block', marginRight: '0.26em', opacity: q, transform: `translateY(${c.in.rise * (1 - q) * rise}px)` }}>{w}</span>;
