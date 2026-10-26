@@ -1,2 +1,6 @@
 node_modules/
 out/
+# generated: npm run theme / capture / normalize rebuild them
+assets/brand/
+assets/screens/*.png
+assets/screens/raw/

@@ -35,7 +35,7 @@ func measureJS(_ s: Shot, fixture: String) -> String {
       if(k.endsWith('[]'))regions[k.slice(0,-2)]=[...document.querySelectorAll(sel)].filter(e=>e.getClientRects().length).map(box);
       else{const e=document.querySelector(sel);if(e&&e.getClientRects().length)regions[k]=box(e);}}
     const styles={};for(const [k,sel] of Object.entries(\(styles))){const e=document.querySelector(sel);if(!e)continue;const c=getComputedStyle(e);
-      styles[k]={fontFamily:c.fontFamily,fontSize:c.fontSize,fontWeight:c.fontWeight,lineHeight:c.lineHeight,color:c.color,letterSpacing:c.letterSpacing,paddingLeft:c.paddingLeft,paddingTop:c.paddingTop};}
+      styles[k]={fontFamily:c.fontFamily,fontSize:c.fontSize,fontWeight:c.fontWeight,lineHeight:c.lineHeight,color:c.color,letterSpacing:c.letterSpacing,paddingLeft:c.paddingLeft,paddingTop:c.paddingTop,paddingRight:c.paddingRight,textAlign:c.textAlign};}
     return JSON.stringify({rect:[o.x,o.y,o.width,o.height],regions,styles});
     """
 }

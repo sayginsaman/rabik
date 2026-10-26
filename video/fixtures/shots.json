@@ -31,6 +31,9 @@
   "regions": {
    "box": "#card",
    "input": "#thread .turn:last-child .q"
+  },
+  "styles": {
+   "input": "#thread .turn:last-child .q"
   }
  },
  {

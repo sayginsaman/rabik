@@ -1,0 +1,733 @@
+{
+ "generatedBy": "video/scripts/normalize.ts",
+ "desktop": {
+  "size": [
+   1152,
+   720
+  ],
+  "scale": 2.5,
+  "wallpaper": "screens/desktop.png",
+  "units": "points; multiply by scale for pixels"
+ },
+ "ui": [
+  {
+   "file": "ui/AppIcon.icns",
+   "use": "The app icon (the video uses the brand kit's PNG)"
+  },
+  {
+   "file": "ui/Rabik_Brand_Kit",
+   "use": "The brand kit as delivered"
+  },
+  {
+   "file": "ui/agents.html",
+   "use": "The agent shelf: the corner chip with live steps (agent) and done (agent_done); its mini screen is native, a stand-in page fills it"
+  },
+  {
+   "file": "ui/brand",
+   "use": "The brand kit (copy of Rabik_Brand_Kit)"
+  },
+  {
+   "file": "ui/logo.png",
+   "use": "Old logo, unused"
+  },
+  {
+   "file": "ui/meeting.html",
+   "use": "Meeting Copilot: the live transcript (meeting_transcript) and the recap with action items (meeting_recap, meeting_recap_ticked)"
+  },
+  {
+   "file": "ui/onboarding.html",
+   "use": "Setup: not in the shot list"
+  },
+  {
+   "file": "ui/orbs.js",
+   "use": "The orb animation, inlined into the pages at /*ORBS*/"
+  },
+  {
+   "file": "ui/settings.html",
+   "use": "Settings window: not in the shot list. Night Shift lives in System Settings, not here"
+  },
+  {
+   "file": "ui/ui.html",
+   "use": "The box: the ask (ask, ask_full), the answer with source chips (summary), the confirm card (confirm), the evening recap (recap, recap_ticked), the dictation pill (dictate_pill)"
+  },
+  {
+   "file": "ui/web.js",
+   "use": "Shared page helpers"
+  }
+ ],
+ "scenes": {
+  "hero": {
+   "status": "brand-only"
+  },
+  "ask": {
+   "status": "captured",
+   "method": "A: the page in an offscreen WKWebView (the app's own engine), demo data from video/fixtures",
+   "page": "ui/ui.html",
+   "fixtures": [
+    "fixtures/ask.js",
+    "fixtures/ask_full.js"
+   ],
+   "screen": "screens/ask.png",
+   "focus": "box",
+   "panels": [
+    {
+     "id": "ask",
+     "src": "screens/raw/ask.png",
+     "x": 356,
+     "y": 52,
+     "w": 440,
+     "h": 151.5,
+     "radius": 18
+    }
+   ],
+   "regions": {
+    "box": [
+     356,
+     52,
+     440,
+     151.5
+    ],
+    "input": [
+     428,
+     124,
+     348,
+     61.5
+    ],
+    "status": [
+     376,
+     66,
+     400,
+     44
+    ]
+   },
+   "styles": {
+    "input": {
+     "color": "rgba(0, 0, 0, 0)",
+     "fontFamily": "-apple-system, system-ui, sans-serif",
+     "fontSize": "15px",
+     "fontWeight": "400",
+     "letterSpacing": "normal",
+     "lineHeight": "21.75px",
+     "paddingLeft": "14px",
+     "paddingRight": "14px",
+     "paddingTop": "9px",
+     "textAlign": "start"
+    }
+   },
+   "states": {
+    "full": {
+     "id": "ask_full",
+     "src": "screens/raw/ask_full.png",
+     "x": 356,
+     "y": 52,
+     "w": 440,
+     "h": 151.5,
+     "regions": {
+      "box": [
+       356,
+       52,
+       440,
+       151.5
+      ],
+      "input": [
+       428,
+       124,
+       348,
+       61.5
+      ]
+     },
+     "styles": {
+      "input": {
+       "color": "rgb(255, 255, 255)",
+       "fontFamily": "-apple-system, system-ui, sans-serif",
+       "fontSize": "15px",
+       "fontWeight": "400",
+       "letterSpacing": "normal",
+       "lineHeight": "21.75px",
+       "paddingLeft": "14px",
+       "paddingRight": "14px",
+       "paddingTop": "9px",
+       "textAlign": "start"
+      }
+     }
+    }
+   }
+  },
+  "summary": {
+   "status": "captured",
+   "method": "A: the page in an offscreen WKWebView (the app's own engine), demo data from video/fixtures",
+   "page": "ui/ui.html",
+   "fixtures": [
+    "fixtures/summary.js"
+   ],
+   "screen": "screens/summary.png",
+   "focus": "summaryCard",
+   "panels": [
+    {
+     "id": "summary",
+     "src": "screens/raw/summary.png",
+     "x": 356,
+     "y": 52,
+     "w": 440,
+     "h": 459.58,
+     "radius": 18
+    }
+   ],
+   "regions": {
+    "chips": [
+     [
+      376,
+      439.58,
+      204.3,
+      22
+     ],
+     [
+      586.3,
+      439.58,
+      57.08,
+      22
+     ]
+    ],
+    "sections": [
+     [
+      376,
+      207.56,
+      400,
+      48.02
+     ],
+     [
+      376,
+      269.58,
+      400,
+      54
+     ],
+     [
+      376,
+      337.58,
+      400,
+      24
+     ],
+     [
+      376,
+      375.58,
+      400,
+      54
+     ]
+    ],
+    "sourceChip": [
+     376,
+     439.58,
+     204.3,
+     22
+    ],
+    "summaryCard": [
+     376,
+     207.56,
+     400,
+     222.02
+    ]
+   },
+   "styles": {},
+   "states": {}
+  },
+  "guide": {
+   "status": "needs-live-capture",
+   "method": "B",
+   "reason": "System Settings and Rabik's ring and step overlays are native windows (Sources/Rabik/Drawing); no HTML page draws them.",
+   "needs": [
+    "assets/screens/raw/guide_before.png",
+    "assets/screens/raw/guide.png",
+    "assets/screens/raw/guide.json"
+   ],
+   "see": "CAPTURE.md"
+  },
+  "dictate": {
+   "status": "needs-live-capture",
+   "method": "B",
+   "reason": "The text field belongs to Mail (another app). Rabik's dictation pill is HTML (captured as dictate_pill), but the field it types into is not.",
+   "needs": [
+    "assets/screens/raw/dictate_field.png",
+    "assets/screens/raw/dictate.json"
+   ],
+   "see": "CAPTURE.md"
+  },
+  "agent": {
+   "status": "captured",
+   "method": "A: the page in an offscreen WKWebView (the app's own engine), demo data from video/fixtures",
+   "page": "ui/agents.html",
+   "fixtures": [
+    "fixtures/agent.js",
+    "fixtures/agent_done.js"
+   ],
+   "screen": "screens/agent.png",
+   "focus": "chip",
+   "panels": [
+    {
+     "id": "agent",
+     "src": "screens/raw/agent.png",
+     "x": 776,
+     "y": 24,
+     "w": 300,
+     "h": 317,
+     "radius": 0
+    }
+   ],
+   "regions": {
+    "chip": [
+     780,
+     52,
+     292,
+     285
+    ],
+    "mini": [
+     792,
+     157,
+     268,
+     132
+    ],
+    "step": [
+     834,
+     75.5,
+     201,
+     13
+    ],
+    "steps": [
+     [
+      792,
+      98,
+      268,
+      13
+     ],
+     [
+      792,
+      116,
+      268,
+      13
+     ],
+     [
+      792,
+      134,
+      268,
+      13
+     ]
+    ],
+    "thumb": [
+     786,
+     60,
+     40,
+     28
+    ]
+   },
+   "styles": {},
+   "states": {
+    "done": {
+     "id": "agent_done",
+     "src": "screens/raw/agent_done.png",
+     "x": 776,
+     "y": 24,
+     "w": 300,
+     "h": 374.75,
+     "regions": {
+      "chip": [
+       780,
+       52,
+       292,
+       314.75
+      ],
+      "mini": [
+       792,
+       98,
+       268,
+       132
+      ],
+      "step": [
+       834,
+       75.5,
+       201,
+       13
+      ],
+      "summary": [
+       792,
+       240,
+       268,
+       78.75
+      ],
+      "thumb": [
+       786,
+       60,
+       40,
+       28
+      ]
+     },
+     "styles": {}
+    }
+   },
+   "mini": {
+    "src": "screens/raw/mini_shop.png",
+    "size": [
+     1072,
+     900
+    ],
+    "note": "Stand-in for the native mini screen: a plain, unbranded results page"
+   }
+  },
+  "meeting": {
+   "status": "captured",
+   "method": "A: the page in an offscreen WKWebView (the app's own engine), demo data from video/fixtures",
+   "page": "ui/meeting.html",
+   "fixtures": [
+    "fixtures/meeting_transcript.js",
+    "fixtures/meeting_recap.js",
+    "fixtures/meeting_recap_ticked.js"
+   ],
+   "screen": "screens/meeting.png",
+   "focus": "transcript",
+   "panels": [
+    {
+     "id": "meeting_transcript",
+     "src": "screens/raw/meeting_transcript.png",
+     "x": 728,
+     "y": 52,
+     "w": 340,
+     "h": 1100,
+     "viewport": {
+      "h": 520,
+      "fixedTop": 105.08,
+      "fixedBottom": 137.38
+     },
+     "radius": 18
+    }
+   ],
+   "regions": {
+    "footer": [
+     728,
+     1014.63,
+     340,
+     82.59
+    ],
+    "header": [
+     744,
+     66,
+     308,
+     48.28
+    ],
+    "lineRows": [
+     [
+      736,
+      165.08,
+      324,
+      46.25
+     ],
+     [
+      736,
+      211.33,
+      324,
+      46.25
+     ],
+     [
+      736,
+      257.58,
+      324,
+      46.25
+     ],
+     [
+      736,
+      303.83,
+      324,
+      28.13
+     ],
+     [
+      736,
+      331.95,
+      324,
+      28.13
+     ],
+     [
+      736,
+      360.08,
+      324,
+      46.25
+     ],
+     [
+      736,
+      406.33,
+      324,
+      28.13
+     ],
+     [
+      736,
+      434.45,
+      324,
+      46.25
+     ],
+     [
+      736,
+      480.7,
+      324,
+      46.25
+     ],
+     [
+      736,
+      526.95,
+      324,
+      46.25
+     ],
+     [
+      736,
+      573.2,
+      324,
+      28.13
+     ]
+    ],
+    "lines": [
+     744,
+     157.08,
+     308,
+     444.25
+    ],
+    "transcript": [
+     744,
+     126.28,
+     308,
+     888.34
+    ]
+   },
+   "styles": {},
+   "states": {
+    "recap": {
+     "id": "meeting_recap",
+     "src": "screens/raw/meeting_recap.png",
+     "x": 728,
+     "y": 52,
+     "w": 340,
+     "h": 496.98,
+     "regions": {
+      "ended": [
+       744,
+       114.28,
+       308,
+       418.7
+      ],
+      "recap": [
+       744,
+       174.47,
+       308,
+       54
+      ],
+      "remind": [
+       744,
+       321.23,
+       308,
+       38.89
+      ],
+      "todos": [
+       [
+        738,
+        255.86,
+        320,
+        28.19
+       ],
+       [
+        738,
+        285.05,
+        320,
+        28.19
+       ]
+      ]
+     },
+     "styles": {}
+    },
+    "ticked": {
+     "id": "meeting_recap_ticked",
+     "src": "screens/raw/meeting_recap_ticked.png",
+     "x": 728,
+     "y": 52,
+     "w": 340,
+     "h": 496.98,
+     "regions": {
+      "remind": [
+       744,
+       321.23,
+       308,
+       38.89
+      ],
+      "todos": [
+       [
+        738,
+        255.86,
+        320,
+        28.19
+       ],
+       [
+        738,
+        285.05,
+        320,
+        28.19
+       ]
+      ]
+     },
+     "styles": {}
+    }
+   }
+  },
+  "safe": {
+   "status": "captured",
+   "method": "A: the page in an offscreen WKWebView (the app's own engine), demo data from video/fixtures",
+   "page": "ui/ui.html",
+   "fixtures": [
+    "fixtures/confirm.js"
+   ],
+   "screen": "screens/safe.png",
+   "focus": "confirmCard",
+   "panels": [
+    {
+     "id": "confirm",
+     "src": "screens/raw/confirm.png",
+     "x": 356,
+     "y": 52,
+     "w": 440,
+     "h": 304.56,
+     "radius": 18
+    }
+   ],
+   "regions": {
+    "confirmCard": [
+     376,
+     237.56,
+     400,
+     101
+    ],
+    "primaryButton": [
+     580,
+     296.56,
+     182,
+     28
+    ],
+    "secondaryButton": [
+     390,
+     296.56,
+     182,
+     28
+    ]
+   },
+   "styles": {},
+   "states": {}
+  },
+  "recap": {
+   "status": "captured",
+   "method": "A: the page in an offscreen WKWebView (the app's own engine), demo data from video/fixtures",
+   "page": "ui/ui.html",
+   "fixtures": [
+    "fixtures/recap.js",
+    "fixtures/recap_ticked.js"
+   ],
+   "screen": "screens/recap.png",
+   "focus": "todo",
+   "panels": [
+    {
+     "id": "recap",
+     "src": "screens/raw/recap.png",
+     "x": 356,
+     "y": 52,
+     "w": 440,
+     "h": 779.33,
+     "viewport": {
+      "h": 520,
+      "fixedTop": 74,
+      "fixedBottom": 0
+     },
+     "radius": 18
+    }
+   ],
+   "regions": {
+    "add": [
+     612.14,
+     771.33,
+     149.86,
+     28
+    ],
+    "card": [
+     376,
+     126,
+     400,
+     687.33
+    ],
+    "todos": [
+     [
+      384,
+      372.53,
+      378,
+      44.58
+     ],
+     [
+      384,
+      417.11,
+      378,
+      44.58
+     ],
+     [
+      384,
+      461.69,
+      378,
+      44.58
+     ]
+    ],
+    "todo": [
+     384,
+     372.53,
+     378,
+     44.58
+    ]
+   },
+   "styles": {},
+   "states": {
+    "ticked": {
+     "id": "recap_ticked",
+     "src": "screens/raw/recap_ticked.png",
+     "x": 356,
+     "y": 52,
+     "w": 440,
+     "h": 779.33,
+     "regions": {
+      "add": [
+       602.8,
+       771.33,
+       159.2,
+       28
+      ],
+      "card": [
+       376,
+       126,
+       400,
+       687.33
+      ],
+      "todos": [
+       [
+        384,
+        372.53,
+        378,
+        44.58
+       ],
+       [
+        384,
+        417.11,
+        378,
+        44.58
+       ],
+       [
+        384,
+        461.69,
+        378,
+        44.58
+       ]
+      ]
+     },
+     "styles": {}
+    }
+   }
+  },
+  "close": {
+   "status": "brand-only"
+  }
+ }
+}
