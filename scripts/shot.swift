@@ -31,16 +31,14 @@ func frame(_ shot: NSImage, size: NSSize) {
                                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
     rep.size = canvas
     NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    let back = dark ? [NSColor(calibratedRed: 0.16, green: 0.17, blue: 0.24, alpha: 1), NSColor(calibratedRed: 0.32, green: 0.24, blue: 0.36, alpha: 1)]
-                    : [NSColor(calibratedRed: 0.86, green: 0.89, blue: 0.97, alpha: 1), NSColor(calibratedRed: 0.97, green: 0.90, blue: 0.92, alpha: 1)]
-    NSGradient(colors: back)!.draw(in: NSRect(origin: .zero, size: canvas), angle: -35)
+    NSColor(srgbRed: 0.98, green: 0.969, blue: 0.945, alpha: 1).setFill(); NSRect(origin: .zero, size: canvas).fill()   // warm paper, as the README hero
     let box = NSRect(x: pad, y: pad, width: size.width, height: size.height), path = NSBezierPath(roundedRect: box, xRadius: radius, yRadius: radius)
-    let shadow = NSShadow(); shadow.shadowBlurRadius = 34; shadow.shadowOffset = NSSize(width: 0, height: -12); shadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
+    let shadow = NSShadow(); shadow.shadowBlurRadius = 30; shadow.shadowOffset = NSSize(width: 0, height: -10); shadow.shadowColor = NSColor(srgbRed: 0.16, green: 0.11, blue: 0.05, alpha: 0.2)
     NSGraphicsContext.saveGraphicsState(); shadow.set()
     (panel == "window" ? (dark ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.96, alpha: 1)) : NSColor(calibratedRed: 0.11, green: 0.11, blue: 0.13, alpha: 0.96)).setFill(); path.fill()
     NSGraphicsContext.restoreGraphicsState()
     NSGraphicsContext.saveGraphicsState(); path.addClip(); shot.draw(in: box); NSGraphicsContext.restoreGraphicsState()
-    NSColor.white.withAlphaComponent(panel == "window" && !dark ? 0 : 0.12).setStroke(); path.lineWidth = 1; path.stroke()
+    (panel == "window" && !dark ? NSColor(srgbRed: 0.89, green: 0.86, blue: 0.82, alpha: 1) : NSColor.white.withAlphaComponent(0.12)).setStroke(); path.lineWidth = 1; path.stroke()
     NSGraphicsContext.restoreGraphicsState()
     try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
 }
