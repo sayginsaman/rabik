@@ -11,7 +11,7 @@
 
 ## Quick install
 
-Download `Rabik-<version>.dmg` from the [Releases page](https://github.com/YOUR_GITHUB/rabik/releases), open it and drag Rabik to Applications.
+Download `Rabik-<version>.dmg` from the [Releases page](https://github.com/sayginsaman/rabik/releases), open it and drag Rabik to Applications.
 
 Needs macOS 26 and an AI client: Claude Code on a Claude plan, Devin, Pi or a local model. [Full install steps](#install)
 
@@ -161,17 +161,17 @@ You need:
 - Apple's command line tools, for Python: `xcode-select --install`
 - Accessibility permission enables native clicks, scrolling, menus, keys, dragging and field typing.
 
-Download the signed and notarized `Rabik-<version>.dmg` from the [Releases page](https://github.com/YOUR_GITHUB/rabik/releases), open it, drag Rabik to Applications and open it. New versions are published there.
+Download the signed and notarized `Rabik-<version>.dmg` from the [Releases page](https://github.com/sayginsaman/rabik/releases), open it, drag Rabik to Applications and open it. New versions are published there.
 
 ### Nix
 
 On macOS with Nix flakes enabled:
 
 ```bash
-nix run github:YOUR_GITHUB/rabik
+nix run github:sayginsaman/rabik
 ```
 
-The flake installs its packaged Rabik version, so macOS 26+ and Apple's command line tools are still required. Run that command again to update. `nix profile add github:YOUR_GITHUB/rabik` installs an `rabik` launcher; update it with `nix profile upgrade rabik`, then run `rabik`. Nix installations show this update path in Settings instead of using Rabik's Git updater.
+The flake installs its packaged Rabik version, so macOS 26+ and Apple's command line tools are still required. Run that command again to update. `nix profile add github:sayginsaman/rabik` installs an `rabik` launcher; update it with `nix profile upgrade rabik`, then run `rabik`. Nix installations show this update path in Settings instead of using Rabik's Git updater.
 
 Working on the code instead? Clone the repo and run `./build.sh` after each change: it builds `~/Applications/Rabik.app` with a local signing identity, starts it at login and restarts it. Release builds are described in [docs/NOTARIZATION.md](docs/NOTARIZATION.md). A Devbox environment is included for Python regression tests; run `devbox shell`, then `devbox run test`.
 

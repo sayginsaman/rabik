@@ -80,7 +80,7 @@
           '';
           meta = with pkgs.lib; {
             description = "Rabik macOS app launcher";
-            homepage = "https://github.com/YOUR_GITHUB/rabik";
+            homepage = "https://github.com/sayginsaman/rabik";
             license = licenses.mit;
             mainProgram = "rabik";
             platforms = targetSystems;
