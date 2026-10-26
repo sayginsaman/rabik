@@ -58,7 +58,14 @@ https://github.com/user-attachments/assets/26822ad2-6281-477d-b676-2f490a4a207b
 | *"Play my late night coding playlist on Spotify."* | Plays it in a second, no clicks. Any song, artist or playlist. |
 | *"When I say focus mode, close Slack and open my to-do list."* | Remembers it. Next time, two words do it all. |
 
-<p align="center"><img src="docs/demo.gif" alt="Rabik arranging windows across two screens" width="820"></p>
+<p align="center"><img src="docs/screens/answer.png" alt="Rabik's box answering from a saved meeting, with source chips under the answer" width="520"></p>
+
+<table>
+<tr><td><img src="docs/screens/recap.png" alt="The daily recap: what got done, decisions, to-dos for Reminders, goals and where the time went"></td>
+<td><img src="docs/screens/transcript.png" alt="Meeting Copilot's transcript with speaker names and a Turkish line translated under it"></td></tr>
+<tr><td><img src="docs/screens/people.png" alt="Settings → People: a person's meetings and what Rabik knows"></td>
+<td><img src="docs/screens/activity.png" alt="Settings → Memory: rules and Activity history"></td></tr>
+</table>
 
 ## Safe by default
 
@@ -158,10 +165,10 @@ Choose **Report Feedback…** in the menu bar, **Report feedback** in Settings, 
 You need:
 - **macOS 26** or later (Rabik uses Apple's new on-device speech)
 - **An AI client:** a paid Claude plan (Pro or Max) and [Claude Code](https://claude.com/claude-code), the [Devin CLI](https://docs.devin.ai/cli) signed in to a Devin plan, [Pi](https://pi.dev) with your chosen provider/model, or a custom server through Claude Code with no Claude account. Pick one in setup (“Change provider”) or Settings → Intelligence.
-- Apple's command line tools, for Python: `xcode-select --install`
+- Python comes inside the app on Apple silicon. Intel Macs and builds from source need Apple's command line tools: `xcode-select --install`
 - Accessibility permission enables native clicks, scrolling, menus, keys, dragging and field typing.
 
-Download the signed and notarized `Rabik-<version>.dmg` from the [Releases page](https://github.com/sayginsaman/rabik/releases), open it, drag Rabik to Applications and open it. New versions are published there.
+Download the signed and notarized `Rabik-<version>.dmg` from the [Releases page](https://github.com/sayginsaman/rabik/releases), open it, drag Rabik to Applications and open it. It opens at login (Settings → General → Open at login) and updates itself through Sparkle, checking the signed releases there (Settings → About & Updates).
 
 ### Nix
 

@@ -56,11 +56,11 @@ Son test: `.dmg`'yi tarayıcıyla indir (karantina bayrağı alsın), temiz bir 
 
 ## 4. Hazır `.dmg` dağıtımından önce kodda yapılması gerekenler
 
-Bunlar notarization'ı engellemez ama dağıtılan uygulamanın düzgün çalışması için gerekli:
+2026-10-25 itibarıyla 1–3 yapıldı (aşağıda her birinin nasıl çözüldüğü yazıyor). Kalanlar notarization'ı engellemez:
 
-1. **Girişte başlatma.** Şu an `build.sh` bir LaunchAgent (`~/Library/LaunchAgents/com.rabik.app.plist`) kuruyor; Settings'teki "login" anahtarı da onu `launchctl` ile açıp kapatıyor. `.dmg`'den kurulan uygulamada bu dosya yok. Bu yüzden `SMAppService.mainApp.register()` / `unregister()` gerekiyor (ServiceManagement, macOS 13+).
-2. **Güncellemeler.** git-pull + yeniden derleme güncelleyicisi release build'de kendiliğinden kapalı: Info.plist'te `RabikSource` anahtarı olmadığı için Settings "Preview build" gösterir. İmzalı güncelleme için Sparkle 2 (EdDSA imzalı appcast) veya en azından GitHub Releases'tan "yeni sürüm var" kontrolü eklenmeli.
-3. **Python bağımlılığı.** Uygulama `rabik.py`'yi sistemdeki `python3` ile çalıştırıyor. Command Line Tools kurulu değilse `/usr/bin/python3` kurulum penceresi açar. Seçenekler:
+1. **Girişte başlatma. Yapıldı:** release `SMAppService.mainApp` ile giriş öğesi olur ve ilk açılışta kendini açar (`App/LoginItem.swift`); kaynaktan derlenen sürüm LaunchAgent'ı korur. Eski not: `build.sh` bir LaunchAgent (`~/Library/LaunchAgents/com.rabik.app.plist`) kuruyor; Settings'teki "login" anahtarı da onu `launchctl` ile açıp kapatıyor. `.dmg`'den kurulan uygulamada bu dosya yok. Bu yüzden `SMAppService.mainApp.register()` / `unregister()` gerekiyor (ServiceManagement, macOS 13+).
+2. **Güncellemeler. Yapıldı:** release Sparkle 2.10.0 ile güncellenir (aşağıdaki §5). Eski not: git-pull + yeniden derleme güncelleyicisi release build'de kendiliğinden kapalı: Info.plist'te `RabikSource` anahtarı olmadığı için Settings "Preview build" gösterir. İmzalı güncelleme için Sparkle 2 (EdDSA imzalı appcast) veya en azından GitHub Releases'tan "yeni sürüm var" kontrolü eklenmeli.
+3. **Python bağımlılığı. Yapıldı:** release, python-build-standalone 3.13.16'yı (aarch64, checksum sabit, her Mach-O imzalı) `Contents/Resources/python` altında taşır; `rabik.py` yanındaki Python'u tercih eder. Intel Mac'ler hâlâ sistemdeki `python3`'ü kullanır. Eski not: Uygulama `rabik.py`'yi sistemdeki `python3` ile çalıştırıyor. Command Line Tools kurulu değilse `/usr/bin/python3` kurulum penceresi açar. Seçenekler:
    - CLT'yi ön koşul olarak belgelemek (kısa vade).
    - İmzalı bir Python runtime'ı uygulamaya gömmek. İçindeki tüm `.dylib`/`.so` dosyaları Developer ID ve Hardened Runtime ile imzalanmalı.
    - Uzun vadede beyni Swift'e taşımak.
@@ -69,3 +69,10 @@ Bunlar notarization'ı engellemez ama dağıtılan uygulamanın düzgün çalı�
 4. **Paketin içine yazmamak.** İmza `Contents/Resources` altındaki `rabik.py` ve `ui/` dosyalarını da mühürlüyor. Python'un `.pyc` dosyalarını paket içine yazması imzayı bozar. Şu an `sys.pycache_prefix` ile `~/Library/Caches/Rabik`'e yönlendiriliyor; modüler refactor'da bu korunmalı.
 5. **Claude Code CLI** hâlâ çalışma zamanı bağımlılığı (kullanıcı kendisi kuruyor). Bu, notarization'ı etkilemez.
 6. **Telemetri ve linkler.** PostHog anahtarı boş, yani telemetri kapalı. Repo adresi `https://github.com/sayginsaman/rabik` (2026-10-25'te kondu; depo henüz oluşturulmadı). Kendi değerlerini koyduğunda: `brain/paths.py` → `REPOSITORY`, `brain/telemetry.py` → `POSTHOG_KEY`, `Sources/Rabik/main.swift` → `repository`.
+
+## 5. Yayınlama ve güncellemeler (Sparkle)
+
+- **İmza anahtarı:** Güncellemeleri imzalayan EdDSA özel anahtarı `~/Library/Application Support/Rabik Release/sparkle_ed25519_key` (0600) dosyasında, repoda değil. Açık anahtarı `build.sh` içindeki `SU_PUBLIC` ve uygulamanın Info.plist'indeki `SUPublicEDKey`. **Bu dosyayı güvenli bir yere yedekle:** kaybolursa mevcut kullanıcılar yeni sürümleri kuramaz. Başka bir dosya kullanmak için `RABIK_SPARKLE_KEY`.
+- **Release:** `RABIK_SIGN_ID="Developer ID Application: Saygin Saman (W49S3K9V48)" RABIK_NOTARY_PROFILE=rabik-notary ./build.sh --release` komutu `dist/Rabik-<sürüm>.dmg` ve `dist/appcast.xml` üretir; appcast, DMG'nin imzasını taşır.
+- **Yayın:** GitHub'da `sayginsaman/rabik` deposunda `v<sürüm>` etiketiyle bir release aç, iki dosyayı da yükle. Uygulamalar `releases/latest/download/appcast.xml` adresine 6 saatte bir bakar.
+- **README görselleri:** `python3 scripts/readme-shots.py` komutu `docs/screens/*.png` dosyalarını gerçek arayüz sayfalarından, örnek verilerle yeniden üretir.
