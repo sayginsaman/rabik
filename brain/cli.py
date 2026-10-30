@@ -112,6 +112,21 @@ def main():
     if args == ['--wait'] or args[:1] == ['--fast']:
         os.setpgrp()   # cancellation also stops the worker's own helper processes
         signal.signal(signal.SIGTERM, clients.stop_workers)
+    if args[:2] == ['--watch', 'press'] and len(args) == 4:   # Rabik.app presses it from watches.json (App/AutoPress.swift)
+        try: return print(watcher.watch_press(args[2], args[3]))
+        except ValueError as e: return print(e)
+    if args in (['--watch', '--help'], ['--watch', 'help'], ['--watch']):
+        return print(prompts.WATCH_HELP)
+    if args == ['--watches']:
+        return print(watcher.watch_list())
+    if args[:1] == ['--unwatch'] and len(args) == 2:   # one watch, by the ID --watches lists
+        if watcher.watch_stop(args[1]): return print('Stopped that watch.')
+        path = os.path.join(watcher.WATCHING, args[1])
+        if args[1].isdigit() and os.path.exists(path):
+            try: os.kill(int(args[1]), signal.SIGTERM)
+            except OSError: pass
+            os.remove(path); return print('Stopped that watch.')
+        return print('That watch is not running.')
     if args[:1] == ['--watch'] and (len(args) in (5, 6) and args[3] in ('gone', 'shows', 'settled') or len(args) in (3, 4) and args[1] == 'cmd'):
         os.makedirs(watcher.WATCHING, exist_ok=True)   # the watcher runs on after this ask ends
         # This ask's RABIK_* vars would make the follow-up request a refused nested ask; keep only install-wide ones.
@@ -137,7 +152,7 @@ def main():
                 pass
             try: os.remove(os.path.join(watcher.WATCHING, pid))
             except FileNotFoundError: pass
-        return print(f'stopped {len(pids)} watch(es)')
+        return print(f'stopped {len(pids) + watcher.watch_stop()} watch(es)')
     if args == ['--budget']:
         ai = [r for r in storage.read_rows(os.path.join(paths.DIR, 'log.jsonl')) if (r.get('usd') or 0) > 0][-50:]
         if not ai:

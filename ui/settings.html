@@ -392,6 +392,8 @@
     </div>
     <h3>Scheduled routines</h3>
     <div class="group" id="routines"></div>
+    <h3>Watches</h3>
+    <div class="group" id="watches"></div>
     <div class="group" style="margin-top:8px">
       <div class="row"><div class="t"><b>If your Mac sleeps through a one-time task</b><span>Its time passed while the Mac was asleep or off.</span></div><select data-k="routineLate" id="routinelate" aria-label="Late one-time tasks"><option value="skip">Skip it and tell me</option><option value="2h">Run it up to 2 hours late</option><option value="always">Always run it</option></select></div>
     </div>
@@ -808,6 +810,20 @@
     $('meetingDemo').hidden = $('meetingPrepOpen').hidden = !P.meeting; $('meetingOn').hidden = !!P.meeting;   // off: one way to turn it on, not two dead buttons
   }
 
+  function paintWatches() {   // button watches (App/AutoPress.swift): what each clicks, how often, and Stop
+    const root = $('watches'); root.replaceChildren();
+    if (!P.watches?.length) { const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = 'No watches. Say “if ChatGPT asks for permission, allow it”.'; root.append(empty); return; }
+    for (const w of P.watches) {
+      const row = document.createElement('div'); row.className = 'row rule';
+      const text = document.createElement('div'); text.className = 't'; const title = document.createElement('b'), note = document.createElement('span');
+      title.textContent = `Clicks “${w.labels.join('” or “')}” in ${w.app}`;
+      note.textContent = `Since ${new Date(w.created * 1000).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} · ` + (w.presses ? `clicked ${w.presses} time${w.presses === 1 ? '' : 's'}` : 'not clicked yet');
+      text.append(title, note);
+      const stop = iconButton('trash', `Stop watching ${w.app}`);
+      stop.onclick = () => { stop.disabled = true; post({ do: 'watchStop', id: w.id }); };
+      row.append(text, stop); root.append(row);
+    }
+  }
   function paintRoutines() {
     const root = $('routines'); root.replaceChildren();
     if (!P.routines?.length) { const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = 'No routines yet. Ask Rabik to schedule one.'; root.append(empty); return; }
@@ -1134,7 +1150,7 @@
     globe(on) { $('globefix').hidden = !on; },   // fn alone also fires macOS's own 🌐 action
     load(d) {
       P = {talkMode: 'hold', dictateMode: 'verbatim', dictateHotkeyLabel: '', microphone: 'automatic', meetingSave: true, meetingSummary: true, client: 'claude', ...d.prefs}; recording = '';
-      P.routines = d.routines || []; paintRoutines(); reminderLists = d.reminderLists || []; if (d.meetingLanguages?.length) meetingLanguages = d.meetingLanguages; if (d.voices) voices = d.voices;
+      P.routines = d.routines || []; paintRoutines(); P.watches = d.watches || []; paintWatches(); reminderLists = d.reminderLists || []; if (d.meetingLanguages?.length) meetingLanguages = d.meetingLanguages; if (d.voices) voices = d.voices;
       $('shortcut').classList.remove('rec'); $('change').textContent = 'Change Shortcut'; $('dictatechange').classList.remove('rec');
       hotkeyTaken = !!d.hotkeyTaken; dictateHotkeyTaken = !!d.dictateHotkeyTaken; if ($('schint').className !== 'warn') $('schint').className = hotkeyTaken ? 'taken' : '';
       if (d.icon) $('icon').src = $('bigicon').src = d.icon;

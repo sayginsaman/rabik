@@ -79,6 +79,11 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         d["routines"] = (try? JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:routines)))) as? [[String:Any]] ?? []
         // Reminders lists only once Rabik may read them: Settings never asks for access; the first Add to Reminders does
         d["meetingLanguages"] = MeetingSpeech.languages; d["voices"] = Speaker.voices()
+        let folder = (Prefs.path as NSString).deletingLastPathComponent   // button watches, with how often each pressed (App/AutoPress.swift)
+        let watches = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: folder + "/watches.json")))) as? [[String: Any]] ?? []
+        let presses = ((try? String(contentsOfFile: folder + "/watches-log.jsonl", encoding: .utf8)) ?? "").split(separator: "\n")
+            .compactMap { (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [String: Any] }
+        d["watches"] = watches.filter { $0["kind"] as? String == "press" }.map { w in w.merging(["presses": presses.filter { $0["id"] as? String == w["id"] as? String }.count]) { $1 } }
         d["reminderLists"] = ((try? CalendarTool.reminders(["action": "reminderLists"], store: calendar))?["lists"] as? [[String: Any]]) ?? []
         if let t = NSApp.applicationIconImage?.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) {
             d["icon"] = "data:image/png;base64," + png.base64EncodedString()
@@ -295,6 +300,12 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
             guard let data = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) else { return }
             NSPasteboard.general.clearContents(); NSPasteboard.general.setString(String(decoding: data, as: UTF8.self), forType: .string)
             send("notice", ["text": "Copied. In Claude Desktop, open Settings → Developer → Edit Config and paste it."])
+        case "watchStop":   // a button watch's Stop in Settings
+            guard let id = b["id"] as? String, id.range(of: #"^[a-f0-9]{8}$"#, options: .regularExpression) != nil else { return }
+            DispatchQueue.global().async { [weak self] in
+                let p = py(["--unwatch", id]); p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+                try? p.run(); p.waitUntilExit(); DispatchQueue.main.async { self?.push() }
+            }
         case "goals":   // Settings → General → Goals: list, add, done, undo, drop (brain/goals.py)
             guard let args = b["args"] as? [String], let first = args.first, ["list", "add", "done", "undo", "drop"].contains(first), args.count <= 2 else { return }
             DispatchQueue.global().async { [weak self] in

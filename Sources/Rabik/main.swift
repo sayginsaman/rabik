@@ -671,6 +671,8 @@ let activity = Activity()   // Settings → Memory → Activity history
 activity.sync()
 let connectorOffer = ConnectorOffer()   // Settings → Agents → Offer connectors
 connectorOffer.start()
+let autoPress = AutoPress()   // watches that press a button whenever it shows
+autoPress.start()
 let onboarding = Onboarding()
 LoginItem.firstLaunch()
 if let on = LoginItem.current(), on != Prefs.bool("login") { Prefs.set("login", on) }   // changed in System Settings
@@ -794,3 +796,4 @@ NSApplication.shared.run()
 // final class ConnectorOffer lives in App/ConnectorOffer.swift
 // enum LoginItem lives in App/LoginItem.swift
 // enum ReleaseUpdates lives in App/ReleaseUpdates.swift
+// final class AutoPress lives in App/AutoPress.swift

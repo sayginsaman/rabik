@@ -166,6 +166,16 @@ class SettingsPageTests(unittest.TestCase):
         self.assertEqual(out['result']['late'], '2h')
         self.assertIn({'do': 'set', 'k': 'routineLate', 'v': 'skip'}, out['posts'])
 
+    def test_watches_list_what_they_click_and_stop(self):
+        out = self.page("""st.load({prefs: {hotkeyLabel: '⌃⌥Space'}, watches: [{id: 'ab12cd34', kind: 'press', app: 'ChatGPT', labels: ['Allow', 'Approve'], created: 1793304000, presses: 3}]}); await tick(20);
+            const row = document.querySelector('#watches .row'), text = [row.querySelector('b').textContent, row.querySelector('span').textContent.split(' · ')[1]];
+            row.querySelector('button').click();
+            st.load({prefs: {hotkeyLabel: '⌃⌥Space'}, watches: []}); await tick(20);
+            return {text, empty: $('watches').textContent};""")
+        self.assertEqual(out['result']['text'], ['Clicks “Allow” or “Approve” in ChatGPT', 'clicked 3 times'])
+        self.assertIn('No watches.', out['result']['empty'])
+        self.assertIn({'do': 'watchStop', 'id': 'ab12cd34'}, out['posts'])
+
     def test_notice_shows_and_its_action_runs_once(self):
         out = self.page('''st.notice({text: 'Couldn’t save that change, so the old setting is back.'});
             const shown = !$('notice').hidden && $('noticebtn').hidden;
