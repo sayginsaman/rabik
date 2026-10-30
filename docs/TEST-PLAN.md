@@ -92,6 +92,12 @@ Bu build hakkında:
 - [ ] Settings → Account & Access → "Add to Claude Code" → düğme "Added" olur; Claude Code'da `/mcp` listesinde rabik görünür ve "Rabik'te hedeflerim neler?" çalışır. "Copy for Claude Desktop" yapılandırmayı kopyalar.
 - [ ] "Add to ChatGPT" → düğme "Added" olur; ChatGPT Mac uygulamasını yeniden başlat, Settings → MCP servers'ta rabik görünür ve "Rabik'te hedeflerim neler?" çalışır.
 
+## 9c. Zamanlanmış görevler ve izleyiciler
+- [ ] "Bugün saat 20:00'de Discord'a gir, Ali'ye 'geliyorum' yaz" de → "Run this later without asking?" kartı çıkar; onayla. Settings → General → Scheduled routines'te "Once on … at 8:00 PM · runs without asking" görünür. 20:00'de ajan sormadan yapar ve bildirim gelir; görev listeden düşer.
+- [ ] "Her pazartesi ve perşembe 9'da takvimimi özetle" → "Mondays and Thursdays at 9:00 AM" olarak listelenir.
+- [ ] Mac'i bir tek seferlik görevin saatinde uykuda bırak → varsayılan: yapılmaz, "Missed: …" bildirimi gelir. Settings'te "Run it up to 2 hours late" seçince geç de yapılır.
+- [ ] "ChatGPT izin isterse onayla" de → "Click this whenever it appears?" kartı; onayla. ChatGPT bir izin istediğinde Rabik "Allow/Approve"a kendisi basar, dakikada en fazla bir bildirim gelir. Settings → General → Watches'ta sayaç artar; Stop ya da "izlemeyi durdur" kapatır.
+
 ## 10. Settings ve modlar
 - [ ] Spotlight'tan "Rabik" → Settings açılır; açık/koyu görünüme uyar.
 - [ ] Kutu varsayılan olarak ekranın üst ortasında açılır.

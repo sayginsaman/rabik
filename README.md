@@ -67,14 +67,15 @@ Hold <kbd>fn</kbd>, talk, let go: your words land in any text field. Double-tap 
 </details>
 
 ### Works in the background
-Big jobs go to **agents** that work behind your apps: a chip in the corner shows live steps and a mini screen, and a card shows the result when you stop typing. Steer one by talking to it ("tell the hub agent to check HDMI too"). Save **named agents** ("make an agent called Researcher that…"), schedule **routines** ("every weekday at 8, summarize my calendar") and set **watches** ("tell me when Codex is done") that check on your Mac for free.
+Big jobs go to **agents** that work behind your apps: a chip in the corner shows live steps and a mini screen, and a card shows the result when you stop typing. Steer one by talking to it ("tell the hub agent to check HDMI too"). Save **named agents** ("make an agent called Researcher that…"), schedule tasks once or on repeat ("today at 8 pm, send Ali on Discord: on my way", "every Monday and Thursday at 9, summarize my calendar"), and set **watches**: "tell me when Codex is done", or "if ChatGPT asks for permission, allow it", which clicks that button each time it shows until you stop it.
 
 <details><summary>More about agents, routines and watches</summary>
 
 - Agents click, type and scroll straight into the app they work in, so your pointer, front app and Space stay put. Web work happens in the agent's own window in your signed-in Chrome profile, and closes when the task ends.
 - A long ask in the box moves to an agent by itself; ⌃⌥↩ moves one sooner from any app. When an agent asks for something, **Always allow for this task** covers that kind of action until it ends.
-- Routines are woken by macOS on time, cost nothing while they wait, run on Cheapest unless you choose otherwise and report back with a notification. Manage them in Settings → General → Scheduled routines.
+- Scheduled tasks run once (a date, "today" or "tomorrow"), every day, on weekdays, weekends or the days you name, or every few minutes. macOS wakes them on time, so they cost nothing while they wait; each runs as an agent on Cheapest unless you choose otherwise and reports back with a notification. One that would send, post or click something can run without asking: you OK it once on a card when you set it up. A one-time task the Mac sleeps through is skipped and reported by default (Settings → General can run it up to 2 hours late, or always). Manage them in Settings → General → Scheduled routines.
 - Watches poll a window or a coding agent's log every 5 seconds with no AI. A window must stay open on this desktop (covered is fine). Say "stop watching" to cancel.
+- A button watch ("if ChatGPT asks for permission, allow it") is confirmed once on a card, then Rabik presses that button in that app every time it shows, with Accessibility, without AI or taking focus. It never presses buttons like Delete, Erase or Buy. Settings → General → Watches shows how often each clicked, with Stop.
 - Agents and routines need Claude Code. With Pi or Devin, asks run in the foreground; Pi has no sandbox, so Safe mode asks before every shell command.
 
 </details>
