@@ -451,7 +451,7 @@ def main():
         ctx += f' Last task worked in: {w["app"]} "{w.get("window") or "?"}".'
     if environ.caret() and prefs.pref('selection', True):
         ctx += ' The user\'s text cursor is in the front app. If the request asks for new text for that cursor, return [draft] + the text.'   # an earlier draft goes in with [insert] (system prompt)
-    help_ = toolhelp.tool_help(task, cached_only=True)
+    help_ = toolhelp.tool_help(task, cached_only=True) + prompts.schedule_help(task)   # routine and watch usage, only when it sounds like that
     threading.Thread(target=toolhelp.tool_help, args=(task,), daemon=True).start()   # cold help is ready for the next turn
     selected = situation.selection_context()
     mem = memory.relevant_rules(task)

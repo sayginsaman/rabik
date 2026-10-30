@@ -224,7 +224,10 @@ class RecapTests(unittest.TestCase):
         brain.recap.recap_make(DAY)   # "summarize my day" at 18:00
         evening = datetime(2026, 10, 25, 21, 5)
         self.assertTrue(brain.recap.recap_due(evening))
-        with patch.object(brain.recap, 'recap_due', return_value=True):
+        class Day(date):   # the catch-up makes today's recap: today is DAY here, whatever the clock says
+            @classmethod
+            def today(cls): return date.fromisoformat(DAY)
+        with patch.object(brain.recap, 'recap_due', return_value=True), patch.object(brain.recap, 'date', Day):
             made = brain.recap.recap_command(['catch-up'])
         self.assertTrue(made['evening'])
         self.assertEqual(self.model.call_count, 1)   # nothing new since 18:00: the same recap, now the evening one

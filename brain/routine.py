@@ -8,10 +8,32 @@ import subprocess
 import sys
 import time
 import uuid
-from brain import environ, paths, prefs, storage
+from brain import environ, paths, prefs, prompts, storage
 
-__all__ = ['routines', 'routine_label', 'routine_job_path', 'routine_install', 'routine_recap_sync', 'routine_repair', 'routine_add',
-           'routine_remove', 'routine_slot', 'routine_queue', 'routine_wake', 'routine_fire', 'routine_pop', 'routine_command']
+__all__ = ['ROUTINE_DAY_NAMES', 'ROUTINE_LATE', 'routine_days', 'routine_due', 'routines', 'routine_label', 'routine_job_path', 'routine_install',
+           'routine_recap_sync', 'routine_repair', 'routine_add', 'routine_remove', 'routine_slot', 'routine_notify', 'routine_queue',
+           'routine_wake', 'routine_fire', 'routine_pop', 'routine_command']
+
+
+ROUTINE_DAY_NAMES = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')   # Python's weekday order
+
+
+ROUTINE_LATE = {'skip': 15 * 60, '2h': 2 * 3600, 'always': float('inf')}   # Settings → a one-time task the Mac slept through
+
+
+def routine_days(days):
+    """daily | weekdays | weekends | "mon,thu" -> the weekdays it runs on (0 = Monday), or None when it is not a valid choice."""
+    named = {'daily': set(range(7)), 'weekdays': set(range(5)), 'weekends': {5, 6}}
+    if days in named: return named[days]
+    parts = str(days).split(',') if isinstance(days, str) else []
+    if not parts or any(p not in ROUTINE_DAY_NAMES for p in parts) or len(set(parts)) != len(parts): return None
+    return {ROUTINE_DAY_NAMES.index(p) for p in parts}
+
+
+def routine_due(row):
+    """A one-time routine's moment, in seconds since the epoch."""
+    year, month, day = map(int, row['date'].split('-')); hour, minute = map(int, row['at'].split(':'))
+    return time.mktime((year, month, day, hour, minute, 0, 0, 0, -1))
 
 
 def routines():
@@ -27,7 +49,10 @@ def routines():
             if row.get('kind') == 'interval':
                 if type(row.get('every')) is not int or row['every'] < 60 or row['every'] % 60: continue
             elif row.get('kind') == 'time':
-                if not isinstance(row.get('at'), str) or not re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d', row['at']) or row.get('days') not in ('daily', 'weekdays'): continue
+                if not isinstance(row.get('at'), str) or not re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d', row['at']) or routine_days(row.get('days')) is None: continue
+            elif row.get('kind') == 'once':
+                if not isinstance(row.get('at'), str) or not re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d', row['at']) or not isinstance(row.get('date'), str) \
+                        or not re.fullmatch(r'20\d\d-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])', row['date']): continue
             else:
                 continue
             valid.append(row)
@@ -37,13 +62,20 @@ def routines():
 
 
 def routine_label(row):
+    """How Settings and the AI say it: "Mondays and Thursdays at 9:00 AM", "Once on Fri, Oct 30 at 8:00 PM", "Every 30 minutes"."""
+    suffix = ' · runs without asking' if row.get('unattended') else ''
     if row['kind'] == 'interval':
         seconds = row['every']
         amount, unit = (seconds // 3600, 'hour') if seconds % 3600 == 0 else (seconds // 60, 'minute')
-        return f"Every {amount if amount != 1 else ''} {unit}{'s' if amount != 1 else ''}".replace('  ', ' ')
+        return f"Every {amount if amount != 1 else ''} {unit}{'s' if amount != 1 else ''}".replace('  ', ' ') + suffix
     hour, minute = map(int, row['at'].split(':'))
     clock = f"{hour % 12 or 12}:{minute:02d} {'AM' if hour < 12 else 'PM'}"
-    return ('Weekdays' if row['days'] == 'weekdays' else 'Every day') + ' at ' + clock
+    if row['kind'] == 'once':
+        return 'Once on ' + time.strftime('%a, %b %-d', time.localtime(routine_due(row))) + ' at ' + clock + suffix
+    named = {'daily': 'Every day', 'weekdays': 'Weekdays', 'weekends': 'Weekends'}
+    if row['days'] in named: return named[row['days']] + ' at ' + clock + suffix
+    days = [('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')[d] + 's' for d in sorted(routine_days(row['days']))]
+    return (days[0] if len(days) == 1 else ', '.join(days[:-1]) + ' and ' + days[-1]) + ' at ' + clock + suffix
 
 
 def routine_job_path(identifier):
@@ -57,10 +89,14 @@ def routine_install(row):
            'ProcessType': 'Background', 'StandardOutPath': '/dev/null', 'StandardErrorPath': '/dev/null'}
     if row['kind'] == 'interval':
         job['StartInterval'] = row['every']
+    elif row['kind'] == 'once':   # launchd has no year: routine_slot checks it, and the routine goes once it starts
+        _, month, day = map(int, row['date'].split('-')); hour, minute = map(int, row['at'].split(':'))
+        job['StartCalendarInterval'] = {'Month': month, 'Day': day, 'Hour': hour, 'Minute': minute}
     else:
         hour, minute = map(int, row['at'].split(':'))
         values = {'Hour': hour, 'Minute': minute}
-        job['StartCalendarInterval'] = [{**values, 'Weekday': day} for day in range(1, 6)] if row['days'] == 'weekdays' else values
+        days = routine_days(row['days'])   # launchd counts Sunday as 0, Monday as 1
+        job['StartCalendarInterval'] = values if len(days) == 7 else [{**values, 'Weekday': (day + 1) % 7} for day in sorted(days)]
     with open(path + '.tmp', 'wb') as f: plistlib.dump(job, f)
     os.chmod(path + '.tmp', 0o600); os.replace(path + '.tmp', path)
     if not environ.sandbox_dir():
@@ -96,10 +132,13 @@ def routine_recap_sync():
 
 def routine_repair():
     """Rewrite jobs written the old way: weekday jobs with Tuesday-Saturday values, and jobs that named a Python of their own
-    instead of starting rabik.py (which picks the one inside Rabik.app); keep the daily recap's job in step with Settings."""
+    instead of starting rabik.py (which picks the one inside Rabik.app); keep the daily recap's job in step with Settings. A one-time
+    routine whose moment passed while the Mac was off runs now or is reported missed, by Settings."""
     try: routine_recap_sync()
     except (OSError, ValueError): pass
     for row in routines():
+        if row['kind'] == 'once' and not row.get('lastSlot') and routine_due(row) <= time.time():
+            routine_fire(row['id']); continue
         try:
             with open(routine_job_path(row['id']), 'rb') as f: job = plistlib.load(f)
             days = [value.get('Weekday') for value in job.get('StartCalendarInterval', [])]
@@ -111,22 +150,39 @@ def routine_repair():
             except (OSError, ValueError, KeyError, TypeError): pass
 
 
-def routine_add(kind, when, ask, mode='cheapest', now=None, days='daily'):
+def routine_add(kind, when, ask, mode='cheapest', now=None, days='daily', date=None, unattended=False):
+    """unattended: the user agreed, when it was set up, that it acts without asking then (the gate showed them the card)."""
     ask, mode = ' '.join(str(ask).split())[:1000], str(mode).lower()
     if not ask: raise ValueError('The routine needs an ask.')
     if mode not in ('cheapest', 'balanced', 'capable'): raise ValueError('Intelligence must be cheapest, balanced or capable.')
-    row = {'id': uuid.uuid4().hex[:12], 'kind': kind, 'ask': ask, 'mode': mode, 'created': time.time() if now is None else now}
-    if kind == 'time':
+    now = time.time() if now is None else now
+    row = {'id': uuid.uuid4().hex[:12], 'kind': kind, 'ask': ask, 'mode': mode, 'created': now}
+    if unattended: row['unattended'] = True
+    if kind in ('time', 'once'):
         match = re.fullmatch(r'([01]\d|2[0-3]):([0-5]\d)', str(when))
         if not match: raise ValueError('Time must be HH:MM.')
-        if days not in ('daily', 'weekdays'): raise ValueError('Days must be daily or weekdays.')
-        row.update(at=when, days=days)
+        row['at'] = when
+    if kind == 'time':
+        days = ','.join(d for d in ROUTINE_DAY_NAMES if d in str(days).split(',')) if routine_days(days) is not None and ',' in str(days) else days
+        if routine_days(days) is None: raise ValueError('Days must be daily, weekdays, weekends or days like mon,thu.')
+        row['days'] = days
+    elif kind == 'once':
+        today = time.localtime(now)
+        if date in ('today', 'tomorrow'):
+            date = time.strftime('%Y-%m-%d', time.localtime(time.mktime((today.tm_year, today.tm_mon, today.tm_mday + (date == 'tomorrow'), 12, 0, 0, 0, 0, -1))))
+        if not re.fullmatch(r'20\d\d-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])', str(date)): raise ValueError('Date must be YYYY-MM-DD, today or tomorrow.')
+        row['date'] = date
+        due = routine_due(row)
+        if time.strftime('%Y-%m-%d', time.localtime(due)) != date: raise ValueError('That date does not exist.')
+        if due <= now + 30: raise ValueError('That time has already passed. Pick a later time.')
+        if due > now + 366 * 86400: raise ValueError('Pick a time within a year.')
     elif kind == 'interval':
         seconds = int(when)
         if seconds < 60 or seconds % 60: raise ValueError('Intervals must be whole minutes, at least 60 seconds.')
         row['every'] = seconds
     else:
-        raise ValueError('Use time or interval.')
+        raise ValueError('Use time, once or interval.')
+    row['label'] = routine_label(row)   # Settings shows it as is
     os.makedirs(paths.DIR, mode=0o700, exist_ok=True)
     lock = open(os.path.join(paths.DIR, 'routines.lock'), 'a+')
     try:
@@ -165,13 +221,17 @@ def routine_slot(row, now=None):
     if row['kind'] == 'interval':
         slot = int((now - row['created']) // row['every'])
         return str(slot) if slot >= 1 else None
+    if row['kind'] == 'once':   # due and not too late (Settings → what to do when the Mac slept through it)
+        due = routine_due(row)
+        late = ROUTINE_LATE.get(str(prefs.pref('routineLate', 'skip')), ROUTINE_LATE['skip'])
+        return row['date'] + '@' + row['at'] if due <= now + 60 and now - due <= late else None
     local = time.localtime(now)
     hour, minute = map(int, row['at'].split(':'))
     due = time.mktime((local.tm_year, local.tm_mon, local.tm_mday, hour, minute, 0, 0, 0, -1))
     if due > now:
         due = time.mktime((local.tm_year, local.tm_mon, local.tm_mday - 1, hour, minute, 0, 0, 0, -1))
     scheduled = time.localtime(due)
-    if row['days'] == 'weekdays' and scheduled.tm_wday >= 5: return None
+    if scheduled.tm_wday not in routine_days(row['days']): return None
     if due < row['created'] or now - due > 15 * 60: return None
     return time.strftime('%Y-%m-%d@', scheduled) + row['at']
 
@@ -188,7 +248,15 @@ def routine_fire(identifier, now=None):
         fcntl.flock(lock, fcntl.LOCK_EX)
         rows = routines(); row = next((r for r in rows if r.get('id') == identifier), None)
         slot = routine_slot(row, now) if row else None
-        if not slot or row.get('lastSlot') == slot: return False
+        if row and row['kind'] == 'once' and not slot and not row.get('lastSlot') and routine_due(row) <= (time.time() if now is None else now):
+            missed = row   # the Mac slept or was off through it, longer than Settings allows: say so, never run it late
+        elif not slot or row.get('lastSlot') == slot: return False
+        else: missed = None
+        if missed:
+            lock.close()
+            routine_remove(identifier)
+            routine_notify(f"Missed: {missed['ask'][:120]} (due {missed['label'] if missed.get('label') else missed['at']}). Your Mac was asleep.")
+            return False
         row['lastSlot'], row['lastAt'] = slot, time.time() if now is None else now
         storage.private_json(os.path.join(paths.DIR, 'routines.json'), rows)
         routine_queue(identifier)
@@ -196,6 +264,12 @@ def routine_fire(identifier, now=None):
         lock.close()
     routine_wake()
     return True
+
+
+def routine_notify(text):
+    if environ.sandbox_dir(): return
+    subprocess.run(['/usr/bin/osascript', '-e', 'on run argv\ndisplay notification (item 1 of argv) with title "Rabik"\nend run', text],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def routine_queue(identifier):
@@ -231,15 +305,24 @@ def routine_pop():
 
 
 def routine_command(args):
+    """--routine add time|once|interval … [mode] [--unattended] | list | remove ID | --help."""
+    unattended = '--unattended' in args
+    args = [a for a in args if a != '--unattended']
+    if args in ([], ['--help'], ['help']): return prompts.ROUTINE_HELP
     if args == ['list']:
         rows = routines()
         return '\n'.join(f"{row['id']} · {routine_label(row)} · {row['ask']} · {row.get('mode', 'cheapest').title()}" for row in rows) or 'No scheduled routines.'
-    if len(args) in (5, 6) and args[:2] == ['add', 'time'] and args[3] in ('daily', 'weekdays'):
-        row = routine_add('time', args[2], args[4], args[5] if len(args) > 5 else 'cheapest', days=args[3])
+    if len(args) in (5, 6) and args[:2] == ['add', 'time']:
+        days = args[3].lower().replace(' ', '')
+        days = ','.join(d[:3] for d in days.split(',')) if days not in ('daily', 'weekdays', 'weekends') else days   # "monday,thursday" too
+        row = routine_add('time', args[2], args[4], args[5] if len(args) > 5 else 'cheapest', days=days, unattended=unattended)
+        return f"Scheduled {routine_label(row)}: {row['ask']}"
+    if len(args) in (5, 6) and args[:2] == ['add', 'once']:
+        row = routine_add('once', args[3], args[4], args[5] if len(args) > 5 else 'cheapest', date=args[2].lower(), unattended=unattended)
         return f"Scheduled {routine_label(row)}: {row['ask']}"
     if len(args) in (4, 5) and args[:2] == ['add', 'interval']:
-        row = routine_add('interval', args[2], args[3], args[4] if len(args) > 4 else 'cheapest')
+        row = routine_add('interval', args[2], args[3], args[4] if len(args) > 4 else 'cheapest', unattended=unattended)
         return f"Scheduled {routine_label(row)}: {row['ask']}"
     if len(args) == 2 and args[0] == 'remove':
         return 'Removed the routine.' if routine_remove(args[1]) else 'That routine no longer exists.'
-    raise ValueError('Use: --routine add time HH:MM daily|weekdays "ask" [mode], add interval seconds "ask" [mode], list, or remove ID.')
+    raise ValueError(prompts.ROUTINE_HELP)

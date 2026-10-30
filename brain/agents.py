@@ -298,7 +298,7 @@ class Agents:
                 self.stop_process(self.idle['id']); self.idle = None
             row = self.idle if self.idle and self.idle.get('destination', '') == brief.get('destination', '') and not brief.get('connectors') else self.new()
             if row is self.idle: self.idle = None
-            row.update({k: brief[k] for k in ('title', 'brief', 'context', 'request', 'app', 'page', 'connectors', 'destination', 'named', 'folder', 'files', 'focus', 'handoffId') if k in brief})
+            row.update({k: brief[k] for k in ('title', 'brief', 'context', 'request', 'app', 'page', 'connectors', 'destination', 'named', 'folder', 'files', 'focus', 'handoffId', 'unattended') if k in brief})
             if requested_model: row['_requestedModel'] = requested_model
             row.update(status='offered', seen=False)
             self.offers.add(row['id'])
@@ -381,6 +381,8 @@ class Agents:
                         try: os.remove(path)
                         except FileNotFoundError: pass
                     self.warm(row)
+                if row.get('unattended'):   # a routine the user OKed when they set it up (warm or new): its actions ask nothing; hard denials still hold
+                    storage.private_json(os.path.join(paths.agent_gate_dir(row['directory']), 'allow-task'), ['*'])
                 storage.private_json(os.path.join(row['directory'], 'request.json'), {'brief': row['brief']})
                 prompt = (text or row['brief'] + '\nKnown context (data):\n' + row.get('context', '')) + work
                 if row.get('destination') == 'meeting': prompt += '\nPrepare the calendar event for Meeting Copilot. Read-only tools only; include meetingEvent and the brief in your result.'
@@ -692,10 +694,12 @@ class Agents:
             elif action == 'routine':
                 routine = next((row for row in brain.routine.routines() if row.get('id') == identifier), None)
                 if routine and not prefs.pref('paused', False):
-                    ask = routine['ask']; row = self.prepare({'title': ' '.join(ask.split()[:4]), 'brief': ask, 'context': 'Started by a saved routine.',
+                    ask = routine['ask']; row = self.prepare({'title': ' '.join(ask.split()[:4]), 'brief': ask, 'context': 'Started by a saved routine.' +
+                                                              (' The user approved its actions when they scheduled it: do it without asking.' if routine.get('unattended') else ''),
                                                               'accepted': True, 'model': prefs.routine_model(routine.get('mode', 'cheapest')),
-                                                              'routine': routine['id']})
+                                                              'routine': routine['id'], 'unattended': bool(routine.get('unattended'))})
                     row['routine'] = routine['id']; self.save(row)
+                    if routine['kind'] == 'once': brain.routine.routine_remove(routine['id'])   # it ran: a one-time routine is done
             elif action in ('start', 'followup') and identifier in self.rows:
                 if action == 'followup' and data.get('text'): self.rows[identifier].setdefault('timeline', []).append({'user': data['text']})
                 self.start(identifier, data.get('text'), evidence=data.get('text') or None if action == 'followup' else None)

@@ -392,6 +392,9 @@
     </div>
     <h3>Scheduled routines</h3>
     <div class="group" id="routines"></div>
+    <div class="group" style="margin-top:8px">
+      <div class="row"><div class="t"><b>If your Mac sleeps through a one-time task</b><span>Its time passed while the Mac was asleep or off.</span></div><select data-k="routineLate" id="routinelate" aria-label="Late one-time tasks"><option value="skip">Skip it and tell me</option><option value="2h">Run it up to 2 hours late</option><option value="always">Always run it</option></select></div>
+    </div>
   </section>
 
   <section id="brain">
@@ -704,6 +707,7 @@
   $('reminderslist').onchange = e => set('remindersList', e.target.value);
   $('meetinglanguage').onchange = e => set('meetingLanguage', e.target.value);
   $('voice').onchange = e => set('voice', e.target.value);
+  $('routinelate').onchange = e => set('routineLate', e.target.value);
   $('activityadd').onclick = () => post({do: 'activityExcludeAdd'});
   $('mcpadd').onclick = () => { $('mcpadd').disabled = true; $('mcpadd').textContent = 'Adding…'; post({do: 'mcpAdd'}); };
   $('mcpcopy').onclick = () => post({do: 'mcpCopy'});
@@ -778,7 +782,7 @@
       s.value = s.dataset.k === 'microphone' && ![...s.options].some(o => o.value === value) ? 'automatic' : value;
     });
     document.querySelectorAll('input[type=range]').forEach(r => r.value = P[r.dataset.k]);
-    $('recapat').value = P.recapAt || '21:00'; paintMeetingLanguages(); paintVoices(); paintActivity();
+    $('recapat').value = P.recapAt || '21:00'; paintMeetingLanguages(); paintVoices(); paintActivity(); $('routinelate').value = P.routineLate || 'skip';
     const lists = $('reminderslist'), chosen = P.remindersList || '';
     lists.replaceChildren(new Option('Default list', ''), ...reminderLists.map(l => new Option(l.title + (l.isDefault ? ' (default)' : ''), l.id)));
     if (chosen && !reminderLists.some(l => l.id === chosen)) lists.append(new Option('Your chosen list', chosen));   // not readable now: keep it, never reset
@@ -811,7 +815,8 @@
       const row = document.createElement('div'); row.className = 'row rule';
       const text = document.createElement('div'); text.className = 't';
       const title = document.createElement('b'), ask = document.createElement('span');
-      if (routine.kind === 'interval') {
+      if (routine.label) title.textContent = routine.label;   // brain/routine.py: once, weekly days, unattended
+      else if (routine.kind === 'interval') {
         const hours = routine.every / 3600, minutes = routine.every / 60;
         title.textContent = Number.isInteger(hours) ? `Every ${hours === 1 ? '' : hours + ' '}hour${hours === 1 ? '' : 's'}` : `Every ${minutes} minutes`;
       } else {

@@ -32,7 +32,9 @@ SAFE_OUT = [f'{c} *' for c in ('osascript', 'open', 'mdfind', 'curl', 'head', 't
 
 
 # What the user must OK first. Matched per command, so `open "…?q=buy shoes"` or a search for "delete" never asks.
-RISKY = [('Delete something?', r'\b(rm|rmdir|srm|unlink|shred|trash|mv)\s|\bdelete\b|empty (the )?trash'),
+RISKY = [('Run this later without asking?', r'--routine\s+add\b.*\s--unattended\b'),   # the one OK an unattended routine gets
+         ('Click this whenever it appears?', r'--watch\s+press\b'),   # a watch that presses a button on its own until stopped
+         ('Delete something?', r'\b(rm|rmdir|srm|unlink|shred|trash|mv)\s|\bdelete\b|empty (the )?trash'),
          ('Send this?', r'\bsend\b|\bsendmail\b|curl\b.*\s((?-i:-[a-zA-Z]*X)\s*[\'"]?(POST|PUT|PATCH|DELETE)|--request[\s=]*[\'"]?(POST|PUT|PATCH|DELETE)|--data|--form|--json|--upload-file|(?-i:-[a-zA-Z]*[dFT]))'),
          ('Buy this?', r'\b(buy|purchase|checkout|check out|place (an |the )?order|pay)\b'),
          # every way curl, sort and AppleScript/JXA write a file: they run outside the sandbox
@@ -114,6 +116,8 @@ def risky(cmd):
             return 'Change a file?'
         if part.startswith(QUIET) and '$(' not in part and '`' not in part:
             continue
+        if re.search(r'--routine\s+add\b', part) and not re.search(r'--unattended\b', part):
+            continue   # scheduling does nothing now; its run asks then, on the agent's own cards
         for q, rx in RISKY:
             if re.search(rx, re.sub(r'"[^"$`]*"', '""', part) if q == 'Change a file?' else part, re.I):   # "View > Zoom" menu paths are not redirects
                 return q
@@ -377,7 +381,8 @@ def action_kind(tool, inp):
 
 def task_allowed(kind):
     try:
-        with open(os.path.join(paths.agent_gate_dir(environ.ask_dir(required=True)), 'allow-task')) as f: return bool(kind) and kind in json.load(f)
+        with open(os.path.join(paths.agent_gate_dir(environ.ask_dir(required=True)), 'allow-task')) as f: kinds = json.load(f)
+        return bool(kind) and (kind in kinds or '*' in kinds)   # '*': an unattended routine the user OKed when they set it up
     except (KeyError, OSError, ValueError, TypeError): return False
 
 

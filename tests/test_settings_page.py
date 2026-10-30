@@ -155,6 +155,17 @@ class SettingsPageTests(unittest.TestCase):
         for args in (['list'], ['add', 'Read 2 books'], ['done', 'aaaaaaaa'], ['drop', 'aaaaaaaa']):
             self.assertIn({'do': 'goals', 'args': args}, out['posts'])
 
+    def test_routines_show_their_label_and_late_tasks_have_a_choice(self):
+        out = self.page("""st.load({prefs: {hotkeyLabel: '⌃⌥Space', routineLate: '2h'}, routines: [
+              {id: 'a1', kind: 'once', date: '2026-10-30', at: '20:00', ask: 'Send Ali: on my way', label: 'Once on Fri, Oct 30 at 8:00 PM · runs without asking'},
+              {id: 'b2', kind: 'time', at: '09:00', days: 'mon,thu', ask: 'Summarize my calendar', label: 'Mondays and Thursdays at 9:00 AM'}]}); await tick(20);
+            const titles = [...document.querySelectorAll('#routines b')].map(b => b.textContent), late = $('routinelate').value;
+            $('routinelate').value = 'skip'; $('routinelate').dispatchEvent(new Event('change'));
+            return {titles, late};""")
+        self.assertEqual(out['result']['titles'], ['Once on Fri, Oct 30 at 8:00 PM · runs without asking', 'Mondays and Thursdays at 9:00 AM'])
+        self.assertEqual(out['result']['late'], '2h')
+        self.assertIn({'do': 'set', 'k': 'routineLate', 'v': 'skip'}, out['posts'])
+
     def test_notice_shows_and_its_action_runs_once(self):
         out = self.page('''st.notice({text: 'Couldn’t save that change, so the old setting is back.'});
             const shown = !$('notice').hidden && $('noticebtn').hidden;

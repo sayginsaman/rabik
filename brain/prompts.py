@@ -1,4 +1,5 @@
 """Every prompt text the models get, and system_prompt() that assembles the main one from the settings."""
+import re
 import shlex
 from brain import prefs
 from brain.paths import (
@@ -6,7 +7,7 @@ from brain.paths import (
     TYPE, WATCH, WEB, WINDOW)
 
 __all__ = ['SYSTEM', 'NEVER', 'ASK_FIRST', 'SANDBOX', 'LEARN_ME', 'WORKFLOW', 'TEACH', 'ASK_ME', 'POINTER', 'DRAW_HELP', 'DRAWING', 'MODEL_OFFER',
-           'AGENT_HANDOFF', 'AGENT_SYSTEM', 'MEETING_SYSTEM', 'DICTATE_SYSTEM', 'CALENDAR_HELP', 'system_prompt']
+           'AGENT_HANDOFF', 'AGENT_SYSTEM', 'MEETING_SYSTEM', 'DICTATE_SYSTEM', 'CALENDAR_HELP', 'ROUTINE_HELP', 'WATCH_HELP', 'SCHEDULE_WORDS', 'schedule_help', 'system_prompt']
 
 
 SYSTEM = f"""You are Rabik, a Mac helper in a small box. The user holds a hotkey, talks, then lets go.
@@ -34,8 +35,7 @@ Tools:
 - Personal data: {shlex.quote(ME)} --me <category>|find "<words>". Categories: basics, contact, places, school_work, links, preferences, people, notes. Forget a found fact: --me drop <id> "<exact user words>". People: --contacts "<name/relationship>" or the app address book; missing/ambiguous: choices, never guess. Calendar (any language): --calendar --help for JSON list/add/move/delete; always use it (picks ambiguous events, confirms edits).
 - Spotify: {PLAY} "<name>" plays; {QUEUE} "<track>" queues.
 - Past asks: {HISTORY} "<words or date>". Past meetings: {shlex.quote(ME)} --meeting-history "<words or date>" (send a recap to Slack/email: hand off). Pages/files seen: --activity "<words or date>"; people met: --people "<name>".
-- Watch: {WATCH} "<app>" "<window title words>" <gone|shows|settled> "<phrase>" ["<then request>"], or {WATCH} cmd '<shell test, exit 0 = done>' ["<request>"]. No AI until done. Stop: {shlex.quote(ME)} --unwatch.
-- Routines: {ROUTINE} add time HH:MM daily|weekdays "<ask>" [mode] | add interval SECONDS "<ask>" [mode] | list | remove listed-ID.
+- Later or repeating work (once, daily, weekly days, every N min) and watches (also clicking a button whenever it shows): {ROUTINE} --help, {WATCH} --help.
 Earlier supplies follow-ups. "this"/"here" = front window; "it" after a task = Last task window. Answer/draw from open content (video, page, doc) unless told not to.
 Memory: follow rules. Recall/forget X: --me find, then drop a fact or {FORGET} the exact rule. Save personal facts: {ABOUT} <category> "<kind>" "<exact words from now/Earlier>"; how-tos: {REMEMBER} "<rule>".
 Shortcuts: "when I say X, do Y" in any words: run and verify Y, then end with [shortcut X], X in the user's exact words. Rabik saves the verified actions and tells the user; never save it yourself (shortcut or rule) or say it is saved.
@@ -182,3 +182,33 @@ DICTATE_SYSTEM = (
     'In a message or email, the greeting and the sign-off each get their own line. Split long speech into short paragraphs where the topic shifts. '
     'Fix capitalization and punctuation, including ? for a clear question. When unsure, keep the heard words.'
 )
+
+
+ROUTINE_HELP = f"""Routines: Rabik runs a request later as a background agent and notifies the result. 24-hour HH:MM, this Mac's time.
+  {ROUTINE} add time HH:MM <daily|weekdays|weekends|mon,thu> "<ask>" [cheapest|balanced|capable] [--unattended]
+  {ROUTINE} add once <YYYY-MM-DD|today|tomorrow> HH:MM "<ask>" [mode] [--unattended]
+  {ROUTINE} add interval <seconds, whole minutes> "<ask>" [mode] [--unattended]
+  {ROUTINE} list | {ROUTINE} remove <ID from list>
+Write the ask as the whole request for later ("open Discord and send Ali: I'm on my way"). Add --unattended when it sends, posts, buys,
+deletes or clicks something the user wants done then without being asked; they confirm it once now on a card."""
+
+
+WATCH_HELP = f"""Watches: free while they wait (no AI). Stop all: {shlex.quote(ME)} --unwatch; one: --unwatch <ID>; list: {shlex.quote(ME)} --watches.
+  {WATCH} press "<app>" "<button>[|<button 2>]": click that button in that app every time it appears, until the user stops it ("if ChatGPT
+    asks for permission, allow it": {WATCH} press "ChatGPT" "Allow|Approve"). The user confirms once on a card. Use the button names the
+    user said, else the usual ones for that app's prompt; never "Always allow" unless they asked for it.
+  {WATCH} "<app>" "<window title words>" <gone|shows|settled> "<phrase>" ["<then request>"]: once, when the window's text changes.
+  {WATCH} cmd '<shell test, exit 0 = done>' ["<request>"]: once, when the test passes."""
+
+
+# Asks about later, repeating or "whenever X happens" work, in English and Turkish: they get the routine and watch help with the request
+SCHEDULE_WORDS = re.compile(r"\b(every|each|daily|weekly|weekday|weekdays|weekend|tomorrow|tonight|today at|at \d|o'?clock|in \d+ ?(min|minute|hour)|"
+                            r"schedule|remind|routine|later|whenever|(when|if) .{0,40}\b(asks?|shows?|appears?|pops? up|done|finish)|permission|until|watch|monday|tuesday|"
+                            r"wednesday|thursday|friday|saturday|sunday|her (gün|sabah|akşam|hafta|pazar|cuma|saat|\d)|saat \d|\d+ ?(de|da|te|ta)\b|yarın|bugün|"
+                            r"bu akşam|haftada|hafta içi|hafta sonu|pazartesi|salı|çarşamba|perşembe|cuma|cumartesi|pazar|dakikada|saatte|zamanla|hatırlat|"
+                            r"izle|takip|olduğunda|olunca|isterse|onayla|izin ver)", re.I)
+
+
+def schedule_help(task):
+    """The routine and watch usage, attached to an ask that sounds like later, repeating or "whenever" work (kept out of SYSTEM)."""
+    return f'Routine and watch tools:\n{ROUTINE_HELP}\n{WATCH_HELP}\n' if SCHEDULE_WORDS.search(task or '') else ''
