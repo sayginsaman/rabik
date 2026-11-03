@@ -28,6 +28,8 @@
 | *"What's wrong with this code?"* | Rabik looks at your screen and answers in a line. |
 | *"Where do I turn on Night Shift?"* | A ring appears on the exact spot. |
 | *"Explain the Pythagorean theorem and draw it."* | A step-by-step drawing builds up over your screen. |
+| *"What should my coffee shop's marketing plan be?"* | Rabik talks you through it while each step is drawn on a live board, in time with its voice. |
+| *"How does a car engine work? Show me in 3D."* | A 3D model builds part by part as it explains; drag to turn it, click a part to ask about it. |
 | *"Reply to this. Thursday works, send me a time."* | A draft of the reply, ready to insert. It never sends by itself. |
 | *"Move my dentist appointment to 4."* | A card shows the old and new time. Adding is immediate; moving or deleting asks first. |
 | *"Find me a desk lamp under $30 on Amazon."* | Rabik shops in Chrome behind your apps; a mini screen shows it. |
@@ -94,16 +96,30 @@ Turn it on in Settings → Meetings. When a call app starts using your mic, Rabi
 
 </details>
 
+### Live board
+Ask for a plan, a process, a comparison, numbers or how something works, and Rabik answers out loud while a card a little right of the middle of your screen draws it: a hand-drawn flow, mind map, comparison, timeline or chart, each part appearing as the sentence about it is spoken. Things you can hold in your hand (an engine, a molecule, a planet) get a **3D model** that grows part by part; drag to turn it, scroll to zoom, click a part to ask about it. Follow-up questions add to the same board. ⤓ saves it to Downloads as a picture.
+
+<details><summary>More about the live board</summary>
+
+- The model writes one short command per line (`say`, `item`, `bar`, `part` …); Rabik checks each line and draws it as soon as it arrives, so drawing starts with the first sentence. Nothing the model writes is ever run as code.
+- With the voice muted, the board keeps a reading pace instead.
+- Talk over Rabik or press the shortcut and the voice stops; the board finishes drawing at once. Esc or ✕ closes it.
+
+</details>
+
 ### Remembers, privately
 Say "remember…" or let Rabik keep lasting facts about you; your **rules** apply to every ask. Answers that come from Rabik's records show **source chips** you can click. Everything below stays on your Mac.
 
 - **Daily recap:** a notification every evening (21:00 unless you pick another time) with your asks, finished agents, meeting decisions, tomorrow's calendar and to-dos you can tick into Reminders. One Haiku call; a quiet day costs nothing.
 - **Goals:** up to five ("my goal is…" or Settings → General → Goals). The recap says when your day moved one forward.
+- **Learned about you:** the recap lists what Rabik learned about you that day; keep each fact or forget it right there.
+- **Focus nudges** (on while you have a goal): after five minutes on YouTube, Reddit, X or the like, one gentle line names your goal. At most three a day, never in meetings.
+- **Meeting briefs:** five minutes before a calendar meeting with people Rabik knows, a notification says who they are and what you decided or promised last time.
 - **People** (Settings → People): who you met in saved meetings and what About you says about them, one person however their name was spelled.
 - **Activity history** (Settings → Memory, off until you turn it on): the window in front, its file or page address, so "open the Figma file I had yesterday" works. No screenshots; private windows, Tor, password managers and your Don't record list are skipped. Kept 30 days.
 
 ### Talks back
-With **Read answers aloud** on, Rabik reads each sentence as the answer streams, in the Siri voice or any Premium or Enhanced voice on your Mac, switching to the right voice for another language. **Stop when I talk** listens only while it speaks, with Apple's echo cancellation, and stops when you start talking. Esc or the shortcut stops it too.
+Rabik answers out loud by default (the speaker in the box mutes it). It reads each sentence as the answer streams, in the Siri voice or any Premium or Enhanced voice on your Mac, switching to the right voice for another language. **Stop when I talk** listens only while it speaks, with Apple's echo cancellation, and stops when you start talking. Esc or the shortcut stops it too. Turn on **"Hey Rabik"** (Settings → General → Voice) to start an ask by voice; it listens with on-device recognition only, and only while Rabik is idle.
 
 ### Works with Claude Code and ChatGPT
 Settings → Account & Access → **Add to Claude Code** or **Add to ChatGPT** gives those apps read-only access to Rabik's memory, meetings, people, goals, recaps and Activity history through an MCP server (`rabik.py --mcp`); **Copy for Claude Desktop** copies the same config. Open Notion, Slack, Linear, Figma, Asana or ClickUp while its Claude connector isn't connected and Rabik offers it once (Settings → Account & Access → Offer connectors).

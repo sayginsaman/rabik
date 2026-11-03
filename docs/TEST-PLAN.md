@@ -98,6 +98,17 @@ Bu build hakkında:
 - [ ] Mac'i bir tek seferlik görevin saatinde uykuda bırak → varsayılan: yapılmaz, "Missed: …" bildirimi gelir. Settings'te "Run it up to 2 hours late" seçince geç de yapılır.
 - [ ] "ChatGPT izin isterse onayla" de → "Click this whenever it appears?" kartı; onayla. ChatGPT bir izin istediğinde Rabik "Allow/Approve"a kendisi basar, dakikada en fazla bir bildirim gelir. Settings → General → Watches'ta sayaç artar; Stop ya da "izlemeyi durdur" kapatır.
 
+## 9d. Canlı tahta, ses ve yeni yardımcılar
+- [ ] "Küçük bir kahve dükkanım var, pazarlama planım nasıl olmalı?" → ekranın ortasının biraz sağında krem bir kart açılır; Rabik konuşurken her adım kutusu, okları ve notları o cümleyle birlikte elle çiziliyormuş gibi belirir. Kutuda anlatım yazı olarak akar.
+- [ ] "Araba motoru nasıl çalışır, 3D göster" → parçalar konuşmayla büyüyen bir 3D model; sürükleyince döner, tekerlek yakınlaştırır, bir parçaya tıklayınca "… ne işe yarar?" sorusu gider ve aynı tahtaya eklenir ya da cevaplanır.
+- [ ] "Kiralamak mı satın almak mı?" → iki sütunlu karşılaştırma; "Q1 40, Q2 55 gelir grafiği çiz" → çubuk grafik.
+- [ ] Tahta çizerken konuş ya da kısayola bas → ses susar, kalan çizim hemen tamamlanır. ⤓ Downloads'a PNG kaydeder ("Saved to Downloads"), ✕ ya da Esc kapatır.
+- [ ] Kutudaki hoparlör düğmesi: tıklayınca sessize alır (çarpı görünür), cevaplar okunmaz; tahta okuma hızında çizilir. Tekrar tıklayınca açar. İlk açılışta ses varsayılan olarak açık.
+- [ ] Settings → General → Voice → "Hey Rabik"i aç (turuncu mikrofon noktası görünür) → "Hey Rabik" de → başlangıç sesi, dinleme başlar; sustuğunda soru gider. Rabik konuşurken, toplantıda ve ekran kilitliyken dinlemez. Kapatınca nokta kaybolur.
+- [ ] Bir hedef ekle, 5 dakikadan uzun YouTube'da kal → "6 min on YouTube. Your goal: … Back to it?" bildirimi; günde en fazla 3, aralarında 45 dk. Hedef yokken gelmez.
+- [ ] Takvime 6 dk sonra, daha önce toplantı yaptığın biriyle bir toplantı koy → ~5 dk kala "Before “…” · in 5 min" bildirimi; tıklayınca brifing kutuda açılır ve okunur. Tanımadığın biriyle olan toplantıda gelmez.
+- [ ] Rabik'e kendinle ilgili bir şey öğret ("kahvemi yulaf sütlü içerim") → akşam özetinde "Learned about you" altında görünür; Keep ✓ işaretler, Forget About you'dan siler.
+
 ## 10. Settings ve modlar
 - [ ] Spotlight'tan "Rabik" → Settings açılır; açık/koyu görünüme uyar.
 - [ ] Kutu varsayılan olarak ekranın üst ortasında açılır.
