@@ -39,6 +39,10 @@ canvas#three.pick{cursor:pointer}
   padding:2px 7px;border-radius:7px;background:rgba(251,248,241,.82);opacity:0;transition:opacity .4s}
 #labels div.on{opacity:1}
 #labels div.hot{background:#ffe8a3}
+#notes3d{position:absolute;left:16px;top:6px;max-width:46%;display:grid;gap:6px;pointer-events:none}
+#notes3d div{font:15px/1.3 "Noteworthy","Chalkboard SE",cursive;color:var(--ink);background:#ffec99;padding:7px 10px;border-radius:4px;transform:rotate(-1deg);
+  box-shadow:0 1px 2px rgba(60,45,25,.15);opacity:0;transition:opacity .5s}
+#notes3d div.on{opacity:1}
 #hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;font:12px -apple-system,system-ui,sans-serif;color:var(--ink2);opacity:0;transition:opacity .4s;pointer-events:none}
 #hint.on{opacity:.8}
 </style></head>
@@ -54,6 +58,7 @@ canvas#three.pick{cursor:pointer}
     <svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="world"></g></svg>
     <canvas id="three"></canvas>
     <div id="labels"></div>
+    <div id="notes3d"></div>
     <div id="hint">Drag to turn · click a part to ask about it</div>
   </div>
 </div>
@@ -156,7 +161,7 @@ function reset(layout, title) {
   $('title').textContent = title || ''
   const is3d = layout === '3d'
   $('three').classList.toggle('on', is3d); ink.style.display = is3d ? 'none' : ''
-  $('labels').innerHTML = ''; $('hint').classList.remove('on')
+  $('labels').innerHTML = ''; $('notes3d').innerHTML = ''; $('hint').classList.remove('on')
   if (is3d) { S.three = S.three || makeThree($('three')); S.three.clear() }
   else if (layout === 'mind' && title) {   // the idea itself sits in the middle from the start
     const g = el('g', {class: 'mark'}, world), lines = wrap(title, 16, 2), w = Math.max(150, Math.max(...lines.map(l => l.length)) * 12 + 40), h = 40 + lines.length * 26
@@ -345,7 +350,7 @@ function fit(now) {
 }
 
 function show(m, secs) {
-  if (S.layout === '3d') { S.three.grow(m, secs); return }
+  if (S.layout === '3d') { if (m.note) { m.drawn = true; m.note.classList.add('on') } else S.three.grow(m, secs); return }
   draw(m, secs); connectors(); fit(false)
 }
 
@@ -359,7 +364,14 @@ function play(n, secs) {
 function add(ev) {
   if (ev.op === 'say') { S.segments.push([]); S.seg = S.segments.length - 1; return }
   if (S.layout === '3d') {
-    if (ev.op !== 'part') { if (ev.op === 'title') $('title').textContent = ev.text; return }
+    if (ev.op === 'title') { $('title').textContent = S.title = ev.text; return }
+    if (['note', 'check', 'formula'].includes(ev.op)) {   // in 3D, asides are sticky notes over the scene
+      const div = document.createElement('div'); div.textContent = (ev.op === 'check' ? '✓ ' : '') + ev.text; $('notes3d').appendChild(div)
+      const m = {kind: ev.op, ev, drawn: false, note: div}
+      S.marks.push(m); S.segments[S.seg].push(m); if (S.played.has(S.seg)) show(m, .5)
+      return
+    }
+    if (ev.op !== 'part') return
     const m = {kind: 'part', ev, drawn: false}
     S.marks.push(m); S.three.add(m)
     S.segments[S.seg].push(m); if (S.played.has(S.seg)) show(m, .9)
@@ -519,7 +531,7 @@ function makeThree(canvas) {
       const p = parts[i]
       if (p.scale <= .001) return
       const g = meshes[p.m.ev.shape], see = !picking && p.shell
-      gl.uniform1f(U.alpha, see ? .3 : 1)
+      gl.uniform1f(U.alpha, see ? .4 : 1)
       if (see) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false) } else { gl.disable(gl.BLEND); gl.depthMask(true) }
       gl.bindBuffer(gl.ARRAY_BUFFER, g.pb); gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 3, gl.FLOAT, false, 0, 0)
       gl.bindBuffer(gl.ARRAY_BUFFER, g.nb); gl.enableVertexAttribArray(aN); gl.vertexAttribPointer(aN, 3, gl.FLOAT, false, 0, 0)
@@ -542,7 +554,8 @@ function makeThree(canvas) {
       for (const o of placed) if (Math.abs(o.x - l.x) < (o.w + l.w) / 2 && Math.abs(o.y - l.y) < 24) l.y = o.y + 24
       placed.push(l)
       l.p.label.style.left = l.x + 'px'; l.p.label.style.top = l.y + 'px'
-      l.p.label.classList.toggle('on', l.p.scale > .7); l.p.label.classList.toggle('hot', l.i === hot)
+      // a name shows while its part is new (just spoken about) or under the pointer, so a busy model never drowns in labels
+      l.p.label.classList.toggle('on', l.p.scale > .7 && (l.i === hot || performance.now() - l.p.t0 < 4500)); l.p.label.classList.toggle('hot', l.i === hot)
     })
   }
   function pickAt(x, y) {
@@ -559,7 +572,8 @@ function makeThree(canvas) {
     shown.forEach(p => { p.box = box(p); for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], p.box[0][k]); hi[k] = Math.max(hi[k], p.box[1][k]) } })
     p_target = lo.map((l, k) => (l + hi[k]) / 2)
     fitDist = Math.max(2.5, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 1.15)
-    const inside = (a, b) => b !== a && b.target > 0 && [0, 1, 2].every(k => a.box[0][k] < b.m.ev.at[k] && b.m.ev.at[k] < a.box[1][k])
+    // a shell: a part with another, clearly thinner one inside it (an engine block around its piston, not a crankshaft and its pin)
+    const inside = (a, b) => b !== a && b.target > 0 && Math.min(...a.m.ev.size) > 1.6 * Math.min(...b.m.ev.size) && [0, 1, 2].every(k => a.box[0][k] < b.m.ev.at[k] && b.m.ev.at[k] < a.box[1][k])
     parts.forEach(a => { a.shell = parts.some(b => inside(a, b)) })
   }
   let p_target = [0, 0, 0], last = performance.now()
@@ -575,7 +589,8 @@ function makeThree(canvas) {
     target = target.map((t, k) => t + (p_target[k] - t) * Math.min(1, dt * 4))
     dist += (fitDist - dist) * Math.min(1, dt * 3)
     if (auto && !dragging) yaw += dt * .22
-    if (moving || auto || dragging || dirty || Math.abs(fitDist - dist) > .01) { render(false); dirty = false }
+    const fresh = parts.some(p => p.target > 0 && now - p.t0 < 5000)   // names still fading out
+    if (moving || auto || dragging || dirty || fresh || Math.abs(fitDist - dist) > .01) { render(false); dirty = false }
     requestAnimationFrame(frame)
   }
   canvas.addEventListener('mousedown', e => { dragging = {x: e.clientX, y: e.clientY, moved: false}; canvas.classList.add('drag') })
