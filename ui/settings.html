@@ -369,9 +369,13 @@
     <div class="group" id="goals"></div>
     <div class="goaladd"><input id="goalnew" type="text" maxlength="160" placeholder="Add a goal, like “ship the beta by Friday”" aria-label="New goal" autocomplete="off"><button class="btn" id="goaladd">Add</button></div>
     <p class="lede" style="margin:6px 2px 0;font-size:11.5px">The daily recap says when your day moves one forward. Or say “my goal is…”.</p>
+    <div class="group" style="margin-top:10px">
+      <div class="row"><div class="t"><b>Focus nudges</b><span>After 5 minutes on YouTube, Reddit or the like, a gentle note with a goal. <i class="info" title="Only while you have a goal. At most 3 a day, 45 minutes apart. Never in meetings or calls. Nothing is saved.">i</i></span></div><label class="sw"><input type="checkbox" data-k="focusNudges"></label></div>
+    </div>
     <h3>Voice</h3>
     <div class="group">
       <div class="row"><div class="t"><b>Microphone</b></div><select data-k="microphone"></select></div>
+      <div class="row"><div class="t"><b>“Hey Rabik”</b><span>Say it instead of the shortcut. <i class="info" title="The mic stays on while Rabik is idle (macOS shows its orange dot). Listening uses on-device recognition only: nothing leaves this Mac and nothing is saved.">i</i></span></div><label class="sw"><input type="checkbox" data-k="wakeWord"></label></div>
       <div class="row"><div class="t"><b>Speech model</b><span>Speech stays on this Mac. <i class="info" title="Speech: free, English (US), on this Mac. Dictation: the model your keyboard’s mic uses.">i</i></span></div><div class="seg" data-k="speechModel"><button data-v="speech">Speech</button><button data-v="dictation">Dictation</button></div></div>
       <div class="row"><div class="t"><b>Sound volume</b></div><input type="range" min="0" max="0.6" step="0.02" data-k="volume"><span class="val" id="volv"></span></div>
     </div>
@@ -532,6 +536,7 @@
       <div class="row"><div class="t"><b>AI meeting summaries</b><span>Claude reads the transcript once. <i class="info" title="For a recap and action items. With Devin or Pi, meetings stay on this Mac. Off: a local recap, and prep won’t search connected email or documents.">i</i></span></div><label class="sw"><input type="checkbox" data-k="meetingSummary" aria-label="AI meeting summaries"></label></div>
       <div class="row"><div class="t"><b>Language</b><span>What the call is in. Speech stays on this Mac.</span></div><select data-k="meetingLanguage" id="meetinglanguage" aria-label="Meeting language"></select></div>
       <div class="row"><div class="t"><b>Translate the call</b><span>Their words, into your Mac’s language, on this Mac.</span></div><label class="sw"><input type="checkbox" data-k="meetingTranslate"></label></div>
+      <div class="row"><div class="t"><b>Meeting briefs</b><span>Who you’re meeting and what you said last time, 5 minutes before. <i class="info" title="From your calendar, People and saved meetings. Only for meetings with people Rabik already knows. Needs Calendar access.">i</i></span></div><label class="sw"><input type="checkbox" data-k="meetingBriefs"></label></div>
       <div class="row"><div class="t"><b>Remind me before calls</b><span>A card when a call with a link or people starts soon. <i class="info" title="About two minutes before, from your calendar. Needs Calendar access.">i</i></span></div><label class="sw"><input type="checkbox" data-k="meetingNudge"></label></div>
       <div class="row"><div class="t"><b>Prep in a Claude chat</b><span>Copies a prompt for call notes.</span></div><button class="btn" data-do="meetingPrepPrompt" id="meetingPrepPrompt">Copy Prompt</button></div>
       </div>

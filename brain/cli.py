@@ -13,7 +13,7 @@ import threading
 import time
 from pathlib import Path
 from brain import (
-    activity, agents, apps, ask, board, calendar, clients, dictation, drawing, environ, goals, hands, instant, interaction, macos, meeting, memory,
+    activity, agents, apps, ask, board, brief, calendar, clients, dictation, drawing, environ, goals, hands, instant, interaction, macos, meeting, memory,
     mcp, paths, people, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, sources, spotify, storage, support, telemetry, tips,
     toolhelp, turn, watcher, web, windows, wording)
 
@@ -65,6 +65,11 @@ def main():
         return mcp.mcp_serve()
     if args[:1] in (['--mcp-install'], ['--mcp-status']) and args[1:] in ([], ['chatgpt']):   # Claude Code, or the ChatGPT Mac app
         return print(json.dumps(mcp.mcp_install(check=args[0] == '--mcp-status', target=args[1] if args[1:] else 'claude')))
+    if len(args) == 3 and args[0] == '--focus-nudge' and args[2].isdigit():   # Rabik.app: the user is on a distracting site or app
+        return print(json.dumps(goals.focus_nudge(args[1], int(args[2])), ensure_ascii=False))
+    if args == ['--brief']:   # Rabik.app: a calendar meeting with people starts soon (the event as JSON on stdin)
+        try: return print(json.dumps(brief.brief_make(json.load(sys.stdin)), ensure_ascii=False))
+        except (OSError, ValueError, TypeError): return print(json.dumps({'skip': 'bad event'}))
     if args[:1] == ['--goals']:
         try: return print(json.dumps(goals.goals_command(args[1:]), ensure_ascii=False))
         except ValueError as e: return print(json.dumps({'error': str(e)}))

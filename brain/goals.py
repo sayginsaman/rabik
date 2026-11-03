@@ -7,10 +7,12 @@ import time
 import uuid
 from brain import paths, storage, wording
 
-__all__ = ['GOALS_MOST', 'goals_file', 'goals', 'goals_open', 'goal_add', 'goal_done', 'goal_drop', 'goals_command']
+__all__ = ['GOALS_MOST', 'FOCUS_DAILY', 'FOCUS_GAP', 'goals_file', 'goals', 'goals_open', 'goal_add', 'goal_done', 'goal_drop', 'goals_command',
+           'focus_nudge']
 
 
 GOALS_MOST = 5
+FOCUS_DAILY, FOCUS_GAP = 3, 45 * 60   # focus nudges: at most 3 a day, 45 minutes apart
 
 
 def goals_file():
@@ -71,3 +73,23 @@ def goals_command(args):
     elif action == 'list': note = ''
     else: raise ValueError('Use --goals list | add "<text>" | done <id> | undo <id> | drop <id>')
     return {'goals': goals(), 'note': note}
+
+
+def focus_nudge(where, minutes, now=None):
+    """Rabik.app saw the user on a distracting site or app (YouTube, Reddit, …) for a while: one gentle line naming a goal they set,
+    or {'skip': why}. Never without a goal, at most FOCUS_DAILY a day and FOCUS_GAP apart (focus-nudges.json counts them)."""
+    now = now or time.time()
+    open_goals = goals_open()
+    if not open_goals: return {'skip': 'no goals'}
+    where, minutes = ' '.join(str(where).split())[:40] or 'that', max(1, int(minutes))
+    path, day = os.path.join(paths.DIR, 'focus-nudges.json'), time.strftime('%Y-%m-%d', time.localtime(now))
+    try:
+        with open(path) as f: state = json.load(f)
+    except (OSError, ValueError): state = {}
+    if not isinstance(state, dict) or state.get('day') != day: state = {'day': day, 'count': 0, 'last': 0}
+    if state.get('count', 0) >= FOCUS_DAILY: return {'skip': 'daily limit'}
+    if now - state.get('last', 0) < FOCUS_GAP: return {'skip': 'too soon'}
+    goal = open_goals[state['count'] % len(open_goals)]['text']   # a different goal each time when there are several
+    state.update(count=state['count'] + 1, last=now)
+    os.makedirs(paths.DIR, exist_ok=True); storage.private_json(path, state)
+    return {'text': f'{minutes} min on {where}. Your goal: {goal}. Back to it?', 'goal': goal}

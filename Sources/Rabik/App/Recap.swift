@@ -65,8 +65,11 @@ final class Recap: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "recap." + day, content: content, trigger: nil))
     }
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler done: @escaping () -> Void) {
-        let day = response.notification.request.content.userInfo["recap"] as? String ?? ""
-        DispatchQueue.main.async { [self] in if !day.isEmpty { open(day) } }
+        let info = response.notification.request.content.userInfo, day = info["recap"] as? String ?? ""
+        DispatchQueue.main.async { [self] in
+            if !day.isEmpty { open(day) }
+            if let brief = info["brief"] as? String { MeetingBriefs.show(info["briefTitle"] as? String ?? "Meeting", brief) }   // Nudges.swift
+        }
         done()
     }
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler done: @escaping (UNNotificationPresentationOptions) -> Void) {

@@ -230,6 +230,13 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         if k == "draw", v as? Bool == false { app.drawing.clear(); app.unwarm() }
         if k == "meetingSave" { meeting.savingChanged(v as? Bool == true) }
         if k == "meeting", v as? Bool == false { meeting.stop() }
+        if k == "meetingBriefs", v as? Bool == true, EKEventStore.authorizationStatus(for: .event) == .notDetermined {
+            calendar.requestFullAccessToEvents { ok, _ in if !ok { DispatchQueue.main.async { Prefs.set("meetingBriefs", false); settings.push() } } }
+        }
+        if k == "wakeWord", v as? Bool == true, SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+            SFSpeechRecognizer.requestAuthorization { ok in if ok != .authorized { DispatchQueue.main.async { Prefs.set("wakeWord", false); settings.push() } } }
+        }
+        if k == "wakeWord", v as? Bool == false { wakeWord.end() }
         if k == "meetingNudge", v as? Bool == true, EKEventStore.authorizationStatus(for: .event) != .fullAccess {
             calendar.requestFullAccessToEvents { ok, _ in if !ok { DispatchQueue.main.async { Prefs.set("meetingNudge", false); settings.push() } } }
         }

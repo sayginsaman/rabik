@@ -673,6 +673,17 @@ let connectorOffer = ConnectorOffer()   // Settings → Agents → Offer connect
 connectorOffer.start()
 let autoPress = AutoPress()   // watches that press a button whenever it shows
 autoPress.start()
+let focusNudge = FocusNudge()   // Settings → Focus nudges
+focusNudge.start()
+let meetingBriefs = MeetingBriefs()   // Settings → Meeting briefs
+meetingBriefs.start()
+let wakeWord = WakeWord()   // Settings → "Hey Rabik"
+wakeWord.canListen = { !app.engine.isRunning && !app.busy && !app.dictating && !app.speaker.speaking && !meeting.running }
+wakeWord.onWake = {   // as if the mic button was clicked: the ask ends after a pause
+    guard !app.engine.isRunning, !app.busy else { return }
+    app.clickTalk = true; app.start(); if !app.engine.isRunning { app.clickTalk = false }
+}
+wakeWord.start()
 let onboarding = Onboarding()
 LoginItem.firstLaunch()
 if let on = LoginItem.current(), on != Prefs.bool("login") { Prefs.set("login", on) }   // changed in System Settings
@@ -797,3 +808,6 @@ NSApplication.shared.run()
 // enum LoginItem lives in App/LoginItem.swift
 // enum ReleaseUpdates lives in App/ReleaseUpdates.swift
 // final class AutoPress lives in App/AutoPress.swift
+// final class FocusNudge and MeetingBriefs live in App/Nudges.swift
+// final class WakeWord lives in Speech/WakeWord.swift
+// final class Board lives in Board/Board.swift
