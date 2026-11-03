@@ -29,7 +29,7 @@ def brief_inputs(event):
     keys = {str(a.get('email', '')).casefold() for a in wanted if a.get('email')} | {str(a.get('name', '')).casefold() for a in wanted if a.get('name')}
     found = []
     for p in people.people_all():
-        if p['id'] in keys or p['name'].casefold() in keys or (p['email'] and p['email'] in keys):
+        if p['id'].casefold() in keys or p['name'].casefold() in keys or (p['email'] and p['email'].casefold() in keys):
             found.append({'name': p['name'], 'last': datetime.fromtimestamp(p['last']).strftime('%a %b %d') if p['last'] else '',
                           'facts': p['facts'][:5], 'meetings': [m['id'] for m in p['meetings'][:2]]})
     ids = [i for p in found for i in p['meetings']]

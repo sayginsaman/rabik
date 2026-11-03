@@ -136,7 +136,10 @@ def recap_fact(day, identifier, keep):
             if isinstance(data, dict) and data:
                 data['kept'] = sorted(set(data.get('kept', [])) | {identifier}); storage.private_json(recap_path(day), data)
     elif memory.profile_drop(identifier) != 'forgotten': raise ValueError('Could not forget it. Try again from Settings → Memory.')
-    return {'day': day, 'learned': recap_learned(day, (recap_read(day) or {}).get('kept', []) if keep else ())}
+    try:
+        with open(recap_path(day)) as f: kept = json.load(f).get('kept', [])
+    except (OSError, ValueError, AttributeError): kept = []
+    return {'day': day, 'learned': recap_learned(day, kept)}
 
 
 def recap_make(day=None, force=False, evening=False):

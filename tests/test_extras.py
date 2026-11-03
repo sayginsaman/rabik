@@ -48,7 +48,7 @@ class LearnedTodayTests(unittest.TestCase):
         self.assertEqual([f['kept'] for f in kept['learned']], [True, False])
         self.assertTrue(brain.recap.recap_read(TODAY)['learned'][0]['kept'])
         gone = brain.recap.recap_command(['fact', TODAY, self.ids[1], 'forget'])
-        self.assertEqual([f['text'] for f in gone['learned']], ['coffee: oat flat white'])
+        self.assertEqual([(f['text'], f['kept']) for f in gone['learned']], [('coffee: oat flat white', True)])   # still ticked
         self.assertNotIn(self.ids[1], [f['id'] for f in brain.memory.me()['facts']])
         with self.assertRaises(ValueError): brain.recap.recap_command(['fact', TODAY, self.ids[2], 'forget'])   # not a learned fact of that day
         with self.assertRaises(ValueError): brain.recap.recap_command(['fact', TODAY, self.ids[0], 'delete'])
@@ -92,7 +92,7 @@ class BriefTests(unittest.TestCase):
                   patch.object(brain.meeting, 'meeting_read', side_effect=lambda i: meetings[i]),
                   patch.object(brain.prefs, 'client', return_value='pi')):
             p.start(); self.addCleanup(p.stop)
-        self.event = {'id': 'e1', 'start': 1800000000, 'title': 'Design sync', 'attendees': [{'name': 'Ana Silva', 'email': 'ana@acme.com'}]}
+        self.event = {'id': 'e1', 'start': 1800000000, 'title': 'Design sync', 'attendees': [{'name': 'A. Silva', 'email': 'Ana@Acme.com'}]}   # found by email, whatever its case
 
     def test_a_meeting_with_known_people_gets_one_brief(self):
         made = brain.brief.brief_make(self.event)
@@ -152,9 +152,9 @@ for t in ["Hey Rabik", "hey rabbit what time is it", "Hey, Robik", "OK Rabik", "
     def test_wiring_and_defaults(self):
         app, prefs = native_source(), (ROOT / 'Sources/Rabik/Core/Prefs.swift').read_text()
         self.assertIn('"focusNudges": true, "meetingBriefs": true, "wakeWord": false,', prefs)   # the mic stays off unless asked
-        self.assertIn('wakeWord.canListen = { !app.engine.isRunning && !app.busy && !app.dictating && !app.speaker.speaking && !meeting.running }', app)
+        self.assertIn('wakeWord.canListen = { !app.engine.isRunning && !app.busy && !app.dictating && !app.speaker.speaking && !meeting.running && callAppsOnMic().isEmpty }', app)
         self.assertIn('app.clickTalk = true; app.start(); if !app.engine.isRunning { app.clickTalk = false }', app)
-        self.assertIn('if recognizer.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true } else { return }', app)   # never a server
+        self.assertIn('r.requiresOnDeviceRecognition = true', app); self.assertIn('recognizer?.supportsOnDeviceRecognition == true', app)   # never a server
         self.assertIn('if let brief = info["brief"] as? String { MeetingBriefs.show(', app)
         self.assertIn('guard Prefs.bool("focusNudges"), !Prefs.bool("paused"), !meeting.running, callAppsOnMic().isEmpty,', app)
         settings = (ROOT / 'ui/settings.html').read_text()

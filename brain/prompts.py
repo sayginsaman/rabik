@@ -221,7 +221,7 @@ def schedule_help(task):
 
 BOARD_HELP = f"""Live board: for a plan, steps, a process, a comparison, numbers, a timeline, ideas, or how something works or looks
 (an engine, a cell, a planet), answer ON the board, not in plain text: the user hears each say line and watches its marks drawn.
-Reply with only this, no tools, starting at once:
+When the answer is an explanation (not an action on the Mac), reply with only this, starting at once (no tools unless facts need a search first):
 [board <layout>: <short title>]
 say <one or two natural spoken sentences in the user's language; no lists, no Markdown>
 <1-3 marks, drawn while that line is spoken>
@@ -234,7 +234,8 @@ Marks: item <title, ≤6 words> | <few words of detail>   (a step, branch, event
   note <short aside>   check <short line with a tick>   formula <math or one key line>   circle <item number> (emphasis)
   part <name> | box|sphere|cylinder|cone|torus | x,y,z | width,height,depth | <color> [| rx,ry,rz degrees]
     (3d: y is up; centre the object near 0,0,0; sizes about 0.2-4; colors: red, orange, yellow, green, teal, blue, purple, pink, brown, gray, black, white, silver, gold or #rrggbb; a cylinder or cone stands on y)
-Say lines carry the explanation; marks are short labels. If Context shows a board on screen and this continues it, start with [board+] instead."""
+Say lines carry the explanation; marks are short labels. If Context shows a board on screen and this continues it, start with [board+] instead.
+Pointing at or marking things in the user's own apps stays with the screen drawing (--draw)."""
 
 
 # Asks that may want the live board, in English and Turkish: they get its format with the request (kept out of SYSTEM)

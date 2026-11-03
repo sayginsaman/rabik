@@ -678,7 +678,7 @@ focusNudge.start()
 let meetingBriefs = MeetingBriefs()   // Settings → Meeting briefs
 meetingBriefs.start()
 let wakeWord = WakeWord()   // Settings → "Hey Rabik"
-wakeWord.canListen = { !app.engine.isRunning && !app.busy && !app.dictating && !app.speaker.speaking && !meeting.running }
+wakeWord.canListen = { !app.engine.isRunning && !app.busy && !app.dictating && !app.speaker.speaking && !meeting.running && callAppsOnMic().isEmpty }   // never in a call
 wakeWord.onWake = {   // as if the mic button was clicked: the ask ends after a pause
     guard !app.engine.isRunning, !app.busy else { return }
     app.clickTalk = true; app.start(); if !app.engine.isRunning { app.clickTalk = false }

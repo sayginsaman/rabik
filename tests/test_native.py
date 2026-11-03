@@ -550,6 +550,7 @@ final class Harness {
     func js(_ f: String, _ text: Any? = nil) { if f == "agentEscape" || f == "locked" { events.append(f) } }
     func hide(after: Double) {}
     var pausedNotice = Date.distantPast; func show() {}
+    final class BoardStub { var visible = false; func close() {} }; let board = BoardStub()   // the live board: hidden here
 """ + methods + stop + '        events.append("send"); engine.isRunning = false; busy = true; toggleTalk = false\n    }\n' + """}
 meeting.running = true
 let meetingShortcut = Harness(); meetingShortcut.shortcut(true); meetingShortcut.shortcut(false)

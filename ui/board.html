@@ -501,6 +501,7 @@ function makeThree(canvas) {
   function resize() {
     const r = canvas.getBoundingClientRect(), d = devicePixelRatio || 1
     W = Math.max(1, Math.round(r.width * d)); H = Math.max(1, Math.round(r.height * d)); canvas.width = W; canvas.height = H
+    if (pickFB) { gl.deleteFramebuffer(pickFB); gl.deleteTexture(pickTex); gl.deleteRenderbuffer(pickRB) }   // a resize replaces them
     pickFB = gl.createFramebuffer(); pickTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, pickTex)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
     pickRB = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, pickRB); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, W, H)
@@ -575,12 +576,13 @@ function makeThree(canvas) {
     p_target = lo.map((l, k) => (l + hi[k]) / 2)
     fitDist = Math.max(2.5, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 1.15)
     // a shell: a part with another, clearly thinner one inside it (an engine block around its piston, not a crankshaft and its pin)
-    const inside = (a, b) => b !== a && b.target > 0 && Math.min(...a.m.ev.size) > 1.6 * Math.min(...b.m.ev.size) && [0, 1, 2].every(k => a.box[0][k] < b.m.ev.at[k] && b.m.ev.at[k] < a.box[1][k])
+    const inside = (a, b) => b !== a && a.box && a.target > 0 && b.target > 0 && Math.min(...a.m.ev.size) > 1.6 * Math.min(...b.m.ev.size) && [0, 1, 2].every(k => a.box[0][k] < b.m.ev.at[k] && b.m.ev.at[k] < a.box[1][k])
     parts.forEach(a => { a.shell = parts.some(b => inside(a, b)) })
   }
   let p_target = [0, 0, 0], last = performance.now()
   function frame(now) {
     const dt = Math.min(.05, (now - last) / 1000); last = now
+    if (!canvas.classList.contains('on')) { requestAnimationFrame(frame); return }   // a 2D board: the 3D view rests
     let moving = false
     for (const p of parts) {
       if (p.scale !== p.target) {

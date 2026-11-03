@@ -86,7 +86,9 @@ final class MeetingBriefs {
             DispatchQueue.global().async {
                 guard let data = try? JSONSerialization.data(withJSONObject: event) else { return }
                 let p = py(["--brief"]), out = Pipe(), inp = Pipe(); p.standardOutput = out; p.standardInput = inp; p.standardError = FileHandle.nullDevice
-                try? p.run(); try? inp.fileHandleForWriting.write(contentsOf: data); try? inp.fileHandleForWriting.close()
+                fcntl(inp.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)   // a helper that dies early must not take Rabik with it
+                do { try p.run() } catch { return }
+                try? inp.fileHandleForWriting.write(contentsOf: data); try? inp.fileHandleForWriting.close()
                 let reply = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
                 guard let brief = (try? JSONSerialization.jsonObject(with: reply)) as? [String: Any], let text = brief["text"] as? String, !text.isEmpty else { return }
                 let title = brief["title"] as? String ?? "Meeting"

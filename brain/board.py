@@ -73,7 +73,7 @@ class BoardStream:
 
     def reset(self, emit=None):
         if emit is not None: self.emit = emit
-        self.state, self.used, self.spoken, self.counts, self.events, self.columns = None, 0, [], {}, [], set()   # state: None (unknown), 'board', 'no', 'done'
+        self.state, self.used, self.spoken, self.counts, self.events, self.columns, self.prose = None, 0, [], {}, [], set(), []   # state: None (unknown), 'board', 'no', 'done'
 
     def _send(self, event):
         kind = 'say' if event['op'] == 'say' else 'column' if event['op'] == 'column' else 'mark'
@@ -112,6 +112,7 @@ class BoardStream:
                 self.state = 'done'; self._send({'op': 'end'}); return True
             event = board_line(line)
             if event: self._send(event)
+            elif line.strip(): self.prose.append(line.strip())   # not a command: kept in case nothing is said
         if final and self.state == 'board': self.state = 'done'; self._send({'op': 'end'})
         return True
 
@@ -131,7 +132,8 @@ def board_reply(reply):
     if not re.match(r'\s*\[board', reply or '', re.I): return reply
     stream = board_stream if board_stream.state in ('board', 'done') else BoardStream(emit=environ.in_box() and prefs.pref('board', True))
     stream.feed(reply, final=True)
-    return ' '.join(stream.spoken) or 'It’s on the board.'
+    if stream.state == 'no': return reply   # "[Board of directors] meet…": not a board after all
+    return ' '.join(stream.spoken) or ' '.join(stream.prose) or 'It’s on the board.'
 
 
 def board_context(board):

@@ -117,6 +117,9 @@ class BoardStreamTests(unittest.TestCase):
             self.assertEqual(brain.board.board_reply(PLAN), 'Birincisi, kime sattığını netleştir. Sonra kazanabileceğin iki kanal seç.')
             self.assertEqual(brain.board.board_reply('Just text.'), 'Just text.')
             self.assertEqual(brain.board.board_reply('[board flow: X]\nitem Only marks'), 'It’s on the board.')
+            for text in ('[Board of directors] usually meet quarterly.', '[board flow: Plan] say Hello.\nMore.'):
+                self.assertEqual(brain.board.board_reply(text), text)   # not a board after all: the answer stays whole
+            self.assertEqual(brain.board.board_reply('[board flow: Plan]\nThe plan is simple.\nitem One'), 'The plan is simple.')   # prose, no say lines
         self.assertEqual(brain.board.board_spoken(PLAN), 'Birincisi, kime sattığını netleştir. Sonra kazanabileceğin iki kanal seç.')
 
     def test_a_column_named_again_is_the_same_column(self):
@@ -208,7 +211,10 @@ board.open({layout: 'chart', title: 'Revenue'}); [{op:'bar',text:'Q1',value:40},
 out.chart = [board.marks().length, document.querySelectorAll('.conn').length, document.getElementById('title').textContent];
 board.open({layout: '3d', title: 'Engine'}); board.add({op:'say',text:'Parts.'});
 board.add({op:'part',text:'Piston',shape:'cylinder',at:[0,0,0],size:[1,1,1],color:'silver',rot:[0,0,0]}); board.add({op:'item',text:'ignored in 3d'});
-board.play(1, .2); await tick(300);
+board.add({op:'say',text:'Around it.'}); board.add({op:'part',text:'Block',shape:'box',at:[0,0,0],size:[3,3,3],color:'gray',rot:[0,0,0]});
+board.add({op:'note',text:'Four strokes'});
+board.play(1, .2); await tick(300); board.flush(); await tick(50);   // a shell spoken about after what it holds: flushing builds it all
+out.threeAll = board.marks().every(m => m.drawn);
 out.three = [board.summary(), document.getElementById('three').classList.contains('on'), getComputedStyle(document.getElementById('ink')).display];
 board.end(); await tick(50);
 out.hint = document.getElementById('hint').classList.contains('on');
@@ -240,7 +246,8 @@ class BoardPageTests(unittest.TestCase):
         self.assertEqual(out['appended'], 7)   # [board+] keeps what was drawn
         self.assertEqual(out['compare'], 2)   # "column renting" again is the first column, not a third
         self.assertEqual(out['chart'], [2, 1, 'Revenue'])   # two bars and their axis
-        self.assertEqual(out['three'][0], {'layout': '3d', 'title': 'Engine', 'items': ['Piston']})
+        self.assertEqual(out['three'][0], {'layout': '3d', 'title': 'Engine', 'items': ['Piston', 'Block']})
+        self.assertTrue(out['threeAll'])
         self.assertTrue(out['three'][1]); self.assertEqual(out['three'][2], 'none')
         self.assertTrue(out['hint'])
         posts = [p.get('do') for p in got['posts'] if isinstance(p, dict)]
@@ -258,8 +265,10 @@ class BoardNativeTests(unittest.TestCase):
         self.assertIn('board.onAsk = { [weak self] question in self?.typed(question) }', app)
         self.assertIn('if was { board.flush() }', app)   # speech stopped: the drawing finishes
         self.assertIn('func say(_ sentences: [String], voice: AVSpeechSynthesisVoice?, started: ((Double) -> Void)? = nil)', speaker)
-        self.assertIn('if let next = queued.first { next.started?(next.seconds) }', speaker)
-        self.assertIn('guard let buffer, let player else { started?(Speaker.readingTime(sentence)); finished(g); return }', speaker)
+        self.assertIn('if generation == g, let next = queued.first { next.started?(next.seconds) }', speaker)
+        self.assertIn('else { queued.append((started, -Speaker.readingTime(sentence))) }', speaker)   # a line with no voice keeps its place
+        self.assertIn('guard speaking else { return }   // no audio engine', speaker)
+        self.assertIn('return speaker.speaking   // the audio engine could not start', app)
         self.assertIn('if speak?(text, start) != true {', board)   # voice off: reading pace
         self.assertIn('loadPage(v, "board.html")', board)
         self.assertIn('final class BoardPanel: NSPanel { override var canBecomeKey: Bool { false } }', board)

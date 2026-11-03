@@ -9,8 +9,8 @@ import WebKit
 final class Board: NSObject, WKScriptMessageHandler {
     private(set) var panel: NSPanel?
     private var web: WKWebView?
-    private var ready = false, waiting: [(String, [Any])] = []
-    private var generation = 0, segment = 0, paceUntil = Date.distantPast
+    private var ready = false, waiting: [(String, [Any])] = [], summaryWanted = false
+    private var generation = 0, segment = 0, paceUntil = Date.distantPast, quiet = false   // quiet: the voice was stopped, the rest goes at reading pace
     private(set) var summary: [String: Any]?
     var speak: ((String, @escaping (Double) -> Void) -> Bool)?   // App: speak one line, call back when it starts (seconds long); false: not speaking
     var onAsk: ((String) -> Void)?
@@ -21,16 +21,17 @@ final class Board: NSObject, WKScriptMessageHandler {
               let op = event["op"] as? String else { return }
         switch op {
         case "open":
-            if event["append"] as? Bool != true || !visible { generation += 1; summary = nil }
-            segment = 0; paceUntil = .distantPast
+            var event = event
+            if event["append"] as? Bool != true || !visible { summary = nil; event["append"] = false }   // [board+] adds only to a board still on screen
+            generation += 1; segment = 0; paceUntil = .distantPast; quiet = false   // an earlier answer's paced lines never play into this one
             show(); js("board.open", [event])
         case "say":
-            guard panel != nil else { return }
+            guard visible else { return }   // closed with ✕: the rest of this answer neither draws nor speaks
             segment += 1
             let n = segment, g = generation, text = event["text"] as? String ?? ""
             js("board.add", [event])
             let start = { [weak self] (seconds: Double) in guard let self, g == generation else { return }; js("board.play", [n, seconds]) }
-            if speak?(text, start) != true {   // voice off: one line after another at reading pace
+            if quiet || speak?(text, start) != true {   // voice off or stopped: one line after another at reading pace
                 let seconds = Speaker.readingTime(text), at = max(Date(), paceUntil)
                 paceUntil = at.addingTimeInterval(seconds)
                 DispatchQueue.main.asyncAfter(deadline: .now() + at.timeIntervalSinceNow) { start(seconds) }
@@ -40,13 +41,13 @@ final class Board: NSObject, WKScriptMessageHandler {
         case "drop":
             close()
         default:
-            guard panel != nil else { return }
+            guard visible else { return }
             js("board.add", [event])
         }
     }
 
     // Speech stopped (the user talked or pressed the shortcut): draw what is left now.
-    func flush() { if visible { js("board.flush", []) } }
+    func flush() { if visible { quiet = true; js("board.flush", []) } }
 
     func close() {
         generation += 1; summary = nil
@@ -54,6 +55,7 @@ final class Board: NSObject, WKScriptMessageHandler {
     }
 
     private func refreshSummary() {
+        guard ready else { summaryWanted = true; return }   // the page is still loading: asked again once it is ready
         let g = generation
         web?.evaluateJavaScript("board.summary()") { [weak self] value, _ in
             guard let self, g == generation else { return }; summary = value as? [String: Any]
@@ -99,6 +101,7 @@ final class Board: NSObject, WKScriptMessageHandler {
         switch action {
         case "ready":
             ready = true; let calls = waiting; waiting = []; calls.forEach { callJS(web, $0.0, $0.1) }
+            if summaryWanted { summaryWanted = false; refreshSummary() }
         case "close": close()
         case "save": save(b["title"] as? String ?? "")
         case "ask":

@@ -501,7 +501,7 @@ print("visible ok")
         self.assertIn('if web.navigationDelegate == nil { web.navigationDelegate = LocalPageOnly.shared }', self.swift)
         self.assertIn('decisionHandler(LocalPageOnly.allows(a) ? .allow : .cancel)', self.swift)   # Settings is its own delegate
         handlers = self.swift.split('func userContentController(')[1:]
-        self.assertEqual(len(handlers), 5)
+        self.assertEqual(len(handlers), 6)   # the box, Settings, meetings, agents, onboarding and the live board
         for handler in handlers:
             self.assertIn('frameInfo.isMainFrame', handler.split('\n')[0] + handler.split('\n')[1])
 

@@ -48,6 +48,7 @@ final class Speaker {
     func say(_ sentences: [String], voice: AVSpeechSynthesisVoice?, started: ((Double) -> Void)? = nil) {
         guard !sentences.isEmpty else { return }
         if !speaking { begin() }
+        guard speaking else { return }   // no audio engine: nothing will play (callers see speaking == false)
         let g = generation
         for sentence in sentences {
             pending += 1
@@ -56,7 +57,11 @@ final class Speaker {
                 let buffer = self.render(sentence, voice)
                 DispatchQueue.main.async { [weak self] in
                     guard let self, generation == g else { return }
-                    guard let buffer, let player else { started?(Speaker.readingTime(sentence)); finished(g); return }
+                    guard let buffer, let player else {   // no voice for this one: its turn comes in order, at once
+                        if queued.isEmpty { started?(Speaker.readingTime(sentence)); finished(g) }
+                        else { queued.append((started, -Speaker.readingTime(sentence))) }
+                        return
+                    }
                     queued.append((started, Double(buffer.frameLength) / Speaker.format.sampleRate))
                     player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in DispatchQueue.main.async { self?.played(g) } }
                     if queued.count == 1 { queued[0].started?(queued[0].seconds) }   // nothing ahead of it: it plays now
@@ -71,8 +76,11 @@ final class Speaker {
     private func played(_ g: Int) {
         guard g == generation else { return }
         if !queued.isEmpty { queued.removeFirst() }
-        if let next = queued.first { next.started?(next.seconds) }
         finished(g)
+        while let next = queued.first, next.seconds < 0, generation == g {   // sentences that could not be rendered: their turn, then gone
+            queued.removeFirst(); next.started?(-next.seconds); finished(g)
+        }
+        if generation == g, let next = queued.first { next.started?(next.seconds) }
     }
 
     func stop() {

@@ -165,7 +165,7 @@ final class App: NSObject, WKScriptMessageHandler {
         guard Prefs.bool("speak") else { return false }
         if sayVoice == nil { siriVoice(); sayVoice = Speaker.voice(for: Speaker.language(of: text)) }
         speaker.say([spoken(text)], voice: sayVoice, started: started)
-        return true
+        return speaker.speaking   // the audio engine could not start: the board keeps reading pace instead
     }
     func deliver(_ a: String, aloud: Bool = true) {   // Settings: read answers aloud, copy them
         if Prefs.bool("autoCopy") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(a, forType: .string) }
@@ -1551,7 +1551,8 @@ final class App: NSObject, WKScriptMessageHandler {
                     if line == "! improve" { self.js("improve"); continue }   // the one-time "help make Rabik better?" card
                     if line.hasPrefix("▣ "), let value = try? JSONSerialization.jsonObject(with:Data(line.dropFirst(2).utf8)) as? [String:Any] { if Prefs.d["miniScreen"] as? Bool ?? true { self.mini.receive(value) }; continue }
                     if line.hasPrefix("◫ ") {   // the live board: drawn as its lines are spoken
-                        if !boarded { boarded = true; self.shush(); self.sayVoice = nil }
+                        if line.contains(#""op": "drop""#) { boarded = false }   // cut off by a tool call: the answer after it speaks as usual
+                        else if !boarded { boarded = true; self.shush(); self.sayVoice = nil }
                         self.board.receive(String(line.dropFirst(2))); continue
                     }
                     if line.hasPrefix("✎ ") {
