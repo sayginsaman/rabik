@@ -473,6 +473,9 @@ final class App: NSObject, WKScriptMessageHandler {
                 dailyRecap.add(source, keys) { [weak self] in self?.js("recapAdded", $0) }
             }
             if b["recapLater"] != nil { pinned = false; hide(after: 1) }
+            if let f = b["recapFact"] as? [String: Any], let day = f["day"] as? String, let id = f["id"] as? String {   // Learned about you: keep or forget
+                dailyRecap.brain(["fact", day, id, f["keep"] as? Bool == true ? "keep" : "forget"]) { [weak self] in self?.js("recapFacts", $0.isEmpty ? ["error": "Could not save that. Try again."] : $0) }
+            }
             if let id = b["agentOpen"] as? String {
                 if let target = b["target"] as? String { agentsUI.open(id,target:target) }
                 else { agentsUI.openView(id) }   // the done card's Return action opens the report; its artifact buttons open artifacts

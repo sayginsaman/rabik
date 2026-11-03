@@ -405,6 +405,12 @@
   .recap-card .todo small { display:block; margin-top:1px; color:var(--fg2); font-size:11px; }
   .recap-card .todo.added { cursor:default; opacity:.6; } .recap-card .todo.added > i { background:#30d158; }
   .recap-card .note { margin:8px 0 0; font-size:12px; line-height:1.4; color:var(--fg2); }
+  .recap-card .learned { display:grid; gap:2px; margin:2px 0 0; }
+  .recap-card .fact { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:13px; line-height:1.4; }
+  .recap-card .fact > span { flex:1; min-width:0; } .recap-card .fact small { display:block; color:var(--fg2); font-size:11px; }
+  .recap-card .fact button { flex:none; height:24px; padding:0 9px; border-radius:12px; font-size:11.5px; }
+  .recap-card .fact .forget { color:#ff6961; }
+  .recap-card .fact.kept .t::after { content:" ✓"; color:#30d158; }
   .agent-card { max-height:900px; }   /* not none: a card folding away (.gone) can only animate from a length */
   .agent-card .a { display:block; margin-top:8px; max-height:min(260px, calc(var(--screen-height, 10000px) - 300px)); overflow-y:auto; font-size:13.5px; line-height:1.55; cursor:default; }
   .agent-card .a::-webkit-scrollbar { width:0; } .agent-card .a.more { -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
@@ -789,6 +795,17 @@
       if(a.added){b.disabled=true;b.setAttribute('aria-disabled','true');}else b.onclick=e=>{e.stopPropagation();b.setAttribute('aria-checked',b.getAttribute('aria-checked')==='true'?'false':'true');recapCount(d);};
       box.append(b);}
     recapCount(d);};
+  // What Rabik learned about the user that day: each fact can be kept (ticked) or forgotten (gone from About you) right here.
+  const recapFacts=(d,r)=>{const box=d.querySelector('.learned');if(!box)return;box.textContent='';
+    for(const f of r.learned||[]){const row=document.createElement('div');row.className='fact'+(f.kept?' kept':'');row.dataset.id=f.id;
+      row.innerHTML='<span><span class="t"></span><small></small></span><button class="keep" title="Keep it">Keep</button><button class="forget" title="Forget it">Forget</button>';
+      row.querySelector('.t').textContent=f.text;row.querySelector('small').textContent=f.category||'';
+      const send=keep=>e=>{e.stopPropagation();row.querySelectorAll('button').forEach(b=>b.disabled=true);post({recapFact:{day:r.day,id:f.id,keep}});};
+      row.querySelector('.keep').onclick=send(true);row.querySelector('.forget').onclick=send(false);
+      if(f.kept)row.querySelector('.keep').remove();
+      box.append(row);}
+    if(!box.children.length){box.previousElementSibling?.remove();box.remove();}
+    fit();};
   const recapCard=r=>{
     $('thread').querySelectorAll('.recap-card').forEach(e=>e.remove());
     const d=document.createElement('div');d.className='ok offer agent-card done recap-card';d.dataset.day=r.day;
@@ -800,7 +817,9 @@
       for(const t of rows){const li=document.createElement('li');li.textContent=t;ul.append(li);}body.append(h,ul);};
     list('Today',r.highlights);list('Decisions',r.decisions);
     if(r.actions?.length){const h=document.createElement('h4');h.textContent='To do';const box=document.createElement('div');box.className='todos';body.append(h,box);}
-    list('Goals',(r.goals||[]).map(g=>g.goal+' — '+g.note));list('Most time on',r.focus||[]);list('Tomorrow',r.tomorrow);
+    list('Goals',(r.goals||[]).map(g=>g.goal+' — '+g.note));
+    if(r.learned?.length){const h=document.createElement('h4');h.textContent='Learned about you';const box=document.createElement('div');box.className='learned';body.append(h,box);recapFacts(d,r);}
+    list('Most time on',r.focus||[]);list('Tomorrow',r.tomorrow);
     if(r.note){const n=document.createElement('p');n.className='note';n.textContent=r.note;body.append(n);}
     const actions=d.querySelector('.agent-actions');
     const later=keyButton('Later','esc');later.dataset.esc='';later.onclick=()=>{d.remove();post({recapLater:true});fit();};actions.append(later);
@@ -833,6 +852,8 @@
     },
     agentDone(row){agentCard(row);},
     recap(r){recapCard(r);},
+    recapFacts(res){const d=$('thread').querySelector('.recap-card');if(!d)return;if(res.error){status(res.error);d.querySelectorAll('.fact button').forEach(b=>b.disabled=false);return;}
+      recapFacts(d,res);status('Saved');},
     connectorOffer(o){   // an app whose Claude connector isn't connected came to the front: offer it once
       $('thread').querySelectorAll('.connector-card').forEach(e=>e.remove());
       const d=document.createElement('div');d.className='ok offer agent-card done connector-card';
