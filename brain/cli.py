@@ -13,7 +13,7 @@ import threading
 import time
 from pathlib import Path
 from brain import (
-    activity, agents, apps, ask, calendar, clients, dictation, drawing, environ, goals, hands, instant, interaction, macos, meeting, memory,
+    activity, agents, apps, ask, board, calendar, clients, dictation, drawing, environ, goals, hands, instant, interaction, macos, meeting, memory,
     mcp, paths, people, policy, prefs, prompts, protocol, recap, routine, screen, situation, skills, sources, spotify, storage, support, telemetry, tips,
     toolhelp, turn, watcher, web, windows, wording)
 
@@ -35,6 +35,8 @@ def main():
     if len(args) == 5 and args[:3] == ['--telemetry', 'error', 'worker_exit']:
         return telemetry.report_error('worker_exit', worker=args[3] if args[3] in ('python', 'claude', 'devin', 'pi') else 'python',
                             exit=int(args[4]) if args[4].lstrip('-').isdigit() else -1)
+    if args == ['--board', '--help']:
+        return print(prompts.BOARD_HELP)
     if args == ['--draw', '--help']:
         return print(prompts.DRAW_HELP if prefs.pref('draw', True) else 'Screen drawings are off')
     if args[:1] == ['--draw']:
@@ -390,13 +392,14 @@ def main():
         reading_started = True
     displays = threading.Thread(target=lambda: displays.screens.extend(macos.screens()), daemon=True)   # key-down too: off the path to the model
     displays.screens = []; displays.start()
-    remaining, done, marks, drawn, card = None, [], None, None, ''
+    remaining, done, marks, drawn, card, on_board = None, [], None, None, '', None
     if args == ['--wait']:   # "<app the user is in now>\t<request>", even if Claude could not start
         line = sys.stdin.readline().strip()
         if line.startswith('{'):
             request = json.loads(line)
             front_now, task = request['front'], request['task']
             remaining, done, marks, drawn = request.get('remaining'), request.get('done', []), request.get('point'), request.get('drawing')
+            on_board = request.get('board')
             card = str(request.get('agentCard') or '')
         else: front_now, _, task = line.rpartition('\t')
         environ.set_front_app(front_now or environ.front_app(''))
@@ -466,7 +469,7 @@ def main():
         ctx += f' Last task worked in: {w["app"]} "{w.get("window") or "?"}".'
     if environ.caret() and prefs.pref('selection', True):
         ctx += ' The user\'s text cursor is in the front app. If the request asks for new text for that cursor, return [draft] + the text.'   # an earlier draft goes in with [insert] (system prompt)
-    help_ = toolhelp.tool_help(task, cached_only=True) + prompts.schedule_help(task)   # routine and watch usage, only when it sounds like that
+    help_ = toolhelp.tool_help(task, cached_only=True) + prompts.schedule_help(task) + prompts.board_help(task, on_board) + board.board_context(on_board)   # routine and watch usage, only when it sounds like that
     threading.Thread(target=toolhelp.tool_help, args=(task,), daemon=True).start()   # cold help is ready for the next turn
     selected = situation.selection_context()
     mem = memory.relevant_rules(task)
@@ -565,6 +568,7 @@ def main():
         skills.unlearn(failed_shortcut['key'])
     replacement, reply = situation.replacement_reply(reply, bool(selected))
     if not replacement:
+        reply = board.board_reply(reply)   # a live board: its last lines go to the app, the answer is what was said
         reply = drawing.point(re.sub(r'\s*\n\s*Sources?:.*\Z', '', reply, flags=re.S | re.I))
     taught = None if replacement else re.search(r'\[tip ([^\]]+)\]', reply)
     reply = (reply[:taught.start()] + reply[taught.end():]).strip() if taught else reply

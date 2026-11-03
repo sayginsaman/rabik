@@ -290,7 +290,7 @@ class DrawingTests(unittest.TestCase):
         app = source.split('final class App: NSObject, WKScriptMessageHandler {',1)[1]
         self.assertIn('drawing.autoSteps = { Prefs.str("guideSteps") != "next" }',app)
         self.assertIn('(guided ? finish : result)',app)
-        self.assertIn('deliver(guided ? finish : result, aloud: !guided)',app)   # a follow-up answer beside an old drawing still speaks
+        self.assertIn('deliver(guided ? finish : result, aloud: !guided && !boarded)',app)   # a follow-up answer beside an old drawing still speaks
         self.assertIn('guard !marks.isNull else { clear(); return }',drawing)
         self.assertIn('guard screen.intersects(global) else { return }',source)
         self.assertNotIn('drawing.advance()',app)   # a spoken or typed "next" takes over like the Next button

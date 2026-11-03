@@ -14,6 +14,7 @@ final class Speaker {
     private(set) var speaking = false
     private var engine: AVAudioEngine?, player: AVAudioPlayerNode?
     private var generation = 0, pending = 0, loudSince: Date?, startedAt = Date.distantPast
+    private var queued: [(started: ((Double) -> Void)?, seconds: Double)] = []   // scheduled sentences not yet played to the end, in order
     private let render = DispatchQueue(label: "rabik.speaker")
     private let synth = AVSpeechSynthesizer()
 
@@ -42,7 +43,9 @@ final class Speaker {
         return tokenizer.tokens(for: text.startIndex..<text.endIndex).map { text[$0].trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
     }
 
-    func say(_ sentences: [String], voice: AVSpeechSynthesisVoice?) {
+    // started: each sentence as it starts to play, with how long it lasts (the live board draws its marks across it). A sentence
+    // that could not be rendered still calls it, with a reading-pace guess, so a drawing never waits on a voice that won't come.
+    func say(_ sentences: [String], voice: AVSpeechSynthesisVoice?, started: ((Double) -> Void)? = nil) {
         guard !sentences.isEmpty else { return }
         if !speaking { begin() }
         let g = generation
@@ -53,17 +56,28 @@ final class Speaker {
                 let buffer = self.render(sentence, voice)
                 DispatchQueue.main.async { [weak self] in
                     guard let self, generation == g else { return }
-                    guard let buffer, let player else { finished(g); return }
-                    player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in DispatchQueue.main.async { self?.finished(g) } }
+                    guard let buffer, let player else { started?(Speaker.readingTime(sentence)); finished(g); return }
+                    queued.append((started, Double(buffer.frameLength) / Speaker.format.sampleRate))
+                    player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in DispatchQueue.main.async { self?.played(g) } }
+                    if queued.count == 1 { queued[0].started?(queued[0].seconds) }   // nothing ahead of it: it plays now
                     if !player.isPlaying { player.play() }
                 }
             }
         }
     }
 
+    static func readingTime(_ text: String) -> Double { max(1.2, Double(text.split(separator: " ").count) * 0.33) }
+
+    private func played(_ g: Int) {
+        guard g == generation else { return }
+        if !queued.isEmpty { queued.removeFirst() }
+        if let next = queued.first { next.started?(next.seconds) }
+        finished(g)
+    }
+
     func stop() {
         guard speaking else { return }
-        generation += 1; pending = 0; speaking = false; loudSince = nil
+        generation += 1; pending = 0; speaking = false; loudSince = nil; queued = []
         player?.stop(); engine?.inputNode.removeTap(onBus: 0); engine?.stop(); engine = nil; player = nil
     }
 

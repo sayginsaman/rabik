@@ -47,7 +47,7 @@ import brain
 # so brain code reading that name sees the same patch. Unit tests patch the owner itself (patch.object(brain.prefs, ...)).
 _MODULES = [import_module('brain.' + name) for name in (   # dependencies first
     'environ', 'paths', 'wording', 'protocol', 'labels', 'storage', 'sources', 'toolhelp', 'prefs', 'memory', 'situation', 'telemetry',
-    'prompts', 'routine', 'support', 'turn', 'messages', 'macos', 'apps', 'watcher', 'interaction', 'windows', 'policy',
+    'prompts', 'board', 'routine', 'support', 'turn', 'messages', 'macos', 'apps', 'watcher', 'interaction', 'windows', 'policy',
     'calendar', 'clients', 'hands', 'meeting', 'web', 'drawing', 'dictation', 'spotify', 'skills', 'handoffs', 'screen',
     'agents', 'activity', 'people', 'goals', 'recap', 'mcp', 'ask', 'tips', 'instant', 'cli')]
 _OWNERS = {name: module for module in _MODULES for name in module.__all__}

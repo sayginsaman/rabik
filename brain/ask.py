@@ -11,7 +11,7 @@ import tempfile
 import threading
 import time
 from brain import (
-    agents, clients, environ, handoffs, interaction, labels, macos, messages, paths, policy, prefs, prompts, protocol,
+    agents, board, clients, environ, handoffs, interaction, labels, macos, messages, paths, policy, prefs, prompts, protocol,
     situation, storage, telemetry, turn, web)
 
 __all__ = ['RunResult', 'run', 'run_devin', 'run_pi']
@@ -105,6 +105,7 @@ def run(task, p=None, shots=(), auto_work=False, *, request=None, main_only=Fals
     reset_deadline()
     reply, managed_reply, cost, steps, cmds, last_failed, completed, result_error, ids, bad = '', '', 0, [], [], False, False, False, {}, set()
     action_indexes, evidence, redirected = [], False, set()
+    board.board_stream.reset(emit=environ.in_box())
     live, shown, drew = '', '', False   # the answer so far, as the box shows it ("… <text>"); the final reply always replaces it
     streams = environ.in_box() and prefs.pref('showAnswers', 'stream') != 'once'   # Settings › Show answers: All at once
     # a draft for the caret shows its mode only in the final answer, so a cursor ask never moves mid-way
@@ -124,10 +125,14 @@ def run(task, p=None, shots=(), auto_work=False, *, request=None, main_only=Fals
                 block, delta = (event.get(k) if isinstance(event.get(k), dict) else {} for k in ('content_block', 'delta'))
                 if event.get('type') == 'message_start' or block.get('type') == 'tool_use':   # a tool call: the text before it was a note
                     live = None if block.get('type') == 'tool_use' else ''
+                    if board.board_stream.state == 'board': protocol.say('◫', '{"op": "drop"}')   # a board cut off by a tool call
+                    if board.board_stream.state != 'done': board.board_stream.reset()
                     if shown: protocol.say('…', ''); shown = ''
                 elif delta.get('type') == 'text_delta' and isinstance(delta.get('text'), str) and live is not None:
                     live += delta['text']
                     commit = environ.commit()
+                    if not drew and (not commit or os.path.exists(commit)) and board.board_stream.feed(live):
+                        shown = ' '.join(board.board_stream.spoken); continue   # a board: its spoken lines are the box's text
                     text = handoffs.streamed_answer(live) if streams and not drew and (not commit or os.path.exists(commit)) else ''
                     if text != shown: protocol.say('…', text); shown = text
                 continue

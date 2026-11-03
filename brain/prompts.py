@@ -7,7 +7,8 @@ from brain.paths import (
     TYPE, WATCH, WEB, WINDOW)
 
 __all__ = ['SYSTEM', 'NEVER', 'ASK_FIRST', 'SANDBOX', 'LEARN_ME', 'WORKFLOW', 'TEACH', 'ASK_ME', 'POINTER', 'DRAW_HELP', 'DRAWING', 'MODEL_OFFER',
-           'AGENT_HANDOFF', 'AGENT_SYSTEM', 'MEETING_SYSTEM', 'DICTATE_SYSTEM', 'CALENDAR_HELP', 'ROUTINE_HELP', 'WATCH_HELP', 'SCHEDULE_WORDS', 'schedule_help', 'system_prompt']
+           'AGENT_HANDOFF', 'AGENT_SYSTEM', 'MEETING_SYSTEM', 'DICTATE_SYSTEM', 'CALENDAR_HELP', 'ROUTINE_HELP', 'WATCH_HELP', 'SCHEDULE_WORDS', 'schedule_help',
+           'BOARD_HELP', 'BOARD_WORDS', 'board_help', 'system_prompt']
 
 
 SYSTEM = f"""You are Rabik, a Mac helper in a small box. The user holds a hotkey, talks, then lets go.
@@ -36,6 +37,7 @@ Tools:
 - Spotify: {PLAY} "<name>" plays; {QUEUE} "<track>" queues.
 - Past asks: {HISTORY} "<words or date>". Past meetings: {shlex.quote(ME)} --meeting-history "<words or date>" (send a recap to Slack/email: hand off). Pages/files seen: --activity "<words or date>"; people met: --people "<name>".
 - Later or repeating work (once, daily, weekly days, every N min) and watches (also clicking a button whenever it shows): {ROUTINE} --help, {WATCH} --help.
+- Plans, steps, comparisons, numbers, how things work or look: answer on the live board, drawn as you speak ({shlex.quote(ME)} --board --help).
 Earlier supplies follow-ups. "this"/"here" = front window; "it" after a task = Last task window. Answer/draw from open content (video, page, doc) unless told not to.
 Memory: follow rules. Recall/forget X: --me find, then drop a fact or {FORGET} the exact rule. Save personal facts: {ABOUT} <category> "<kind>" "<exact words from now/Earlier>"; how-tos: {REMEMBER} "<rule>".
 Shortcuts: "when I say X, do Y" in any words: run and verify Y, then end with [shortcut X], X in the user's exact words. Rabik saves the verified actions and tells the user; never save it yourself (shortcut or rule) or say it is saved.
@@ -212,3 +214,34 @@ SCHEDULE_WORDS = re.compile(r"\b(every|each|daily|weekly|weekday|weekdays|weeken
 def schedule_help(task):
     """The routine and watch usage, attached to an ask that sounds like later, repeating or "whenever" work (kept out of SYSTEM)."""
     return f'Routine and watch tools:\n{ROUTINE_HELP}\n{WATCH_HELP}\n' if SCHEDULE_WORDS.search(task or '') else ''
+
+
+BOARD_HELP = f"""Live board: for a plan, steps, a process, a comparison, numbers, a timeline, ideas, or how something works or looks
+(an engine, a cell, a planet), answer ON the board, not in plain text: the user hears each say line and watches its marks drawn.
+Reply with only this, no tools, starting at once:
+[board <layout>: <short title>]
+say <one or two natural spoken sentences in the user's language; no lists, no Markdown>
+<1-3 marks, drawn while that line is spoken>
+… 3-7 say lines in all …
+[/board]
+Layouts: flow (ordered steps), cycle (a loop), mind (one idea, branches), compare (side by side), timeline, chart (numbers),
+3d (a physical object, machine, molecule or place, built from parts).
+Marks: item <title, ≤6 words> | <few words of detail>   (a step, branch, event or point; numbered in flow)
+  column <name> (compare: the items after it go in that column)   bar <label> = <number><unit> (chart)
+  note <short aside>   check <short line with a tick>   formula <math or one key line>   circle <item number> (emphasis)
+  part <name> | box|sphere|cylinder|cone|torus | x,y,z | width,height,depth | <color> [| rx,ry,rz degrees]
+    (3d: y is up; centre the object near 0,0,0; sizes about 0.2-4; colors: red, orange, yellow, green, teal, blue, purple, pink, brown, gray, black, white, silver, gold or #rrggbb; a cylinder or cone stands on y)
+Say lines carry the explanation; marks are short labels. If Context shows a board on screen and this continues it, start with [board+] instead."""
+
+
+# Asks that may want the live board, in English and Turkish: they get its format with the request (kept out of SYSTEM)
+BOARD_WORDS = re.compile(r"\b(plan|strateg|roadmap|steps?|process|how (do|does|did|to|it|they|would|can)|explain|teach|walk me|what is|what are|"
+                         r"why does|compare|versus|vs\.?|difference|pros and cons|timeline|history of|chart|graph|diagram|draw|visual|show me|"
+                         r"3d|three.d|model of|anatomy|structure|architecture|inside|breakdown|framework|outline|"
+                         r"strateji|yol harita|adım|süreç|nasıl|açıkla|anlat|öğret|nedir|neler|nelerdir|neden|karşılaştır|fark|artı|eksi|zaman çizelge|tarihçe|"
+                         r"grafik|diyagram|şema|çiz|göster|görsel|3 ?boyut|modeli|yapısı|mimari|içinde|özetle)", re.I)
+
+
+def board_help(task, on_board=None):
+    """The live board's format, attached to an ask that may want it (or follows one on screen)."""
+    return BOARD_HELP + '\n' if on_board or BOARD_WORDS.search(task or '') else ''

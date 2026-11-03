@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Rabik board</title>
+<!-- The live board (Board/Board.swift). Rabik.app calls window.board.* with the events brain/board.py checked; the page posts
+     {do: ready | close | save | ask | drag} to the "board" handler. Each `say` starts a segment; board.play(n, seconds) draws that
+     segment's marks across the seconds its sentence is spoken. Hand-drawn SVG for 2D layouts, a small WebGL renderer for 3d.
+     No network, no libraries: fonts are the Mac's own (Noteworthy, Chalkboard SE). -->
+<style>
+:root{--paper:#fbf8f1;--ink:#2b2a27;--ink2:#6b6458;--line:rgba(60,45,25,.12);--ease:cubic-bezier(.2,.8,.2,1)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:transparent;-webkit-font-smoothing:antialiased;-webkit-user-select:none;user-select:none;cursor:default}
+#card{position:absolute;inset:0;border-radius:18px;background:var(--paper);overflow:hidden;display:flex;flex-direction:column;
+  background-image:radial-gradient(rgba(60,45,25,.10) 1px,transparent 1.2px);background-size:22px 22px;background-position:11px 11px}
+header{flex:none;display:flex;align-items:center;gap:10px;height:46px;padding:0 10px 0 18px;cursor:grab}
+#title{flex:1;min-width:0;font:600 19px/1.1 "Noteworthy","Chalkboard SE","Bradley Hand",cursive;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.2px}
+header button{width:30px;height:30px;border:0;border-radius:9px;background:none;color:var(--ink2);display:grid;place-items:center;padding:0;cursor:pointer;transition:background .15s,color .15s}
+header button:hover,header button.hot{background:rgba(60,45,25,.08);color:var(--ink)}
+header button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#saved{font:12px -apple-system,system-ui,sans-serif;color:#2f9e44;opacity:0;transition:opacity .3s}
+#saved.on{opacity:1}
+#stage{position:relative;flex:1;min-height:0}
+svg#ink{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+#ink .hand{font-family:"Noteworthy","Chalkboard SE","Bradley Hand",cursive;fill:var(--ink)}
+#ink .t{font-size:21px;font-weight:700}
+#ink .d{font-size:15px;fill:var(--ink2)}
+#ink .big{font-size:30px;font-weight:700}
+#ink .num{font-size:17px;font-weight:700;fill:#fff;text-anchor:middle;dominant-baseline:central}
+#ink path:not(.wash){fill:none}
+#ink path{stroke-linecap:round;stroke-linejoin:round}
+#ink .wash{stroke:none;opacity:0;transition:opacity .7s var(--ease)}
+#ink .wash.on{opacity:1}
+#ink .mark{transition:transform .65s var(--ease)}
+#ink .pending{visibility:hidden}
+canvas#three{position:absolute;inset:0;width:100%;height:100%;display:none;cursor:grab}
+canvas#three.on{display:block}
+canvas#three.drag{cursor:grabbing}
+canvas#three.pick{cursor:pointer}
+#labels{position:absolute;inset:0;pointer-events:none}
+#labels div{position:absolute;transform:translate(-50%,-100%);font:700 15px/1.1 "Noteworthy","Chalkboard SE",cursive;color:var(--ink);white-space:nowrap;
+  padding:2px 7px;border-radius:7px;background:rgba(251,248,241,.82);opacity:0;transition:opacity .4s}
+#labels div.on{opacity:1}
+#labels div.hot{background:#ffe8a3}
+#hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;font:12px -apple-system,system-ui,sans-serif;color:var(--ink2);opacity:0;transition:opacity .4s;pointer-events:none}
+#hint.on{opacity:.8}
+</style></head>
+<body>
+<div id="card">
+  <header id="bar">
+    <div id="title"></div>
+    <span id="saved">Saved to Downloads</span>
+    <button id="save" title="Save as image" aria-label="Save as image"><svg viewBox="0 0 16 16"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg></button>
+    <button id="close" title="Close" aria-label="Close board"><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+  </header>
+  <div id="stage">
+    <svg id="ink" xmlns="http://www.w3.org/2000/svg"><g id="world"></g></svg>
+    <canvas id="three"></canvas>
+    <div id="labels"></div>
+    <div id="hint">Drag to turn · click a part to ask about it</div>
+  </div>
+</div>
+<script>
+'use strict'
+const post = m => { try { webkit.messageHandlers.board.postMessage(m) } catch (e) {} }
+const $ = id => document.getElementById(id)
+const NS = 'http://www.w3.org/2000/svg'
+const PALETTE = ['#e8590c', '#1971c2', '#2f9e44', '#c2255c', '#7048e8', '#0c8599', '#e67700']
+const NAMED = {red: '#e03131', orange: '#f76707', yellow: '#fcc419', green: '#37b24d', teal: '#12b886', blue: '#1c7ed6', purple: '#7048e8',
+  pink: '#e64980', brown: '#8d5b3a', gray: '#868e96', black: '#343a40', white: '#f1f3f5', silver: '#c0c6cc', gold: '#e0a800'}
+
+// ---------- hand-drawn strokes: seeded jitter, two passes, like a pen that went over its line again ----------
+function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296) }
+function jitterLine(x1, y1, x2, y2, r, wobble) {
+  const len = Math.hypot(x2 - x1, y2 - y1), w = Math.min(wobble, len / 12), o = () => (r() - .5) * w * 2
+  const mx = x1 + (x2 - x1) * (.45 + r() * .1) + o(), my = y1 + (y2 - y1) * (.45 + r() * .1) + o()
+  return `M${(x1 + o() * .4).toFixed(1)} ${(y1 + o() * .4).toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${(x2 + o() * .4).toFixed(1)} ${(y2 + o() * .4).toFixed(1)}`
+}
+function roughLine(x1, y1, x2, y2, seed, wobble = 2.4) { const r = rng(seed); return jitterLine(x1, y1, x2, y2, r, wobble) + ' ' + jitterLine(x1, y1, x2, y2, r, wobble * .8) }
+function roughRect(x, y, w, h, seed, wobble = 2.2) {
+  const r = rng(seed), side = (a, b, c, d) => jitterLine(a, b, c, d, r, wobble)
+  const one = () => [side(x, y, x + w, y), side(x + w, y, x + w, y + h), side(x + w, y + h, x, y + h), side(x, y + h, x, y)].join(' ')
+  return one() + ' ' + one()
+}
+function roughEllipse(cx, cy, rx, ry, seed, turns = 1.08) {
+  const r = rng(seed), pts = [], n = 28, start = r() * Math.PI * 2
+  for (let i = 0; i <= n * turns; i++) {
+    const a = start + i / n * Math.PI * 2, k = 1 + (r() - .5) * .07
+    pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k])
+  }
+  return 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L')
+}
+function arrowPath(x1, y1, x2, y2, seed, bend = 0) {
+  const r = rng(seed), mx = (x1 + x2) / 2 - (y2 - y1) * bend, my = (y1 + y2) / 2 + (x2 - x1) * bend
+  const body = `M${x1.toFixed(1)} ${y1.toFixed(1)} Q${(mx + (r() - .5) * 6).toFixed(1)} ${(my + (r() - .5) * 6).toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`
+  const a = Math.atan2(y2 - my, x2 - mx), h = 13
+  const head = `M${(x2 - h * Math.cos(a - .45)).toFixed(1)} ${(y2 - h * Math.sin(a - .45)).toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)} L${(x2 - h * Math.cos(a + .45)).toFixed(1)} ${(y2 - h * Math.sin(a + .45)).toFixed(1)}`
+  return body + ' ' + head
+}
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag)
+  for (const k in attrs) e.setAttribute(k, attrs[k])
+  if (parent) parent.appendChild(e)
+  return e
+}
+// Wrap words into lines of at most `max` characters (the handwriting font is ~0.5em per character)
+function wrap(text, max, lines = 3) {
+  const out = []; let cur = ''
+  for (const w of String(text || '').split(/\s+/).filter(Boolean)) {
+    if (cur && (cur + ' ' + w).length > max) { out.push(cur); cur = w } else cur = cur ? cur + ' ' + w : w
+  }
+  if (cur) out.push(cur)
+  if (out.length > lines) { out.length = lines; out[lines - 1] = out[lines - 1].replace(/\s*\S*$/, '') + '…' }
+  return out
+}
+function textBlock(g, x, y, lines, cls, lh, anchor = 'start') {
+  const t = el('text', {x, y, class: 'hand ' + cls, 'text-anchor': anchor}, g)
+  lines.forEach((l, i) => { const s = el('tspan', {x, dy: i ? lh : 0}, t); s.dataset.full = l; s.textContent = '' })
+  return t
+}
+
+// ---------- drawing a mark: strokes come off the pen, text is written letter by letter ----------
+function draw(m, secs) {
+  if (m.drawn) return
+  m.drawn = true; m.g.classList.remove('pending')
+  const ms = Math.max(250, secs * 1000)
+  const paths = [...m.g.querySelectorAll('path:not(.wash)')], spans = [...m.g.querySelectorAll('tspan')]
+  paths.forEach((p, i) => {
+    let len = 0
+    try { len = p.getTotalLength() } catch (e) {}
+    if (!len) return
+    p.style.transition = 'none'; p.style.strokeDasharray = len; p.style.strokeDashoffset = len
+    p.getBoundingClientRect()
+    const share = ms * .55, delay = paths.length > 1 ? i * (ms * .45) / paths.length : 0
+    p.style.transition = `stroke-dashoffset ${share}ms cubic-bezier(.5,.1,.3,1) ${delay}ms`
+    p.style.strokeDashoffset = 0
+  })
+  m.g.querySelectorAll('.wash').forEach(w => setTimeout(() => w.classList.add('on'), ms * .25))
+  const chars = spans.reduce((n, s) => n + s.dataset.full.length, 0)
+  if (!chars) return
+  const start = performance.now() + ms * .2, span = ms * .75
+  const tick = now => {
+    let shown = Math.ceil(Math.max(0, Math.min(1, (now - start) / span)) * chars)
+    for (const s of spans) { const n = Math.min(shown, s.dataset.full.length); s.textContent = s.dataset.full.slice(0, n); shown -= n }
+    if (now < start + span) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
+// ---------- the board ----------
+const S = {layout: 'flow', title: '', marks: [], segments: [[]], seg: 0, played: new Set([0]), column: -1, seed: 1, three: null, timers: []}
+const world = $('world'), ink = $('ink')
+let view = {x: -100, y: -100, w: 800, h: 500}, viewTimer = 0
+
+function reset(layout, title) {
+  S.timers.forEach(clearTimeout)
+  Object.assign(S, {layout, title, marks: [], segments: [[]], seg: 0, played: new Set([0]), column: -1, seed: 1, timers: []})
+  world.innerHTML = ''
+  $('title').textContent = title || ''
+  const is3d = layout === '3d'
+  $('three').classList.toggle('on', is3d); ink.style.display = is3d ? 'none' : ''
+  $('labels').innerHTML = ''; $('hint').classList.remove('on')
+  if (is3d) { S.three = S.three || makeThree($('three')); S.three.clear() }
+  else if (layout === 'mind' && title) {   // the idea itself sits in the middle from the start
+    const g = el('g', {class: 'mark'}, world), lines = wrap(title, 16, 2), w = Math.max(150, Math.max(...lines.map(l => l.length)) * 12 + 40), h = 40 + lines.length * 26
+    el('path', {d: roughEllipse(0, 0, w / 2, h / 2, 7), stroke: 'var(--ink)', 'stroke-width': 2.4}, g)
+    textBlock(g, 0, -((lines.length - 1) * 26) / 2 + 9, lines, 't', 26, 'middle')
+    const m = {kind: 'center', g, w, h, n: 0, drawn: false}
+    S.marks.push(m); m.g.classList.add('pending'); layoutAll(); draw(m, 1)
+  }
+  fit(true)
+}
+
+function items() { return S.marks.filter(m => m.kind === 'item') }
+function color(i) { return PALETTE[i % PALETTE.length] }
+
+function makeMark(ev) {
+  const seed = S.seed += 17, g = el('g', {class: 'mark pending'}, world), m = {kind: ev.op, ev, g, seed, drawn: false}
+  if (ev.op === 'item') {
+    const n = items().length + 1, c = color(n - 1)
+    m.n = n; m.color = c
+    if (S.layout === 'compare') {
+      const lines = wrap(ev.text, 24, 2), detail = ev.detail ? wrap(ev.detail, 30, 2) : []
+      m.w = Math.min(250, 40 + Math.max(...lines.map(l => l.length * 11), ...detail.map(l => l.length * 7.5))); m.h = 12 + lines.length * 26 + detail.length * 20
+      m.column = Math.max(0, S.column)
+      el('path', {d: roughEllipse(9, 12, 5, 5, seed, 1.2), stroke: c, 'stroke-width': 3}, g)
+      textBlock(g, 24, 19, lines, 't', 26)
+      if (detail.length) textBlock(g, 24, 19 + lines.length * 26 - 4, detail, 'd', 20)
+    } else if (S.layout === 'timeline') {
+      const lines = wrap(ev.text, 16, 2), detail = ev.detail ? wrap(ev.detail, 22, 3) : []
+      m.w = 190; m.h = lines.length * 26 + detail.length * 20 + 10
+      el('path', {d: roughEllipse(0, 0, 9, 9, seed, 1.15), stroke: c, 'stroke-width': 3}, g)
+      m.text = el('g', {}, g)
+      textBlock(m.text, 0, 0, lines, 't', 26, 'middle')
+      if (detail.length) textBlock(m.text, 0, lines.length * 26 - 4, detail, 'd', 20, 'middle')
+    } else {   // flow, cycle, mind: a card
+      const lines = wrap(ev.text, 17, 2), detail = ev.detail ? wrap(ev.detail, 24, 3) : []
+      m.w = 230; m.h = 30 + lines.length * 26 + detail.length * 20
+      el('path', {d: `M${-m.w / 2} ${-m.h / 2}h${m.w}v${m.h}h${-m.w}z`, class: 'wash', fill: c + '1f'}, g)
+      el('path', {d: roughRect(-m.w / 2, -m.h / 2, m.w, m.h, seed), stroke: c, 'stroke-width': 2.3}, g)
+      const top = -m.h / 2 + 34
+      textBlock(g, 0, top, lines, 't', 26, 'middle')
+      if (detail.length) textBlock(g, 0, top + lines.length * 26 - 2, detail, 'd', 20, 'middle')
+      if (S.layout !== 'mind') {
+        el('circle', {cx: -m.w / 2 + 2, cy: -m.h / 2 + 2, r: 15, fill: c, class: 'wash'}, g)
+        const t = el('text', {x: -m.w / 2 + 2, y: -m.h / 2 + 3, class: 'hand num'}, g); const s = el('tspan', {}, t); s.dataset.full = String(n)
+      }
+    }
+  } else if (ev.op === 'column') {
+    S.column++; m.column = S.column
+    const lines = wrap(ev.text, 18, 1)
+    m.w = 250; m.h = 46
+    textBlock(g, 0, 22, lines, 'big', 30)
+    el('path', {d: roughLine(0, 34, Math.min(240, lines[0].length * 16 + 10), 34, seed, 2), stroke: color(S.column), 'stroke-width': 3}, g)
+  } else if (ev.op === 'bar') {
+    m.n = S.marks.filter(x => x.kind === 'bar').length; m.color = color(m.n); m.w = 96; m.h = 300
+    m.rect = el('path', {stroke: m.color, 'stroke-width': 2.4}, g); m.fill = el('path', {class: 'wash', fill: m.color + '33'}, g)
+    m.label = textBlock(g, 0, 26, wrap(ev.text, 12, 2), 'd', 18, 'middle')
+    m.value = textBlock(g, 0, 0, [fmt(ev.value) + (ev.unit || '')], 't', 24, 'middle')
+  } else if (ev.op === 'note') {
+    const lines = wrap(ev.text, 30, 4); m.w = 270; m.h = 26 + lines.length * 21
+    el('path', {d: `M0 0h${m.w}v${m.h}h${-m.w}z`, class: 'wash', fill: '#ffec99', transform: 'rotate(-1.2)'}, g)
+    el('path', {d: roughRect(0, 0, m.w, m.h, seed, 1.4), stroke: '#e0a800', 'stroke-width': 1.6, transform: 'rotate(-1.2)'}, g)
+    textBlock(g, 14, 28, lines, 'd', 21)
+  } else if (ev.op === 'check') {
+    const lines = wrap(ev.text, 36, 2); m.w = 360; m.h = 8 + lines.length * 26
+    el('path', {d: `M2 12 L9 20 L22 2`, stroke: '#2f9e44', 'stroke-width': 3.2}, g)
+    textBlock(g, 34, 18, lines, 't', 26)
+  } else if (ev.op === 'formula') {
+    const lines = wrap(ev.text, 30, 2); m.w = Math.max(...lines.map(l => l.length)) * 17 + 20; m.h = lines.length * 40 + 10
+    textBlock(g, 0, 32, lines, 'big', 40)
+    el('path', {d: roughLine(-6, lines.length * 40 + 6, m.w, lines.length * 40 + 2, seed, 2), stroke: '#c2255c', 'stroke-width': 2.4}, g)
+  } else if (ev.op === 'title') {
+    $('title').textContent = S.title = ev.text; g.remove(); return null
+  } else return null
+  return m
+}
+
+function fmt(v) { return Math.abs(v) >= 1000 ? v.toLocaleString('en-US') : String(+v.toFixed(2)) }
+
+// Every mark's place for the current layout; marks glide when a new one moves them (a cycle grows, a chart rescales)
+function layoutAll() {
+  const its = items(), L = S.layout
+  const place = (m, x, y) => { m.x = x; m.y = y; m.g.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`) }
+  if (L === 'flow') {
+    const per = its.length <= 4 ? Math.max(1, its.length) : 3, dx = 300, dy = 210
+    its.forEach((m, i) => { const r = Math.floor(i / per), c = i % per, col = r % 2 ? per - 1 - c : c; place(m, col * dx, r * dy) })
+  } else if (L === 'cycle') {
+    const n = Math.max(its.length, 3), R = Math.max(190, n * 62)
+    its.forEach((m, i) => { const a = -Math.PI / 2 + i / n * Math.PI * 2; place(m, Math.cos(a) * R * 1.25, Math.sin(a) * R) })
+  } else if (L === 'mind') {
+    const center = S.marks.find(m => m.kind === 'center'); if (center) place(center, 0, 0)
+    const angles = [-25, 205, 25, 155, -70, 250, 70, 110, -45, 225, 45, 135], n = its.length, R = 330 + Math.max(0, n - 8) * 20
+    its.forEach((m, i) => { const a = (angles[i % angles.length] + 360 * Math.floor(i / angles.length) * .04) * Math.PI / 180; place(m, Math.cos(a) * R, Math.sin(a) * R * .72) })
+  } else if (L === 'compare') {
+    const tops = {}
+    S.marks.filter(m => m.kind === 'column' || m.kind === 'item').forEach(m => {
+      const c = m.column || 0, y = tops[c] || 0
+      place(m, c * 290, y); tops[c] = y + m.h + 18
+    })
+  } else if (L === 'timeline') {
+    its.forEach((m, i) => { place(m, i * 210, 0); m.text.setAttribute('transform', `translate(0 ${i % 2 ? 44 : -34 - (m.h - 10)})`) })
+  } else if (L === 'chart') {
+    const bars = S.marks.filter(m => m.kind === 'bar'), top = Math.max(1, ...bars.map(b => Math.abs(b.ev.value)))
+    bars.forEach((b, i) => {
+      place(b, i * 120, 0)
+      const h = Math.max(4, Math.abs(b.ev.value) / top * 260), w = 70
+      b.rect.setAttribute('d', roughRect(-w / 2, -h, w, h, b.seed, 1.6)); b.fill.setAttribute('d', `M${-w / 2} 0v${-h}h${w}v${h}z`)
+      b.value.setAttribute('y', -h - 12); b.value.querySelectorAll('tspan').forEach(s => s.setAttribute('x', 0))
+    })
+  }
+  // notes, checks and formulas stack under the main drawing
+  const main = S.marks.filter(m => !['note', 'check', 'formula', 'circle', 'arrow'].includes(m.kind))
+  const box = bounds(main), extra = S.marks.filter(m => ['note', 'check', 'formula'].includes(m.kind))
+  let y = (main.length ? box.y + box.h : 0) + 50, x = main.length ? box.x : 0
+  for (const m of extra) { place(m, x, y); y += m.h + 22 }
+  connectors()
+  S.marks.filter(m => m.kind === 'circle').forEach(ring)
+}
+
+function bounds(list) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  for (const m of list) {
+    if (m.x === undefined) continue
+    const centred = ['item', 'center'].includes(m.kind) && !['compare'].includes(S.layout) || m.kind === 'bar'
+    const left = m.kind === 'bar' ? m.x - 50 : centred ? m.x - m.w / 2 : m.x, top = m.kind === 'bar' ? m.y - 300 : centred && S.layout !== 'timeline' ? m.y - m.h / 2 : S.layout === 'timeline' && m.kind === 'item' ? m.y - m.h - 40 : m.y
+    const h = m.kind === 'bar' ? 360 : S.layout === 'timeline' && m.kind === 'item' ? m.h * 2 + 90 : m.h
+    x0 = Math.min(x0, left); y0 = Math.min(y0, top); x1 = Math.max(x1, left + m.w); y1 = Math.max(y1, top + h)
+  }
+  return x0 === Infinity ? {x: 0, y: 0, w: 0, h: 0} : {x: x0, y: y0, w: x1 - x0, h: y1 - y0}
+}
+
+// Arrows between consecutive cards (flow, cycle), spokes in a mind map, the line under a timeline
+function connectors() {
+  world.querySelectorAll('.conn').forEach(c => { c.dataset.keep = '' })
+  const its = items(), L = S.layout, want = []
+  const edge = (a, b) => {   // from a's border towards b, to b's border
+    const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d
+    const cut = m => Math.min(Math.abs(m.w / 2 / (ux || 1e-6)), Math.abs(m.h / 2 / (uy || 1e-6))) + 10
+    return [a.x + ux * cut(a), a.y + uy * cut(a), b.x - ux * cut(b), b.y - uy * cut(b)]
+  }
+  if (L === 'flow' || L === 'cycle') its.slice(1).forEach((m, i) => want.push({id: 'a' + m.n, to: m, d: arrowPath(...edge(its[i], m), m.seed, L === 'cycle' ? .12 : 0)}))
+  if (L === 'cycle' && its.length > 2) { const a = its[its.length - 1], b = its[0]; want.push({id: 'close', to: a, d: arrowPath(...edge(a, b), 991, .12)}) }
+  if (L === 'mind') { const c = S.marks.find(m => m.kind === 'center'); if (c) its.forEach(m => want.push({id: 's' + m.n, to: m, d: roughLine(...edge(c, m), m.seed, 3)})) }
+  const bars = S.marks.filter(m => m.kind === 'bar')
+  if (L === 'chart' && bars.length) want.push({id: 'axis', to: bars[0], d: roughLine(-70, 0, (bars.length - 1) * 120 + 70, 0, 5, 1.5), axis: true})
+  if (L === 'timeline' && its.length) want.push({id: 'axis', to: its[its.length - 1], d: arrowPath(-60, 0, (its.length - 1) * 210 + 90, 0, 5), axis: true})
+  for (const w of want) {
+    let p = world.querySelector(`.conn[data-id="${w.id}"]`)
+    if (!p) {
+      p = el('path', {class: 'conn', 'data-id': w.id, stroke: w.axis ? 'var(--ink)' : '#5c5446', 'stroke-width': w.axis ? 2.6 : 2}, null)
+      world.insertBefore(p, world.firstChild); p.style.visibility = 'hidden'
+    }
+    p.setAttribute('d', w.d); p.dataset.keep = '1'
+    if (w.to.drawn && p.style.visibility === 'hidden') { p.style.visibility = ''; const len = p.getTotalLength(); p.style.strokeDasharray = len; p.style.strokeDashoffset = len; p.getBoundingClientRect(); p.style.transition = 'stroke-dashoffset .6s ease'; p.style.strokeDashoffset = 0 }
+    else if (w.to.drawn) { p.style.strokeDasharray = ''; p.style.strokeDashoffset = '' }
+  }
+  world.querySelectorAll('.conn').forEach(c => { if (!c.dataset.keep) c.remove() })
+}
+
+function ring(m) {
+  const target = items()[m.ev.n - 1]
+  if (!target || target.x === undefined) return
+  const cx = S.layout === 'compare' ? target.x + target.w / 2 : target.x, cy = S.layout === 'compare' ? target.y + target.h / 2 : S.layout === 'timeline' ? target.y : target.y
+  m.g.setAttribute('transform', `translate(${cx} ${cy})`); m.x = cx; m.y = cy; m.w = target.w + 40; m.h = target.h + 40
+  if (!m.path) m.path = el('path', {stroke: '#e03131', 'stroke-width': 3}, m.g)
+  m.path.setAttribute('d', roughEllipse(0, 0, target.w / 2 + 24, target.h / 2 + 22, m.seed, 1.12))
+}
+
+// The view follows the drawing: it eases out as marks land so everything stays on the card
+function fit(now) {
+  const box = bounds(S.marks.filter(m => m.drawn || m.kind === 'center')), r = $('stage').getBoundingClientRect()
+  const pad = 60, w = Math.max(box.w + pad * 2, 520), h = Math.max(box.h + pad * 2, 320)
+  const aspect = (r.width || 760) / (r.height || 470)
+  let vw = w, vh = h
+  if (vw / vh < aspect) vw = vh * aspect; else vh = vw / aspect
+  const target = {x: box.x + box.w / 2 - vw / 2, y: box.y + box.h / 2 - vh / 2, w: vw, h: vh}
+  cancelAnimationFrame(viewTimer)
+  if (now) { view = target; ink.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`); return }
+  const from = {...view}, t0 = performance.now(), dur = 700
+  const step = t => {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3)
+    view = {x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e, w: from.w + (target.w - from.w) * e, h: from.h + (target.h - from.h) * e}
+    ink.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`)
+    if (k < 1) viewTimer = requestAnimationFrame(step)
+  }
+  viewTimer = requestAnimationFrame(step)
+}
+
+function show(m, secs) {
+  if (S.layout === '3d') { S.three.grow(m, secs); return }
+  draw(m, secs); connectors(); fit(false)
+}
+
+// Segment n's marks, spread over the seconds its sentence takes
+function play(n, secs) {
+  S.played.add(n)
+  const list = S.segments[n] || [], each = Math.max(.6, secs / Math.max(1, list.length))
+  list.forEach((m, i) => S.timers.push(setTimeout(() => show(m, Math.min(each * .9, 1.6)), i * each * 1000)))
+}
+
+function add(ev) {
+  if (ev.op === 'say') { S.segments.push([]); S.seg = S.segments.length - 1; return }
+  if (S.layout === '3d') {
+    if (ev.op !== 'part') { if (ev.op === 'title') $('title').textContent = ev.text; return }
+    const m = {kind: 'part', ev, drawn: false}
+    S.marks.push(m); S.three.add(m)
+    S.segments[S.seg].push(m); if (S.played.has(S.seg)) show(m, .9)
+    return
+  }
+  if (ev.op === 'part') return
+  if (ev.op === 'circle') {
+    const m = {kind: 'circle', ev, g: el('g', {class: 'mark pending'}, world), seed: S.seed += 17, drawn: false}
+    S.marks.push(m); ring(m)
+    S.segments[S.seg].push(m); if (S.played.has(S.seg)) show(m, .9)
+    return
+  }
+  const m = makeMark(ev)
+  if (!m) return
+  S.marks.push(m); layoutAll()
+  S.segments[S.seg].push(m)
+  if (S.played.has(S.seg)) show(m, .9)
+}
+
+window.board = {
+  open(o) {
+    o = o || {}
+    if (o.append && S.marks.length) {   // [board+]: the same board, new segments after the drawn ones
+      S.segments = [[]]; S.seg = 0; S.played = new Set([0]); if (o.title) $('title').textContent = S.title = o.title
+      return
+    }
+    reset(o.layout || 'flow', o.title || '')
+  },
+  add,
+  play,
+  flush() { S.segments.forEach((list, n) => { S.played.add(n); list.forEach(m => show(m, .4)) }) },   // speech stopped: finish drawing now
+  end() { if (S.layout === '3d') $('hint').classList.add('on'); setTimeout(() => S.layout !== '3d' && fit(false), 400) },
+  summary() {
+    const its = S.layout === '3d' ? S.marks.filter(m => m.kind === 'part').map(m => m.ev.text) : S.marks.filter(m => ['item', 'column', 'bar'].includes(m.kind)).map(m => m.ev.text)
+    return {layout: S.layout, title: S.title, items: its}
+  },
+  saved() { $('saved').classList.add('on'); setTimeout(() => $('saved').classList.remove('on'), 2400) },
+  marks() { return S.marks.map(m => ({kind: m.kind, drawn: m.drawn, text: m.ev ? m.ev.text : S.title})) },
+}
+
+$('bar').addEventListener('mousedown', e => { if (!e.target.closest('button')) post({do: 'drag'}) })
+$('close').onclick = () => post({do: 'close'})
+$('save').onclick = () => post({do: 'save', title: S.title})
+addEventListener('keydown', e => { if (e.key === 'Escape') post({do: 'close'}) })
+addEventListener('resize', () => { if (S.layout === '3d') S.three && S.three.resize(); else fit(true) })
+
+// ---------- 3D: a small WebGL renderer for boxes, spheres, cylinders, cones and tori ----------
+function makeThree(canvas) {
+  const gl = canvas.getContext('webgl', {antialias: true, preserveDrawingBuffer: true, alpha: true})
+  if (!gl) return {clear() {}, add() {}, grow(m) { m.drawn = true }, resize() {}}
+  const vs = `attribute vec3 p;attribute vec3 n;uniform mat4 M,V,P;varying vec3 vn;varying vec3 vw;
+    void main(){vec4 w=M*vec4(p,1.);vw=w.xyz;vn=mat3(M)*n;gl_Position=P*V*w;}`
+  const fs = `precision mediump float;varying vec3 vn;varying vec3 vw;uniform vec3 c;uniform float pick,hot,alpha;uniform vec3 eye;
+    void main(){if(pick>.5){gl_FragColor=vec4(c,1.);return;}vec3 N=normalize(vn);vec3 L=normalize(vec3(.5,.9,.6));vec3 E=normalize(eye-vw);
+    float d=max(dot(N,L),0.),fill=max(dot(N,normalize(vec3(-.6,.2,-.4))),0.)*.25,rim=pow(1.-max(dot(N,E),0.),2.5)*.25;
+    vec3 col=c*(.38+.62*d+fill)+vec3(rim)+vec3(.12,.1,.02)*hot;gl_FragColor=vec4(col,alpha);}`
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o }
+  const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog); gl.useProgram(prog)
+  const loc = n => gl.getUniformLocation(prog, n), aP = gl.getAttribLocation(prog, 'p'), aN = gl.getAttribLocation(prog, 'n')
+  const U = {M: loc('M'), V: loc('V'), P: loc('P'), c: loc('c'), pick: loc('pick'), hot: loc('hot'), eye: loc('eye'), alpha: loc('alpha')}
+  gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE)
+
+  // unit meshes: positions and normals, triangles
+  function mesh(build) {
+    const P = [], N = []; build((p, n) => { P.push(...p); N.push(...n) })
+    const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(P), gl.STATIC_DRAW)
+    const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(N), gl.STATIC_DRAW)
+    return {pb, nb, count: P.length / 3}
+  }
+  const quad = (v, a, b, c, d, n) => { v(a, n); v(b, n); v(c, n); v(a, n); v(c, n); v(d, n) }
+  const meshes = {
+    box: mesh(v => {
+      const h = .5, f = [[[1, 0, 0], [[h, -h, -h], [h, h, -h], [h, h, h], [h, -h, h]]], [[-1, 0, 0], [[-h, -h, h], [-h, h, h], [-h, h, -h], [-h, -h, -h]]],
+        [[0, 1, 0], [[-h, h, -h], [-h, h, h], [h, h, h], [h, h, -h]]], [[0, -1, 0], [[-h, -h, h], [-h, -h, -h], [h, -h, -h], [h, -h, h]]],
+        [[0, 0, 1], [[-h, -h, h], [h, -h, h], [h, h, h], [-h, h, h]]], [[0, 0, -1], [[h, -h, -h], [-h, -h, -h], [-h, h, -h], [h, h, -h]]]]
+      f.forEach(([n, q]) => quad(v, ...q, n))
+    }),
+    sphere: mesh(v => {
+      const a = 28, b = 18, pt = (i, j) => { const t = i / a * Math.PI * 2, u = j / b * Math.PI, x = Math.sin(u) * Math.cos(t), y = Math.cos(u), z = Math.sin(u) * Math.sin(t); return [x * .5, y * .5, z * .5, x, y, z] }
+      for (let j = 0; j < b; j++) for (let i = 0; i < a; i++) {
+        const q = [pt(i, j), pt(i, j + 1), pt(i + 1, j + 1), pt(i + 1, j)]
+        ;[[0, 3, 2], [0, 2, 1]].forEach(tri => tri.forEach(k => v(q[k].slice(0, 3), q[k].slice(3))))
+      }
+    }),
+    cylinder: null, cone: null,
+    torus: mesh(v => {
+      const a = 36, b = 14, R = .36, r = .14, pt = (i, j) => { const t = i / a * Math.PI * 2, u = j / b * Math.PI * 2, x = Math.cos(t), z = Math.sin(t); return [(R + r * Math.cos(u)) * x, r * Math.sin(u), (R + r * Math.cos(u)) * z, Math.cos(u) * x, Math.sin(u), Math.cos(u) * z] }
+      for (let j = 0; j < b; j++) for (let i = 0; i < a; i++) {
+        const q = [pt(i, j), pt(i, j + 1), pt(i + 1, j + 1), pt(i + 1, j)]
+        ;[[0, 2, 3], [0, 1, 2]].forEach(tri => tri.forEach(k => v(q[k].slice(0, 3), q[k].slice(3))))
+      }
+    }),
+  }
+  const tube = top => mesh(v => {
+    const a = 36, slope = (.5 - top) / 1
+    for (let i = 0; i < a; i++) {
+      const t0 = i / a * Math.PI * 2, t1 = (i + 1) / a * Math.PI * 2, c0 = [Math.cos(t0), Math.sin(t0)], c1 = [Math.cos(t1), Math.sin(t1)]
+      const n0 = [c0[0], slope, c0[1]], n1 = [c1[0], slope, c1[1]]
+      const b0 = [c0[0] * .5, -.5, c0[1] * .5], b1 = [c1[0] * .5, -.5, c1[1] * .5], u0 = [c0[0] * top, .5, c0[1] * top], u1 = [c1[0] * top, .5, c1[1] * top]
+      v(b0, n0); v(u1, n1); v(b1, n1); v(b0, n0); v(u0, n0); v(u1, n1)
+      v([0, -.5, 0], [0, -1, 0]); v(b1, [0, -1, 0]); v(b0, [0, -1, 0])
+      if (top > 0) { v([0, .5, 0], [0, 1, 0]); v(u0, [0, 1, 0]); v(u1, [0, 1, 0]) }
+    }
+  })
+  meshes.cylinder = tube(.5); meshes.cone = tube(0)
+
+  // tiny matrix helpers (column-major, like WebGL)
+  const mul = (a, b) => { const o = new Array(16).fill(0); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) for (let k = 0; k < 4; k++) o[j * 4 + i] += a[k * 4 + i] * b[j * 4 + k]; return o }
+  const T = (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1], Sc = (x, y, z) => [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]
+  const RX = a => { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1] }
+  const RY = a => { const c = Math.cos(a), s = Math.sin(a); return [c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1] }
+  const RZ = a => { const c = Math.cos(a), s = Math.sin(a); return [c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }
+  const persp = (f, a, n, fa) => { const t = 1 / Math.tan(f / 2); return [t / a, 0, 0, 0, 0, t, 0, 0, 0, 0, (fa + n) / (n - fa), -1, 0, 0, 2 * fa * n / (n - fa), 0] }
+  const lookAt = (e, c) => {
+    const z = norm([e[0] - c[0], e[1] - c[1], e[2] - c[2]]), x = norm(cross([0, 1, 0], z)), y = cross(z, x)
+    return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1]
+  }
+  const norm = a => { const l = Math.hypot(...a) || 1; return a.map(x => x / l) }, cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  const rgb = s => { const h = (NAMED[s] || s || '#868e96').replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255) }
+
+  const parts = []
+  let yaw = .6, pitch = .38, dist = 6, target = [0, 0, 0], fitDist = 6, auto = true, dragging = null, hot = -1, dirty = true
+  let pickFB = null, pickTex = null, pickRB = null, W = 1, H = 1
+
+  function resize() {
+    const r = canvas.getBoundingClientRect(), d = devicePixelRatio || 1
+    W = Math.max(1, Math.round(r.width * d)); H = Math.max(1, Math.round(r.height * d)); canvas.width = W; canvas.height = H
+    pickFB = gl.createFramebuffer(); pickTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, pickTex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    pickRB = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, pickRB); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, W, H)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pickFB); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pickTex, 0)
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, pickRB); gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    dirty = true
+  }
+  function model(p) {
+    const e = p.m.ev, k = p.scale, s = e.size, r = e.rot.map(a => a * Math.PI / 180)
+    return mul(T(...e.at), mul(RY(r[1]), mul(RX(r[0]), mul(RZ(r[2]), Sc(s[0] * k, s[1] * k, s[2] * k)))))
+  }
+  function box(p) {   // the part's world box, turned as it is
+    const M = model({m: p.m, scale: 1}), lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
+    for (const x of [-.5, .5]) for (const y of [-.5, .5]) for (const z of [-.5, .5])
+      for (let k = 0; k < 3; k++) { const v = M[k] * x + M[4 + k] * y + M[8 + k] * z + M[12 + k]; lo[k] = Math.min(lo[k], v); hi[k] = Math.max(hi[k], v) }
+    return [lo, hi]
+  }
+  function camera() {
+    const eye = [target[0] + dist * Math.cos(pitch) * Math.sin(yaw), target[1] + dist * Math.sin(pitch), target[2] + dist * Math.cos(pitch) * Math.cos(yaw)]
+    return {eye, V: lookAt(eye, target), P: persp(.75, W / H, .05, 200)}
+  }
+  function render(picking) {
+    const {eye, V, P} = camera()
+    gl.bindFramebuffer(gl.FRAMEBUFFER, picking ? pickFB : null)
+    gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    gl.uniformMatrix4fv(U.V, false, V); gl.uniformMatrix4fv(U.P, false, P); gl.uniform3fv(U.eye, eye); gl.uniform1f(U.pick, picking ? 1 : 0)
+    // a part that holds others (a cylinder around its piston) is drawn last and see-through, so what is inside shows
+    const order = parts.map((p, i) => i).sort((a, b) => (picking ? 0 : (parts[a].shell ? 1 : 0) - (parts[b].shell ? 1 : 0)))
+    order.forEach(i => {
+      const p = parts[i]
+      if (p.scale <= .001) return
+      const g = meshes[p.m.ev.shape], see = !picking && p.shell
+      gl.uniform1f(U.alpha, see ? .3 : 1)
+      if (see) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false) } else { gl.disable(gl.BLEND); gl.depthMask(true) }
+      gl.bindBuffer(gl.ARRAY_BUFFER, g.pb); gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 3, gl.FLOAT, false, 0, 0)
+      gl.bindBuffer(gl.ARRAY_BUFFER, g.nb); gl.enableVertexAttribArray(aN); gl.vertexAttribPointer(aN, 3, gl.FLOAT, false, 0, 0)
+      gl.uniformMatrix4fv(U.M, false, model(p))
+      gl.uniform3fv(U.c, picking ? [(i + 1) / 255, 0, 0] : p.color); gl.uniform1f(U.hot, !picking && i === hot ? 1 : 0)
+      gl.drawArrays(gl.TRIANGLES, 0, g.count)
+    })
+    gl.disable(gl.BLEND); gl.depthMask(true)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    if (!picking) labels(V, P)
+  }
+  function labels(V, P) {
+    const VP = mul(P, V), r = canvas.getBoundingClientRect()
+    const placed = []
+    parts.map((p, i) => {   // a shell's name sits on its top edge, a part inside it at its centre
+      const e = p.m.ev, top = [e.at[0], e.at[1] + (p.shell ? e.size[1] * p.scale / 2 + .12 : 0), e.at[2]]
+      const c = [0, 1, 2, 3].map(k => VP[k] * top[0] + VP[4 + k] * top[1] + VP[8 + k] * top[2] + VP[12 + k])
+      return {p, i, x: (c[0] / c[3] + 1) / 2 * r.width, y: (1 - c[1] / c[3]) / 2 * r.height + (p.shell ? 0 : 10), w: p.label.offsetWidth || 60}
+    }).sort((a, b) => a.y - b.y).forEach(l => {   // names never sit on each other: each moves down past the ones above it
+      for (const o of placed) if (Math.abs(o.x - l.x) < (o.w + l.w) / 2 && Math.abs(o.y - l.y) < 24) l.y = o.y + 24
+      placed.push(l)
+      l.p.label.style.left = l.x + 'px'; l.p.label.style.top = l.y + 'px'
+      l.p.label.classList.toggle('on', l.p.scale > .7); l.p.label.classList.toggle('hot', l.i === hot)
+    })
+  }
+  function pickAt(x, y) {
+    render(true)
+    const r = canvas.getBoundingClientRect(), px = new Uint8Array(4), d = devicePixelRatio || 1
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pickFB); gl.readPixels(Math.round((x - r.left) * d), Math.round(H - (y - r.top) * d), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return px[3] ? px[0] - 1 : -1
+  }
+  function refit() {   // keep every grown part in view
+    const shown = parts.filter(p => p.target > 0)
+    if (!shown.length) return
+    let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
+    shown.forEach(p => { p.box = box(p); for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], p.box[0][k]); hi[k] = Math.max(hi[k], p.box[1][k]) } })
+    p_target = lo.map((l, k) => (l + hi[k]) / 2)
+    fitDist = Math.max(2.5, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 1.15)
+    const inside = (a, b) => b !== a && b.target > 0 && [0, 1, 2].every(k => a.box[0][k] < b.m.ev.at[k] && b.m.ev.at[k] < a.box[1][k])
+    parts.forEach(a => { a.shell = parts.some(b => inside(a, b)) })
+  }
+  let p_target = [0, 0, 0], last = performance.now()
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now
+    let moving = false
+    for (const p of parts) {
+      if (p.scale !== p.target) {
+        const k = Math.min(1, (now - p.t0) / p.dur), e = k < 1 ? 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2) : 1
+        p.scale = k >= 1 ? p.target : p.target * e; moving = true
+      }
+    }
+    target = target.map((t, k) => t + (p_target[k] - t) * Math.min(1, dt * 4))
+    dist += (fitDist - dist) * Math.min(1, dt * 3)
+    if (auto && !dragging) yaw += dt * .22
+    if (moving || auto || dragging || dirty || Math.abs(fitDist - dist) > .01) { render(false); dirty = false }
+    requestAnimationFrame(frame)
+  }
+  canvas.addEventListener('mousedown', e => { dragging = {x: e.clientX, y: e.clientY, moved: false}; canvas.classList.add('drag') })
+  addEventListener('mousemove', e => {
+    if (dragging) {
+      const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y
+      if (Math.abs(dx) + Math.abs(dy) > 3) { dragging.moved = true; auto = false }
+      yaw -= dx * .008; pitch = Math.max(-1.3, Math.min(1.35, pitch + dy * .006)); dragging.x = e.clientX; dragging.y = e.clientY; dirty = true
+    } else if (canvas.classList.contains('on') && e.target === canvas) {
+      const h = pickAt(e.clientX, e.clientY); if (h !== hot) { hot = h; dirty = true }
+      canvas.classList.toggle('pick', hot >= 0)
+    }
+  })
+  addEventListener('mouseup', e => {
+    if (!dragging) return
+    const was = dragging; dragging = null; canvas.classList.remove('drag')
+    if (!was.moved) { const i = pickAt(e.clientX, e.clientY); if (i >= 0) post({do: 'ask', part: parts[i].m.ev.text, title: S.title}) }
+  })
+  canvas.addEventListener('wheel', e => { e.preventDefault(); fitDist = Math.max(1.2, Math.min(60, fitDist * Math.exp(e.deltaY * .0015))) }, {passive: false})
+  resize(); requestAnimationFrame(frame)
+  return {
+    clear() { parts.length = 0; $('labels').innerHTML = ''; yaw = .6; pitch = .38; auto = true; p_target = [0, 0, 0]; fitDist = 6; dirty = true },
+    add(m) {
+      const label = document.createElement('div'); label.textContent = m.ev.text; $('labels').appendChild(label)
+      parts.push({m, label, color: rgb(m.ev.color), scale: 0, target: 0, t0: 0, dur: 1})
+    },
+    grow(m, secs) {
+      const p = parts.find(x => x.m === m); if (!p || m.drawn) return
+      m.drawn = true; Object.assign(p, {target: 1, t0: performance.now(), dur: Math.max(.35, secs) * 1000}); refit()
+    },
+    resize,
+    count() { return parts.length },
+  }
+}
+
+post({do: 'ready'})
+</script>
+</body></html>

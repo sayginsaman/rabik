@@ -144,9 +144,12 @@ final class App: NSObject, WKScriptMessageHandler {
     var drawingReply = false
     var pointContext: [String:Any]?
     let speaker = Speaker()   // read answers aloud (Overlay/Speaker.swift)
+    let board = Board()   // the live board (Board/Board.swift)
     var said: [String] = [], sayVoice: AVSpeechSynthesisVoice?, sayFinal = false   // this answer's sentences queued so far, and its voice
     @discardableResult func shush() -> Bool {
-        let was = speaker.speaking; speaker.stop(); said = []; sayFinal = false; return was
+        let was = speaker.speaking; speaker.stop(); said = []; sayFinal = false
+        if was { board.flush() }   // its lines were being spoken: draw the rest now
+        return was
     }
     // The streamed answer so far: its finished sentences start speaking before the answer ends. A later attempt that
     // rewrites what was said starts over at the final answer.
@@ -156,6 +159,13 @@ final class App: NSObject, WKScriptMessageHandler {
         guard done.starts(with: said) else { shush(); return }
         if said.isEmpty { siriVoice(); sayVoice = Speaker.voice(for: Speaker.language(of: partial)) }
         speaker.say(Array(done[said.count...]), voice: sayVoice); said = done
+    }
+    // One line of the live board, spoken in the answer's voice; started fires when it plays. False: answers are not read aloud.
+    func boardSay(_ text: String, _ started: @escaping (Double) -> Void) -> Bool {
+        guard Prefs.bool("speak") else { return false }
+        if sayVoice == nil { siriVoice(); sayVoice = Speaker.voice(for: Speaker.language(of: text)) }
+        speaker.say([spoken(text)], voice: sayVoice, started: started)
+        return true
     }
     func deliver(_ a: String, aloud: Bool = true) {   // Settings: read answers aloud, copy them
         if Prefs.bool("autoCopy") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(a, forType: .string) }
@@ -295,7 +305,9 @@ final class App: NSObject, WKScriptMessageHandler {
         drawing.status = { [weak self] words in self?.js("msg",words) }
         drawing.speechEnabled = { Prefs.bool("speak") }
         speaker.onIdle = { [weak self] in guard let self, sayFinal else { return }; said = []; sayFinal = false; hide(after: 2) }   // spoken to the end
-        speaker.onInterrupted = { [weak self] in self?.said = []; self?.sayFinal = false }   // the user talked over it
+        speaker.onInterrupted = { [weak self] in self?.said = []; self?.sayFinal = false; self?.board.flush() }   // the user talked over it
+        board.speak = { [weak self] text, started in self?.boardSay(text, started) ?? false }
+        board.onAsk = { [weak self] question in self?.typed(question) }   // a 3D part clicked
         drawing.autoSteps = { Prefs.str("guideSteps") != "next" }
         drawing.inputCleared = { [weak self] in self?.clearPointContext() }
         drawing.inputAway = { [weak self] in self?.finishPointing() }
@@ -484,6 +496,7 @@ final class App: NSObject, WKScriptMessageHandler {
             if b["mic"] != nil && (!busy || retryOffer) && !engine.isRunning { clickTalk = true; start(); if !engine.isRunning { clickTalk = false } }
             if b["ready"] != nil { js("size", Prefs.num("boxH")); if Prefs.bool("tips") && !Prefs.bool("pointCoached") { js("pointCoach") } }
             if b["safe"] != nil { Prefs.set("safe", true); js("mode", true); Rabik.settings.push() }
+            if let on = b["voice"] as? Bool { Prefs.set("speak", on); if !on { shush() }; Rabik.settings.push() }   // the box's speaker: mute or unmute
             if let m = b["model"] as? String {   // picked in the box: the same setting Settings shows; a worker warmed on the old model goes
                 Rabik.settings.apply(Prefs.str("apiBase").isEmpty ? "routing" : "apiModel", m); Rabik.settings.push()
             }
@@ -563,7 +576,7 @@ final class App: NSObject, WKScriptMessageHandler {
         return g
     }
     func show() {
-        gen += 1; js("visible", true); js("mode", Prefs.bool("safe")); js("models", modelChoices())
+        gen += 1; js("visible", true); js("mode", Prefs.bool("safe")); js("voice", Prefs.bool("speak")); js("models", modelChoices())
         startFollowingPointerScreen()
         if panel.isVisible {   // still up: stay where the user dragged it
             NSAnimationContext.runAnimationGroup { $0.duration = 0.18; panel.animator().alphaValue = 1 }
@@ -680,6 +693,8 @@ final class App: NSObject, WKScriptMessageHandler {
             cancel()
         } else if drawing.active {
             drawing.clear()
+        } else if board.visible {
+            board.close()
         } else if panel.isVisible {
             close(clear: false)
         }
@@ -1521,7 +1536,7 @@ final class App: NSObject, WKScriptMessageHandler {
         let p = py(["--wait"], ["RABIK_UI": "1", "RABIK_FRONT": mine, "RABIK_SCREEN": targetScreen, "RABIK_COMMIT": commit, "RABIK_SELECTION": warmSel == "\u{1}" ? "" : warmSel, "RABIK_CARET": warmSel == "\u{1}" ? "1" : "", "RABIK_FOCUS_GUARD": "1"])
         let pipe = Pipe(), inp = Pipe(); p.standardOutput = pipe; p.standardInput = inp
         fcntl(inp.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)   // a worker can exit before we write; let the catch handle EPIPE
-        var buffer = Data(), guided = false   // guided: this ask put a guide on screen, whose callouts carry the explanation
+        var buffer = Data(), guided = false, boarded = false   // guided: this ask put a guide on screen, whose callouts carry the explanation; boarded: a live board speaks its own lines
         let feed = { [weak self] (d: Data) in
             DispatchQueue.main.async {
                 guard let self, self.proc === p else { return }   // buffered output from a cancelled request stays cancelled
@@ -1532,6 +1547,10 @@ final class App: NSObject, WKScriptMessageHandler {
                     if line == "! feedback" { Rabik.settings.open(tab:"feedback"); continue }
                     if line == "! improve" { self.js("improve"); continue }   // the one-time "help make Rabik better?" card
                     if line.hasPrefix("▣ "), let value = try? JSONSerialization.jsonObject(with:Data(line.dropFirst(2).utf8)) as? [String:Any] { if Prefs.d["miniScreen"] as? Bool ?? true { self.mini.receive(value) }; continue }
+                    if line.hasPrefix("◫ ") {   // the live board: drawn as its lines are spoken
+                        if !boarded { boarded = true; self.shush(); self.sayVoice = nil }
+                        self.board.receive(String(line.dropFirst(2))); continue
+                    }
                     if line.hasPrefix("✎ ") {
                         if Prefs.bool("draw"), self.drawing.receive(Data(line.dropFirst(2).utf8)) {
                             self.shush(); guided = true
@@ -1586,11 +1605,11 @@ final class App: NSObject, WKScriptMessageHandler {
                         if self.mode == "draft" && target && (now || Prefs.str("draftInsert") == "auto") { self.applyReplacement() }
                         continue
                     }
-                    if line.hasPrefix("… "), Prefs.bool("speak"), !guided { self.speakAhead(line.dropFirst(2).replacingOccurrences(of: "\u{2028}", with: "\n")) }
+                    if line.hasPrefix("… "), Prefs.bool("speak"), !guided, !boarded { self.speakAhead(line.dropFirst(2).replacingOccurrences(of: "\u{2028}", with: "\n")) }
                     if line.hasPrefix("✓") {
                         let result = self.replacement.flatMap { $0.isEmpty ? nil : $0 } ?? line.dropFirst(2).replacingOccurrences(of: "\u{2028}", with: "\n")
                         let finish = self.drawing.request?.steps.count == 1 ? "Done. It’s on your screen." : "Done. Steps are on screen."
-                        self.mini.finish(); self.answer = "✓ " + (guided ? finish : result); self.deliver(guided ? finish : result, aloud: !guided)   // a guide's steps speak for themselves
+                        self.mini.finish(); self.answer = "✓ " + (guided ? finish : result); self.deliver(guided ? finish : result, aloud: !guided && !boarded)   // a guide's steps and a board's lines speak for themselves
                         self.js("line", self.answer); continue
                     }
                     if line.hasPrefix("! ") { self.js("msg", String(line.dropFirst(2))) }
@@ -1647,6 +1666,7 @@ final class App: NSObject, WKScriptMessageHandler {
             if let remaining { request["remaining"] = remaining; request["done"] = did }
             if let point { request["point"] = point }
             if let drawn { request["drawing"] = drawn }
+            if board.visible, let shown = board.summary { request["board"] = shown }
             if !replyAgent.isEmpty { request["agentCard"] = replyAgent }
             var data = try JSONSerialization.data(withJSONObject:request); data.append(10)
             try w.input.write(contentsOf:data); try w.input.close()
