@@ -269,7 +269,7 @@ class BoardNativeTests(unittest.TestCase):
         self.assertIn('else { queued.append((started, -Speaker.readingTime(sentence))) }', speaker)   # a line with no voice keeps its place
         self.assertIn('guard speaking else { return }   // no audio engine', speaker)
         self.assertIn('return speaker.speaking   // the audio engine could not start', app)
-        self.assertIn('if speak?(text, start) != true {', board)   # voice off: reading pace
+        self.assertIn('if quiet || speak?(text, start) != true {', board)   # voice off or stopped: reading pace
         self.assertIn('loadPage(v, "board.html")', board)
         self.assertIn('final class BoardPanel: NSPanel { override var canBecomeKey: Bool { false } }', board)
 
