@@ -4,10 +4,10 @@ import AVFoundation
 import Speech
 
 // Settings → Voice → "Hey Rabik" (off by default: the mic stays on, so macOS shows its orange dot). While Rabik is idle it
-// listens for "Hey Rabik" with the same on-device model as asks (SpeechAnalyzer: nothing leaves this Mac, nothing is saved;
-// the older SFSpeechRecognizer heard nothing on a Mac without its offline Dictation model). Hearing it starts an ask like the
-// mic button, which ends after a pause. It never listens while Rabik is listening, answering or speaking, taking meeting
-// notes, while paused, or with the screen locked; each listen runs at most 50 s and starts fresh.
+// listens for "Hey Rabik" with the same on-device model as asks (SpeechAnalyzer: nothing leaves this Mac, nothing is saved, and
+// no Speech Recognition permission of its own). Hearing it starts an ask like the mic button, which ends after a pause. It never
+// listens while Rabik is listening, answering or speaking, taking meeting notes, while paused, or with the screen locked; each
+// listen runs at most 50 s and starts fresh.
 final class WakeWord {
     var canListen: () -> Bool = { false }
     var onWake: () -> Void = {}
@@ -18,9 +18,26 @@ final class WakeWord {
     private static let english = Locale(identifier: "en-US")   // SpeechTranscriber's locale for asks too (App.speechModule)
     private static func module() -> SpeechTranscriber { SpeechTranscriber(locale: english, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: []) }
 
-    // "hey rabik" and how English recognition hears it ("hey rabbit", "hey Rubik", "hey Rebecca"); it must be said as a greeting.
+    // "Hey Rabik" as English recognition hears it: a greeting, then one or two words with Rabik's sounds, r-b-k with any vowels
+    // ("Hey, Ravik", "Hey Rabbic", "Hey, Rob Eag" for ra-BEEK, "hey Rubik", "hey Rebecca"), or one of its own words for it.
     static func heard(_ text: String) -> Bool {
-        text.lowercased().range(of: #"\b(hey|hi|hay|okay|ok)[,.!]?\s+(r[aeiouy]{1,2}bb?[aeiouy]{1,2}[ckq]{1,2}s?|rabbit|rabbi|robbie|rebecca|rah ?bick|ravik|rabi)\b"#, options: .regularExpression) != nil
+        let words = text.lowercased().components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
+        for (i, w) in words.enumerated() where ["hey", "hi", "hay", "okay", "ok"].contains(w) {
+            let next = Array(words.dropFirst(i + 1).prefix(2))
+            guard let first = next.first else { continue }
+            if ["rabbit", "rabbi", "robbie"].contains(first) || ["rbk", "rbks"].contains(sounds(first)) || next.count == 2 && sounds(next.joined()) == "rbk" { return true }
+        }
+        return false
+    }
+
+    // A word's consonants as recognition confuses them (v, p → b; c, g, q, x → k), vowels dropped, doubles as one: "ravik" → "rbk".
+    static func sounds(_ word: String) -> String {
+        var out = ""
+        for ch in word {
+            let c: Character? = "aeiouyhw".contains(ch) ? nil : "vpb".contains(ch) ? "b" : "cgqkx".contains(ch) ? "k" : ch
+            if let c, out.last != c { out.append(c) }
+        }
+        return out
     }
 
     func start() {
@@ -88,3 +105,4 @@ final class WakeWord {
         analyzer = nil; listening = false
     }
 }
+

@@ -144,10 +144,12 @@ for (app, title) in [("Google Chrome", "Lofi beats - YouTube"), ("Safari", "Home
         src = (ROOT / 'Sources/Rabik/Speech/WakeWord.swift').read_text()
         body = src[src.index('    static func heard'):src.index('    func start() {')]
         out = run_swift(SNIPPET_HEAD + 'enum WakeWord {\n' + body + '}\n' + r'''
-for t in ["Hey Rabik", "hey rabbit what time is it", "Hey, Robik", "OK Rabik", "hey Rebecca", "Rabik is great", "hey robert", "they rabbit", "the rabbit hole", "Hey Rubik", "hi rabbi", "hey Robbie"] {
+for t in ["Hey Rabik", "hey rabbit what time is it", "Hey, Robik", "OK Rabik", "hey Rebecca", "Rabik is great", "hey robert", "they rabbit", "the rabbit hole", "Hey Rubik", "hi rabbi", "hey Robbie",
+          "Hey, Ravik.", "Hey Rabbic, what's the weather?", "Hey, Rob Eag.", "hey rob", "Okay, little big.", "hey ruby can you"] {   // the middle three: what SpeechAnalyzer heard for spoken "Hey Rabik"
     print(WakeWord.heard(t))
 }''')
-        self.assertEqual(out[:12], ['true', 'true', 'true', 'true', 'true', 'false', 'false', 'false', 'false', 'true', 'true', 'true'])
+        self.assertEqual(out[:18], ['true', 'true', 'true', 'true', 'true', 'false', 'false', 'false', 'false', 'true', 'true', 'true',
+                                    'true', 'true', 'true', 'false', 'false', 'false'])
 
     def test_wiring_and_defaults(self):
         app, prefs = native_source(), (ROOT / 'Sources/Rabik/Core/Prefs.swift').read_text()
