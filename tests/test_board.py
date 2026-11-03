@@ -97,7 +97,7 @@ class BoardStreamTests(unittest.TestCase):
         self.assertEqual([e['op'] for e in events('[board flow: X]\nsay No end tag.').events], ['open', 'say', 'end'])   # the final reply closes it
 
     def test_limits_keep_a_runaway_reply_small(self):
-        stream = events('[board flow: X]\n' + 'say Line.\n' * 60 + 'item Step\n' * 120 + 'column A\n' * 9)
+        stream = events('[board flow: X]\n' + 'say Line.\n' * 60 + 'item Step\n' * 120 + ''.join(f'column C{i}\n' for i in range(9)))
         self.assertEqual(stream.counts['say'], 60); self.assertEqual(len(stream.spoken), 40)
         self.assertEqual(sum(e['op'] == 'item' for e in stream.events), 90)
         self.assertEqual(sum(e['op'] == 'column' for e in stream.events), 4)
@@ -118,6 +118,11 @@ class BoardStreamTests(unittest.TestCase):
             self.assertEqual(brain.board.board_reply('Just text.'), 'Just text.')
             self.assertEqual(brain.board.board_reply('[board flow: X]\nitem Only marks'), 'It’s on the board.')
         self.assertEqual(brain.board.board_spoken(PLAN), 'Birincisi, kime sattığını netleştir. Sonra kazanabileceğin iki kanal seç.')
+
+    def test_a_column_named_again_is_the_same_column(self):
+        stream = events('[board compare: Rent or buy]\ncolumn Renting\nitem A\ncolumn Buying\nitem B\ncolumn renting\nitem C\ncolumn Buying\n'
+                        'column Later\ncolumn Other\ncolumn Fifth\ncolumn Sixth')
+        self.assertEqual([e['text'] for e in stream.events if e['op'] == 'column'], ['Renting', 'Buying', 'renting', 'Buying', 'Later', 'Other'])
 
     def test_a_follow_up_sees_the_board(self):
         context = brain.board.board_context({'layout': 'flow', 'title': 'Plan', 'items': ['Know them', 'Pick channels', 7]})
@@ -186,6 +191,10 @@ out.text = [...document.querySelectorAll('#world tspan')].map(s => s.dataset.ful
 out.summary = board.summary();
 board.open({append: true}); board.add({op:'say',text:'Three.'}); board.add({op:'item',text:'Grow'}); board.flush(); await tick(100);
 out.appended = board.marks().length;
+board.open({layout: 'compare', title: 'Rent or buy'});
+for (const e of [{op:'column',text:'Renting'},{op:'item',text:'A'},{op:'column',text:'Buying'},{op:'item',text:'B'},{op:'column',text:'renting'},{op:'item',text:'C'}]) board.add(e);
+board.flush(); await tick(50);
+out.compare = board.marks().filter(m => m.kind === 'column').length;
 board.open({layout: 'chart', title: 'Revenue'}); [{op:'bar',text:'Q1',value:40},{op:'bar',text:'Q2',value:80,unit:'k'}].forEach(board.add); board.flush(); await tick(100);
 out.chart = [board.marks().length, document.querySelectorAll('.conn').length, document.getElementById('title').textContent];
 board.open({layout: '3d', title: 'Engine'}); board.add({op:'say',text:'Parts.'});
@@ -220,6 +229,7 @@ class BoardPageTests(unittest.TestCase):
         self.assertEqual(out['arrows'], 3)   # flow: an arrow between each pair of cards
         self.assertEqual(out['summary'], {'layout': 'flow', 'title': 'Plan', 'items': ['Before any line', 'Know them', 'Pick two', 'Measure']})
         self.assertEqual(out['appended'], 7)   # [board+] keeps what was drawn
+        self.assertEqual(out['compare'], 2)   # "column renting" again is the first column, not a third
         self.assertEqual(out['chart'], [2, 1, 'Revenue'])   # two bars and their axis
         self.assertEqual(out['three'][0], {'layout': '3d', 'title': 'Engine', 'items': ['Piston']})
         self.assertTrue(out['three'][1]); self.assertEqual(out['three'][2], 'none')

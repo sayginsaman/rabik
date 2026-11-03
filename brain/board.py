@@ -73,11 +73,14 @@ class BoardStream:
 
     def reset(self, emit=None):
         if emit is not None: self.emit = emit
-        self.state, self.used, self.spoken, self.counts, self.events = None, 0, [], {}, []   # state: None (unknown), 'board', 'no', 'done'
+        self.state, self.used, self.spoken, self.counts, self.events, self.columns = None, 0, [], {}, [], set()   # state: None (unknown), 'board', 'no', 'done'
 
     def _send(self, event):
         kind = 'say' if event['op'] == 'say' else 'column' if event['op'] == 'column' else 'mark'
-        if event['op'] != 'open':
+        if kind == 'column':   # "column Renting" again goes back to that column: only new names count
+            if event['text'].casefold() in self.columns: kind = None
+            else: self.columns.add(event['text'].casefold())
+        if kind and event['op'] != 'open':
             self.counts[kind] = self.counts.get(kind, 0) + 1
             if self.counts[kind] > MOST[kind]: return
         if event['op'] == 'say': self.spoken.append(event['text'])

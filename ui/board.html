@@ -209,7 +209,9 @@ function makeMark(ev) {
       }
     }
   } else if (ev.op === 'column') {
-    S.column++; m.column = S.column
+    const again = S.marks.find(x => x.kind === 'column' && x.ev.text.toLowerCase() === ev.text.toLowerCase())
+    if (again) { S.column = again.column; g.remove(); return null }   // back to a column already on the board
+    S.column = S.marks.filter(x => x.kind === 'column').length; m.column = S.column
     const lines = wrap(ev.text, 18, 1)
     m.w = 250; m.h = 46
     textBlock(g, 0, 22, lines, 'big', 30)
