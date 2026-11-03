@@ -44,7 +44,9 @@ print("microphone policy ok")
         )
         start = source[source.index("    func start()", source.index("final class App")):source.index("    func heard(", source.index("final class App"))]
         self.assertIn("AVCaptureDevice(uniqueID: $0.uid)", start)   # opens only the chosen mic
-        self.assertNotIn("AVAudioEngine()", source)   # its input node opens the default (Bluetooth) mic first
+        speaker = source[source.index("final class Speaker"):source.index("\n}\n", source.index("final class Speaker"))]
+        self.assertNotIn("AVAudioEngine()", source.replace(speaker, ""))   # its input node opens the default (Bluetooth) mic first; only the
+        # speaking voice uses one (Speaker), for Apple's echo cancellation while it talks
         self.assertIn("cfg.microphoneCaptureDeviceID = microphoneID", source)
         self.assertIn("microphoneID: demo ? nil : listenMic()?.uid", source)
 

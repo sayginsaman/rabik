@@ -148,8 +148,8 @@ precondition(usage == "Today: $0.03 · asks $0.01 · agents $0.02", "usage did n
         swift = """import Cocoa
 let controlKey = 1, optionKey = 2
 """ + prefs + """
-precondition(!Prefs.set("speak", true), "a write to an unwritable folder reported success")
-precondition(!Prefs.bool("speak"), "the unsaved value stayed in memory")
+precondition(!Prefs.set("pointer", true), "a write to an unwritable folder reported success")
+precondition(!Prefs.bool("pointer"), "the unsaved value stayed in memory")
 """
         with tempfile.TemporaryDirectory() as root:
             path, binary, blocked = Path(root) / "check.swift", Path(root) / "check", Path(root) / "not-a-folder"

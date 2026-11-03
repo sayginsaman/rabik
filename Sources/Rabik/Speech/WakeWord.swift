@@ -11,7 +11,8 @@ final class WakeWord {
     var canListen: () -> Bool = { false }
     var onWake: () -> Void = {}
     private(set) var listening = false
-    private var engine: AVAudioEngine?, request: SFSpeechAudioBufferRecognitionRequest?, task: SFSpeechRecognitionTask?
+    private let mic = Mic()   // only the chosen mic (Audio.swift): never flips Bluetooth headphones into call mode
+    private var request: SFSpeechAudioBufferRecognitionRequest?, task: SFSpeechRecognitionTask?
     private var poll: Timer?, limit: Timer?, locked = false, began = Date.distantPast, retryAt = Date.distantPast, backoff = 5.0
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
 
@@ -35,23 +36,25 @@ final class WakeWord {
         if want && !listening { begin() } else if !want && listening { end() }
     }
 
+    private func wait() { retryAt = Date().addingTimeInterval(backoff); backoff = min(backoff * 2, 120) }
+
     private func begin() {
-        guard let recognizer else { return }
-        let e = AVAudioEngine(), r = SFSpeechAudioBufferRecognitionRequest()
+        guard let recognizer, let device = listenMic().flatMap({ AVCaptureDevice(uniqueID: $0.uid) }) ?? AVCaptureDevice.default(for: .audio) else { return }
+        let r = SFSpeechAudioBufferRecognitionRequest()
         r.shouldReportPartialResults = true; r.taskHint = .search; r.contextualStrings = ["Hey Rabik", "Rabik"]
         r.requiresOnDeviceRecognition = true   // never sent to a server (check() starts only where this Mac can do it)
-        let input = e.inputNode, format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else { return }
-        input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, _ in r.append(buffer) }
-        do { try e.start() } catch { input.removeTap(onBus: 0); return }
-        engine = e; request = r; listening = true; began = Date()
+        request = r; listening = true; began = Date()
+        mic.start(device, sampleRate: 16000, { buffer in r.append(buffer) }) { [weak self] result in
+            guard let self, request === r, case .failure = result else { return }
+            wait(); end()   // the mic would not open: try again later, not every second
+        }
         task = recognizer.recognitionTask(with: r) { [weak self] result, error in
             let text = result?.bestTranscription.formattedString ?? "", done = error != nil || result?.isFinal == true
             DispatchQueue.main.async { [weak self] in
                 guard let self, request === r else { return }
                 if WakeWord.heard(text) { backoff = 5; end(); onWake(); return }
                 if done {   // check() starts a fresh one; one that failed at once waits longer each time, so the mic never flickers
-                    if Date().timeIntervalSince(began) < 3 { retryAt = Date().addingTimeInterval(backoff); backoff = min(backoff * 2, 120) } else { backoff = 5 }
+                    if Date().timeIntervalSince(began) < 3 { wait() } else { backoff = 5 }
                     end()
                 }
             }
@@ -61,8 +64,7 @@ final class WakeWord {
 
     func end() {
         limit?.invalidate(); limit = nil
-        task?.cancel(); request?.endAudio()
-        engine?.inputNode.removeTap(onBus: 0); engine?.stop()
-        engine = nil; request = nil; task = nil; listening = false
+        task?.cancel(); request?.endAudio(); mic.stop()
+        request = nil; task = nil; listening = false
     }
 }
