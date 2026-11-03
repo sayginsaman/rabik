@@ -812,7 +812,10 @@ Updater.schedule()
 // Test hook: `defaults write com.rabik.app demo -string "<request>"` then restart runs it once without the mic.
 if let demo = UserDefaults.standard.string(forKey: "demo") {
     UserDefaults.standard.removeObject(forKey: "demo")
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { app.js("listen"); app.show(); app.js("words", demo); app.run(demo) }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {   // as if it was said: a voice-only pill when that is on
+        app.voiceOnly = Prefs.bool("speak") && !Prefs.bool("showWords"); app.pill(app.voiceOnly, voice: app.voiceOnly)
+        app.js("listen"); app.show(); app.js("words", demo); app.run(demo)
+    }
 }
 
 // ⌘X/C/V/A/Z in every Rabik text field (typing box, choices, Settings, meetings): a menu-bar-less app has no Edit

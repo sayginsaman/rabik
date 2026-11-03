@@ -15,7 +15,7 @@ class SpeakerTests(unittest.TestCase):
     def test_settings_default_to_siri_and_stopping_when_you_talk(self):
         source = native_source()
         defaults = source[source.index('static let defaults'):source.index('static let retiredKeys')]
-        self.assertIn('"speak": true, "voice": "", "bargeIn": true,', defaults)
+        self.assertIn('"speak": true, "showWords": false, "voice": "", "bargeIn": true,', defaults)
         page = (ROOT / 'ui/settings.html').read_text()
         self.assertIn('<select data-k="voice" id="voice" aria-label="Voice"></select>', page)
         self.assertIn('<input type="checkbox" data-k="bargeIn">', page)

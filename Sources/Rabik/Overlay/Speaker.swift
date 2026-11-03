@@ -12,7 +12,7 @@ final class Speaker {
     static let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 22050, channels: 1, interleaved: false)!
     var onIdle: (() -> Void)?   // the last queued sentence was spoken
     var onInterrupted: (() -> Void)?   // the user started talking over it
-    private(set) var speaking = false
+    private(set) var speaking = false, failed = false   // failed: the last say had words but no audio engine to play them
     private var engine: AVAudioEngine?, player: AVAudioPlayerNode?
     private var generation = 0, pending = 0, loudSince: Date?, startedAt = Date.distantPast, listening = false   // listening: the mic tap for Stop when I talk
     private var queued: [(started: ((Double) -> Void)?, seconds: Double)] = []   // scheduled sentences not yet played to the end, in order
@@ -49,8 +49,10 @@ final class Speaker {
     // started: each sentence as it starts to play, with how long it lasts (the live board draws its marks across it). A sentence
     // that could not be rendered still calls it, with a reading-pace guess, so a drawing never waits on a voice that won't come.
     func say(_ sentences: [String], voice: AVSpeechSynthesisVoice?, started: ((Double) -> Void)? = nil) {
+        failed = false
         guard !sentences.isEmpty else { return }
         if !speaking { begin() }
+        failed = !speaking
         guard speaking else { return }   // no audio engine: nothing will play (callers see speaking == false)
         let g = generation
         for sentence in sentences {

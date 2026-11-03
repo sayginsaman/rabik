@@ -383,6 +383,7 @@
     <div class="group">
       <div class="row"><div class="t"><b>Show answers</b><span>Word by word as Rabik writes, or all at the end.</span></div><div class="seg" data-k="showAnswers"><button data-v="stream">As they arrive</button><button data-v="once">All at once</button></div></div>
       <div class="row"><div class="t"><b>Read answers aloud</b><span>Esc stops it.</span></div><label class="sw"><input type="checkbox" data-k="speak"></label></div>
+      <div class="row"><div class="t"><b>Show what I said and the answer</b><span>Off: Rabik only speaks. History keeps the text.</span></div><label class="sw"><input type="checkbox" data-k="showWords"></label></div>
       <div class="row"><div class="t"><b>Voice</b><span id="voicehint">Other languages use their best voice.</span></div><select data-k="voice" id="voice" aria-label="Voice"></select></div>
       <div class="row"><div class="t"><b>Stop when I talk</b><span>Speak over Rabik to stop it, on the Mac’s own mic and speakers.</span></div><label class="sw"><input type="checkbox" data-k="bargeIn"></label></div>
       <div class="row"><div class="t"><b>Live board</b><span>Plans, comparisons and how things work, drawn on a card as Rabik speaks.</span></div><label class="sw"><input type="checkbox" data-k="board" aria-label="Live board"></label></div>
@@ -748,8 +749,8 @@
   const paintVoices = () => { const s = $('voice'); s.replaceChildren(new Option('Automatic (Siri)', ''), ...voices.map(v => new Option(v.name, v.id)));
     if (P.voice && !voices.some(v => v.id === P.voice)) s.append(new Option('Chosen voice', P.voice)); s.value = P.voice || '';
     $('voicehint').textContent = voices.length ? 'Other languages use their best voice.' : 'Add natural voices: Accessibility → Spoken Content → Manage Voices.';
-    for (const k of ['voice', 'bargeIn']) { const row = document.querySelector(`[data-k=${k}]`).closest('.row'); row.classList.toggle('dim', !P.speak); }
-    $('voice').disabled = !P.speak; document.querySelector('[data-k=bargeIn]').disabled = !P.speak; };
+    for (const k of ['voice', 'bargeIn', 'showWords']) { const row = document.querySelector(`[data-k=${k}]`).closest('.row'); row.classList.toggle('dim', !P.speak); }
+    $('voice').disabled = !P.speak; document.querySelector('[data-k=bargeIn]').disabled = !P.speak; document.querySelector('[data-k=showWords]').disabled = !P.speak; };
   let meetingLanguages = [];   // Rabik.app reads them from Apple's speech models once it starts
   const paintMeetingLanguages = () => { const s = $('meetinglanguage'); s.replaceChildren(new Option('Automatic', ''), ...meetingLanguages.map(l => new Option(l.name, l.id)));
     if (P.meetingLanguage && !meetingLanguages.some(l => l.id === P.meetingLanguage)) s.append(new Option(P.meetingLanguage, P.meetingLanguage)); s.value = P.meetingLanguage || ''; };
@@ -1136,6 +1137,7 @@
     reveal(item) { want = item; reveal(); },
     showMeeting(id) { expectedMeeting = id; post({do: 'meetingOpen', id}); },   // a source chip under an answer
     showPerson(id) { wantedPerson = id; post({ do: 'people' }); },
+    showHistory() { $('askq').scrollIntoView({block: 'start'}); $('askq').focus(); },   // menu bar → History…
     mcp(r) { const gpt = r.target === 'chatgpt', b = $(gpt ? 'mcpaddgpt' : 'mcpadd'); b.disabled = !!r.added; b.textContent = r.added ? 'Added' : gpt ? 'Add to ChatGPT' : 'Add to Claude Code'; if (r.error) showNotice(r.error); },
     goals(r) { if (r.note && !/^Goal added|^Done|^Back/.test(r.note)) showNotice(r.note); if (r.goals) paintGoals(r.goals); },
     people(r) { if (r.error) { $('peoplecount').textContent = r.error; return; } savedPeople = r.people || []; paintPeople();

@@ -173,7 +173,7 @@ final class App: NSObject, WKScriptMessageHandler {
             let all = Speaker.sentences(spoken(a))
             if said.isEmpty || !all.starts(with: said) { shush(); siriVoice(); sayVoice = Speaker.voice(for: Speaker.language(of: a)) }   // a voice not downloaded at first use may become available later
             speaker.say(Array(all.dropFirst(said.count)), voice: sayVoice); said = all; sayFinal = true
-            if !speaker.speaking { said = []; sayFinal = false }
+            if !speaker.speaking { said = []; sayFinal = false; if speaker.failed { unvoice() } }   // no voice came out: the answer is read in the box
         }
     }
     // A source chip under an answer (brain/sources.py): the meeting, day, page or file, person or fact the answer read.
@@ -304,7 +304,11 @@ final class App: NSObject, WKScriptMessageHandler {
         drawing.cleanup = Hands.restoreAccessibility
         drawing.status = { [weak self] words in self?.js("msg",words) }
         drawing.speechEnabled = { Prefs.bool("speak") }
-        speaker.onIdle = { [weak self] in guard let self, sayFinal else { return }; said = []; sayFinal = false; hide(after: 2) }   // spoken to the end
+        speaker.onIdle = { [weak self] in
+            guard let self else { return }
+            if voiceOnly { hide(after: 0.6) }   // a voice pill (or a board's last line): gone once it is said; still busy, it stays
+            guard sayFinal else { return }; said = []; sayFinal = false; hide(after: voiceOnly ? 0.6 : 2)   // spoken to the end
+        }
         speaker.onInterrupted = { [weak self] in self?.said = []; self?.sayFinal = false; self?.board.flush() }   // the user talked over it
         board.speak = { [weak self] text, started in self?.boardSay(text, started) ?? false }
         board.onAsk = { [weak self] question in self?.typed(question) }   // a 3D part clicked
@@ -541,7 +545,10 @@ final class App: NSObject, WKScriptMessageHandler {
         if drawing.active && !stuck && !dragging { avoidDrawing() }   // grew onto a mark; a box the user placed waits for the next step
     }
 
-    func js(_ call: String, _ arg: Any? = nil) { callJS(web, "ui." + call, arg.map { [$0] } ?? []) }
+    func js(_ call: String, _ arg: Any? = nil) {
+        if voiceOnly && ["msg", "ask", "pick", "rewrite", "respond", "notice", "improve"].contains(call) { unvoice() }
+        callJS(web, "ui." + call, arg.map { [$0] } ?? [])
+    }
     var pointerNext: String?, pointerBusy = false, pointerHand = false
     func pointer(_ args: String) {   // Rabik never activates, so WebKit runs no :hover or cursor in the box: the page marks .hot and says if the cursor is a hand
         pointerNext = args
@@ -601,7 +608,7 @@ final class App: NSObject, WKScriptMessageHandler {
         DispatchQueue.main.asyncAfter(deadline: .now() + s) { [self] in
             guard g == gen, !busy, !engine.isRunning, !hovering else { return }
             guard !pinned, !stuck, !composing, !mini.holds, !drawing.active, !drawing.hasInput, ringGone == nil, !speaker.speaking else {   // moved or drawn on: only ✕ (Esc for a drawing); an answer's ring keeps its text up
-                if pillOn && !dictating { pill(false) }   // the box stays up for its answer or drawing: give it back, not a pill stuck on its check
+                if pillOn && !dictating && !voiceOnly { pill(false) }   // the box stays up for its answer or drawing: give it back, not a pill stuck on its check (a voice pill stays a pill)
                 return
             }
             NSAnimationContext.runAnimationGroup({ $0.duration = 0.3; panel.animator().alphaValue = 0 },
@@ -652,8 +659,10 @@ final class App: NSObject, WKScriptMessageHandler {
         if let r = escRef { UnregisterEventHotKey(r); escRef = nil }
     }
     var pillOn = false
-    func pill(_ on: Bool) {   // dictation is a pill the page sizes (a hidden one starts as the dot it grows from); the box gets its saved width back
-        pillOn = on; js("dictate", on)
+    var voiceOnly = false   // Settings → Show what I said off: a spoken ask is a small pill and its answer is only heard (History keeps the text)
+    func pill(_ on: Bool, voice: Bool = false) {   // dictation (and a voice-only ask) is a pill the page sizes (a hidden one starts as the dot it grows from); the box gets its saved width back
+        pillOn = on
+        if on { js(voice ? "dictate" : "voicePill", false); js(voice ? "voicePill" : "dictate", true) } else { js("dictate", false); js("voicePill", false) }
         guard !on || !panel.isVisible else { return }
         let w = CGFloat(on ? 36 : max(340, Prefs.num("boxW")))
         var f = panel.frame; guard f.width != w || on && f.height != w else { return }
@@ -661,6 +670,9 @@ final class App: NSObject, WKScriptMessageHandler {
         if on { if !boxAtBottom { f.origin.y = f.maxY - w }; f.size.height = w }
         frame(f)
     }
+
+    // Something to read or answer (a question, choices, a draft, a problem): the pill opens into the box, with the words and answer.
+    func unvoice() { guard voiceOnly else { return }; voiceOnly = false; pill(false) }
 
     func allow(_ ok: Bool) {
         let path = askFile, need = askNeed["need"] as? String ?? "", app = askNeed["app"] as? String ?? ""
@@ -982,7 +994,8 @@ final class App: NSObject, WKScriptMessageHandler {
         if !dictate && !drawingReply { targetScreen = currentRequestScreen(panel) }   // a guide may have moved the box to another display
         text = ""; ahead = ""; speechFailed = false; consumed = 0; consumedText = ""; liveRevised = false; did = []
         if !panel.isVisible && Date().timeIntervalSince(lastDone) > 300 { js("reset"); try? FileManager.default.removeItem(atPath: recent) }
-        pill(dictate)
+        voiceOnly = !dictate && !replying && Prefs.bool("speak") && !Prefs.bool("showWords") && !(Prefs.str("input") == "type" && !clickTalk)
+        pill(dictate || voiceOnly, voice: voiceOnly)
         if !dictate {
             if !replying && Prefs.str("input") == "type" && !clickTalk {   // Settings: the shortcut opens the box ready to type
                 if composing && panel.isVisible { return dismiss() }   // pressed again = put it away
@@ -1482,7 +1495,7 @@ final class App: NSObject, WKScriptMessageHandler {
         if !drawing.active { targetScreen = currentRequestScreen(panel) }   // follow-ups stay with the guide, not its relocated box
         text = t; replacement = nil
         if !heard { replyAgent = agentCard }   // a spoken drawing reply keeps the done card captured at key-down
-        if !heard { js("listen", keep); if let s = selection { js("selected", s.text) } }; show(); js("words", t); run(t)
+        if !heard { unvoice(); js("listen", keep); if let s = selection { js("selected", s.text) } }; show(); js("words", t); run(t)   // typed: read in the box
     }
 
     func finish() {
@@ -1626,7 +1639,7 @@ final class App: NSObject, WKScriptMessageHandler {
                 if !self.showAgent.isEmpty { agentsUI.show(self.showAgent); self.showAgent = "" }
                 if !self.showRecap.isEmpty { dailyRecap.open(self.showRecap); self.showRecap = "" }
                 Apps.q.async { Apps.sync() }
-                self.hide(after: self.linger(max(6, min(30, Double(self.answer.count) / 12))))   // longer answers stay longer
+                self.hide(after: self.voiceOnly ? 1 : self.linger(max(6, min(30, Double(self.answer.count) / 12))))   // longer answers stay longer; a voice pill goes once it is said
             }
         }
         do { try p.run() } catch { return nil }

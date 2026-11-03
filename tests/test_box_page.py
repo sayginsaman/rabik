@@ -35,6 +35,9 @@ ui.listen(); ui.agentSteered({id: 'b1', title: 'Ebikes', steer: {text: 'under $1
 out.steerAndNew = ack();
 ui.listen(); ui.agentStarted({id: 'c1', title: 'Ebikes', status: 'running'}); ui.agentStarted({id: 'd1', title: 'Helmets', status: 'queued'}); out.two = ack();
 ui.listen(); ui.agentStarted({id: 'e1', title: 'Tents', status: 'queued'}); ui.agentStarted({id: 'f1', title: 'Stoves', status: 'running'}); ui.agentStarted({id: 'g1', title: 'Maps', status: 'running'}); out.mix = ack();
+const box = document.getElementById('card'), size = () => [box.offsetWidth, box.offsetHeight];   // a voice-only ask: a pill, its answer only heard
+ui.voicePill(true); ui.listen(); ui.words('capital of Australia'); out.pill = [size()]; ui.think(); out.pill.push(size()); ui.line('✓ Canberra.'); out.pill.push(size());
+ui.voicePill(false); out.opened = [box.offsetWidth > 200, document.querySelector('#thread .turn:last-child .a').textContent];
 ui.dictate(true); ui.learned('Rabik'); const dn = document.getElementById('dn');
 out.learned = [dn.textContent, getComputedStyle(dn).display, dn.className];
 return out;
@@ -77,6 +80,8 @@ class BoxPageTests(unittest.TestCase):
         self.assertEqual(out['two'], 'I started an agent on “Ebikes”. I’ll ping you when it’s done. Queued an agent for “Helmets”. It starts when another one finishes.')   # the queued one is not called started
         self.assertEqual(out['mix'], 'Queued an agent for “Tents”. It starts when another one finishes. I started agents on “Stoves” and “Maps”. I’ll ping you when they’re done.')
         self.assertEqual(out['learned'], ['Learned “Rabik” Undo', 'flex', 'dn tick'])
+        self.assertEqual(out['pill'], [[95, 36], [36, 36], [36, 36]])   # the orb and its wave, then only the orb: no words, no answer
+        self.assertEqual(out['opened'], [True, 'Canberra.'])   # opened up (something to read), the answer is there
 
 
 if __name__ == '__main__':

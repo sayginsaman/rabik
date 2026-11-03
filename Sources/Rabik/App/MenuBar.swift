@@ -62,6 +62,7 @@ final class MenuBar: NSObject, NSMenuDelegate {
         head.isEnabled = false; m.addItem(head)
         m.addItem(.separator())
         add(m, "Ask Rabik", #selector(ask), "")
+        add(m, "History…", #selector(history), "")   // what was said and answered, as text (a voice-only ask shows none of it)
         add(m, "Dictation History…", #selector(dictationHistory), "")
         if pasteHotkeyRegistered && (app.lastDictation ?? DictationData.archive.history.first?.text) != nil {
             add(m, "Paste Last Dictation", #selector(pasteDictation), "v"); m.items.last?.keyEquivalentModifierMask = [.control, .command]
@@ -104,6 +105,7 @@ final class MenuBar: NSObject, NSMenuDelegate {
     @objc func pause() { Prefs.set("paused", !Prefs.bool("paused")); if Prefs.bool("paused") { meeting.stop(paused: true); app.close(clear: false); agentsUI.stopAll() }; paint(); settings.push() }
     @objc func openSettings() { settings.open() }
     @objc func dictationHistory() { settings.open(tab: "dictation") }
+    @objc func history() { settings.open(tab: "usage", then: "showHistory", "") }
     @objc func pasteDictation() { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { app.pasteLastDictation() } }   // after the menu closes and focus returns
     @objc func openAgents() { agentsUI.openView() }
     @objc func hideAgents() { Prefs.set("agentsHidden",!Prefs.bool("agentsHidden")) }

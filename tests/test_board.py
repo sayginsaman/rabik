@@ -263,6 +263,28 @@ class BoardPageTests(unittest.TestCase):
         self.assertIn('hover = {x: e.clientX, y: e.clientY}; wake()', page)   # one pick per frame, not per mouse event
 
 
+class VoiceOnlyTests(unittest.TestCase):
+    def test_a_spoken_ask_is_a_pill_and_its_answer_is_only_heard(self):
+        app, page, settings = native_source(), (ROOT / 'ui/ui.html').read_text(), (ROOT / 'ui/settings.html').read_text()
+        self.assertIn('voiceOnly = !dictate && !replying && Prefs.bool("speak") && !Prefs.bool("showWords") && !(Prefs.str("input") == "type" && !clickTalk)', app)
+        self.assertIn('pill(dictate || voiceOnly, voice: voiceOnly)', app)
+        # anything to read or answer opens the pill into the box; a typed ask is read in the box; no voice at all shows the answer
+        self.assertIn('if voiceOnly && ["msg", "ask", "pick", "rewrite", "respond", "notice", "improve"].contains(call) { unvoice() }', app)
+        self.assertIn('if !heard { unvoice(); js("listen", keep)', app)
+        self.assertIn('if speaker.failed { unvoice() }', app)
+        self.assertIn('if voiceOnly { hide(after: 0.6) }', app)   # gone once it is said
+        self.assertIn('if pillOn && !dictating && !voiceOnly { pill(false) }', app)
+        self.assertIn("body.voice :is(#thread, #comp, #pointbar, .e, #grip) { display: none; }", page)
+        self.assertIn("voicePill(on) { document.body.classList.toggle('voice', !!on); fit(false); }", page)
+        self.assertIn('js(voice ? "voicePill" : "dictate", true)', app)   # not ui.voice: that is the box's mute button
+        self.assertIn("document.body.matches('.dictate, .voice') ? [card.offsetWidth, card.offsetHeight]", page)
+        self.assertIn('data-k="showWords"', settings)
+        menu = (ROOT / 'Sources/Rabik/App/MenuBar.swift').read_text()
+        self.assertIn('add(m, "History…", #selector(history), "")', menu)   # the text lives in History
+        self.assertIn('settings.open(tab: "usage", then: "showHistory", "")', menu)
+        self.assertIn("showHistory() { $('askq').scrollIntoView", settings)
+
+
 class BoardNativeTests(unittest.TestCase):
     def test_app_wiring(self):
         app = native_source()
@@ -303,7 +325,7 @@ for vf in [NSRect(x: 0, y: 0, width: 1512, height: 944), NSRect(x: 1512, y: 0, w
 
     def test_voice_is_on_by_default_with_a_mute_button(self):
         prefs = (ROOT / 'Sources/Rabik/Core/Prefs.swift').read_text()
-        self.assertIn('"speak": true, "voice": "",', prefs)
+        self.assertIn('"speak": true, "showWords": false, "voice": "",', prefs)   # spoken, like HeyClicky: no words or answer on screen
         self.assertIn('if saved["speakDefaulted"] == nil { values["speak"] = true; values["speakDefaulted"] = true }', prefs)
         app, page = native_source(), (ROOT / 'ui/ui.html').read_text()
         self.assertIn('if let on = b["voice"] as? Bool { Prefs.set("speak", on); if !on { shush() }', app)
