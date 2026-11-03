@@ -15,7 +15,7 @@ class SpeakerTests(unittest.TestCase):
     def test_settings_default_to_siri_and_stopping_when_you_talk(self):
         source = native_source()
         defaults = source[source.index('static let defaults'):source.index('static let retiredKeys')]
-        self.assertIn('"speak": false, "voice": "", "bargeIn": true,', defaults)
+        self.assertIn('"speak": true, "voice": "", "bargeIn": true,', defaults)
         page = (ROOT / 'ui/settings.html').read_text()
         self.assertIn('<select data-k="voice" id="voice" aria-label="Voice"></select>', page)
         self.assertIn('<input type="checkbox" data-k="bargeIn">', page)
@@ -47,7 +47,7 @@ print("voices ok")
 
     def test_the_streamed_answer_starts_speaking_and_a_rewrite_starts_over(self):
         app = (ROOT / 'Sources/Rabik/Overlay/App.swift').read_text()
-        self.assertIn('if line.hasPrefix("… "), Prefs.bool("speak"), !guided { self.speakAhead(', app)
+        self.assertIn('if line.hasPrefix("… "), Prefs.bool("speak"), !guided, !boarded { self.speakAhead(', app)
         self.assertIn('guard done.starts(with: said) else { shush(); return }', app)
         self.assertIn('if said.isEmpty || !all.starts(with: said) { shush();', app)
         self.assertIn('ringGone == nil, !speaker.speaking else {', app)   # the box stays while it talks

@@ -25,7 +25,7 @@ enum Prefs {
             ["name": "Technical", "text": "Precise terms, numbers and how it works. Name the tradeoff."],
             ["name": "Friendly", "text": "Warm and conversational, like talking to a colleague. Simple words."]],
         "selection": true, "ahead": true, "aheadDelay": 0.7, "live": true, "screen": "auto", "openOn": "here", "workIn": "back", "miniScreen": true, "draw": true, "guideSteps": "auto", "pageJS": false,
-        "speak": false, "voice": "", "bargeIn": true, "activity": false, "activityExclude": [[String: String]](), "peopleHidden": [String](), "connectorOffers": true, "routineLate": "skip", "connectorMuted": [String](), "connectorSnooze": [String: Double](), "showAnswers": "stream", "autoCopy": false, "hideWhenSharing": true, "menuIcon": true, "autoUpdate": true,
+        "speak": true, "voice": "", "bargeIn": true, "activity": false, "activityExclude": [[String: String]](), "peopleHidden": [String](), "connectorOffers": true, "routineLate": "skip", "connectorMuted": [String](), "connectorSnooze": [String: Double](), "showAnswers": "stream", "autoCopy": false, "hideWhenSharing": true, "menuIcon": true, "autoUpdate": true,
         "learn": true, "safe": true, "pointer": false, "meeting": false, "meetingLanguage": "", "meetingTranslate": false, "meetingSave": true, "meetingAuto": "sure", "meetingNudge": false, "meetingDetect": true, "learnMe": true, "stats": true, "tips": true, "askMe": true, "meetingSummary": true, "input": "voice", "talkMode": "hold", "speechModel": "speech", "improve": false, "improveAsked": false, "draftInsert": "ask",
         "dictateHotkeyCode": -1, "dictateHotkeyMods": 0, "dictateHotkeyLabel": "", "dictateMode": "cleanup", "dictateHistory": true, "dictateLearn": true, "dictateWords": [], "dictateFixes": [String: String](), "boxW": 500, "boxH": 420]
     static let retiredKeys = ["quietAudio", "quietLevel", "autoCopy", "askMe", "linger", "soundStart", "soundRelease", "soundDone", "soundStop",
@@ -45,6 +45,7 @@ enum Prefs {
             values["routing"] = values["model"] as? String != "haiku" ? "capable" :
                 (values["escalate"] as? Bool != false && values["escalateAuto"] as? Bool != false ? "balanced" : "cheapest")
         }
+        if saved["speakDefaulted"] == nil { values["speak"] = true; values["speakDefaulted"] = true }   // voice became the default (Nov 2026): on once for everyone, then the user's choice
         for (k, old) in [("boxW", 460.0), ("boxH", 360.0)] where (values[k] as? NSNumber)?.doubleValue == old { values[k] = defaults[k] }   // every write saves the defaults too: the old size untouched is no choice
         // No dictation shortcut, never cleared on purpose: fn alone (code -2, rabikFnKey), unless the talk shortcut already holds fn.
         if values["dictateHotkeyLabel"] as? String == "", values["dictateHotkeyOff"] as? Bool != true, (values["hotkeyMods"] as? Int ?? 0) & (1 << 20) == 0 {

@@ -228,6 +228,15 @@
   .rewrite button.del { background: #c92b24; }
   .sel { font-size: 11.5px; color: var(--fg2); margin-bottom: 10px; padding-left: 8px; border-left: 2px solid rgba(10,132,255,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+  /* voice: a speaker in the corner; muted, it shows a cross and answers stay silent until it is clicked again */
+  #voice { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; opacity: .55; cursor: pointer;
+    transition: transform .3s var(--spring), opacity .2s, background .2s; }
+  #voice svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+  #voice .cone { fill: #fff; stroke: none; } #voice .slash { display: none; }
+  #voice.off .waves { display: none; } #voice.off .slash { display: inline; } #voice.off { opacity: .45; }
+  #voice:is(:hover,.hot) { opacity: 1; transform: scale(1.12); background: rgba(255,255,255,.08); }
+  #voice:focus-visible { outline: 2px solid #64d2ff; outline-offset: 3px; }
+
   /* safe mode off: a small tag says so; clicking it turns safe mode back on */
   #mode { flex: none; display: none; align-items: center; gap: 5px; height: 22px; padding: 0 9px;
     box-sizing: border-box; border-radius: 11px; font-size: 11px; font-weight: 500; line-height: 1; color: #ffb340; cursor: pointer;
@@ -411,7 +420,7 @@
 </style></head>
 <body>
 <div id="card">
-  <div id="head"><canvas id="orb"></canvas><div id="status"></div><button id="agents-pill" hidden><i></i><span></span></button><div id="mode" role="button" tabindex="0" title="Safe mode is off. Click to turn it on.">Full access</div><div id="x"><svg viewBox="0 0 10 10"><path d="M1 1L9 9M9 1L1 9"/></svg></div></div>
+  <div id="head"><canvas id="orb"></canvas><div id="status"></div><button id="agents-pill" hidden><i></i><span></span></button><div id="mode" role="button" tabindex="0" title="Safe mode is off. Click to turn it on.">Full access</div><div id="voice" role="button" tabindex="0" title="Rabik reads answers aloud. Click to mute." aria-label="Mute Rabik's voice"><svg viewBox="0 0 16 16"><path class="cone" d="M2.5 6h2.2L8 3.2v9.6L4.7 10H2.5z"/><path class="waves" d="M10.4 5.6a3.2 3.2 0 0 1 0 4.8M12.3 3.8a5.8 5.8 0 0 1 0 8.4"/><path class="slash" d="M10.2 5.8l4 4.4M14.2 5.8l-4 4.4"/></svg></div><div id="x"><svg viewBox="0 0 10 10"><path d="M1 1L9 9M9 1L1 9"/></svg></div></div>
   <span id="dictwave" role="img" aria-label="Listening"></span>
   <div id="thread"></div>
   <svg id="lock" viewBox="0 0 10 13" role="img" aria-label="Locked. Press the shortcut to finish."><path d="M2.5 6V4a2.5 2.5 0 0 1 5 0v2"/><rect x="0" y="5.5" width="10" height="7.5" rx="2"/></svg>
@@ -555,6 +564,9 @@
   };
   const enableSafeMode = () => { status('Safe mode on · Settings turns it off'); post({ safe: true }); };
   $('mode').onclick = enableSafeMode;
+  const toggleVoice = () => { const on = $('voice').classList.contains('off'); ui.voice(on); status(on ? 'Voice on' : 'Muted · Click the speaker to hear answers again'); post({ voice: on }); };
+  $('voice').onclick = toggleVoice;
+  $('voice').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleVoice(); } };
   $('mode').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); enableSafeMode(); } };
   let followFrame=0;
   const follow = ms => { cancelAnimationFrame(followFrame); const end = performance.now() + ms; (function f() { fit(); if (performance.now() < end) followFrame=requestAnimationFrame(f); })(); };   // interrupt a prior transition instead of stacking geometry loops
@@ -1066,6 +1078,7 @@
       if (b) return b.click();
       if (document.body.classList.contains('dictate')) return;   // the pill has no typing box: only its buttons act
       if (el?.closest('#mode')) return enableSafeMode();
+      if (el?.closest('#voice')) return toggleVoice();
       if ($('comp').classList.contains('pick')) pickRow(false);   // a click anywhere else closes the model row
       if (el?.closest('.tip .off')) { post({ off: 'tips' }); el.closest('.tip').remove(); status('Tips off · The menu bar turns them back on'); return fit(); }   // its own "Turn off": no more of that kind
       if (el?.closest('.tip')) { el.closest('.tip').remove(); return fit(); }   // click a tip: it goes
@@ -1191,6 +1204,7 @@
       setTimeout(() => d.isConnected && done(-1, 'Pick expired'), 105000);   // the brain stops waiting at 110 s
     },
     mode(safe) { $('mode').classList.toggle('on', !safe); },
+    voice(on) { $('voice').classList.toggle('off', !on); $('voice').title = on ? 'Rabik reads answers aloud. Click to mute.' : 'Muted. Click to hear answers aloud.'; },
     models({ list, pick }) {   // Claude's models, or the custom server's; none for a client without a choice
       const name = v => ({cheapest: 'Cheapest', balanced: 'Balanced', capable: 'Most capable'})[v] || (/^(haiku|sonnet|opus)$/.test(v) ? v[0].toUpperCase() + v.slice(1) : v);
       $('model').hidden = !list.length; $('model').textContent = name(pick);
