@@ -429,7 +429,7 @@ function makeThree(canvas) {
   const fs = `precision mediump float;varying vec3 vn;varying vec3 vw;uniform vec3 c;uniform float pick,hot,alpha;uniform vec3 eye;
     void main(){if(pick>.5){gl_FragColor=vec4(c,1.);return;}vec3 N=normalize(vn);vec3 L=normalize(vec3(.5,.9,.6));vec3 E=normalize(eye-vw);
     float d=max(dot(N,L),0.),fill=max(dot(N,normalize(vec3(-.6,.2,-.4))),0.)*.25,rim=pow(1.-max(dot(N,E),0.),2.5)*.25;
-    vec3 col=c*(.38+.62*d+fill)+vec3(rim)+vec3(.12,.1,.02)*hot;gl_FragColor=vec4(col,alpha);}`
+    vec3 col=c*(.38+.62*d+fill)+vec3(rim)+vec3(.12,.1,.02)*hot;if(alpha<1.)col*=.82;gl_FragColor=vec4(col,alpha);}`
   const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o }
   const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog); gl.useProgram(prog)
   const loc = n => gl.getUniformLocation(prog, n), aP = gl.getAttribLocation(prog, 'p'), aN = gl.getAttribLocation(prog, 'n')
@@ -574,7 +574,7 @@ function makeThree(canvas) {
     let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
     shown.forEach(p => { p.box = box(p); for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], p.box[0][k]); hi[k] = Math.max(hi[k], p.box[1][k]) } })
     p_target = lo.map((l, k) => (l + hi[k]) / 2)
-    fitDist = Math.max(2.5, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 1.15)
+    fitDist = Math.max(3, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 1.6)   // the whole model in view at any turn
     // a shell: a part with another, clearly thinner one inside it (an engine block around its piston, not a crankshaft and its pin)
     const inside = (a, b) => b !== a && a.box && a.target > 0 && b.target > 0 && Math.min(...a.m.ev.size) > 1.6 * Math.min(...b.m.ev.size) && [0, 1, 2].every(k => a.box[0][k] < b.m.ev.at[k] && b.m.ev.at[k] < a.box[1][k])
     parts.forEach(a => { a.shell = parts.some(b => inside(a, b)) })
