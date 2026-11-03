@@ -234,8 +234,8 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         if k == "meetingBriefs", v as? Bool == true, EKEventStore.authorizationStatus(for: .event) == .notDetermined {
             calendar.requestFullAccessToEvents { ok, _ in if !ok { DispatchQueue.main.async { Prefs.set("meetingBriefs", false); settings.push() } } }
         }
-        if k == "wakeWord", v as? Bool == true, SFSpeechRecognizer.authorizationStatus() == .notDetermined {
-            SFSpeechRecognizer.requestAuthorization { ok in if ok != .authorized { DispatchQueue.main.async { Prefs.set("wakeWord", false); settings.push() } } }
+        if k == "wakeWord", v as? Bool == true, AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {   // it hears with the asks' on-device model: only the mic needs asking
+            AVCaptureDevice.requestAccess(for: .audio) { ok in if !ok { DispatchQueue.main.async { Prefs.set("wakeWord", false); settings.push() } } }
         }
         if k == "wakeWord", v as? Bool == false { wakeWord.end() }
         if k == "meetingNudge", v as? Bool == true, EKEventStore.authorizationStatus(for: .event) != .fullAccess {

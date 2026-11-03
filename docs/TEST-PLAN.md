@@ -104,7 +104,8 @@ Bu build hakkında:
 - [ ] "Kiralamak mı satın almak mı?" → iki sütunlu karşılaştırma; "Q1 40, Q2 55 gelir grafiği çiz" → çubuk grafik.
 - [ ] Tahta çizerken konuş ya da kısayola bas → ses susar, kalan çizim hemen tamamlanır. ⤓ Downloads'a PNG kaydeder ("Saved to Downloads"), ✕ ya da Esc kapatır.
 - [ ] Kutudaki hoparlör düğmesi: tıklayınca sessize alır (çarpı görünür), cevaplar okunmaz; tahta okuma hızında çizilir. Tekrar tıklayınca açar. İlk açılışta ses varsayılan olarak açık.
-- [ ] Settings → General → Voice → "Hey Rabik"i aç (turuncu mikrofon noktası görünür) → "Hey Rabik" de → başlangıç sesi, dinleme başlar; sustuğunda soru gider. Rabik konuşurken, toplantıda ve ekran kilitliyken dinlemez. Kapatınca nokta kaybolur.
+- [ ] Settings → General → Voice → "Hey Rabik"i aç (turuncu mikrofon noktası görünür) → "Hey Rabik" de → başlangıç sesi, dinleme başlar; sustuğunda soru gider. Discord/Zoom aramasındayken de duyar. Rabik konuşurken, toplantı notu alırken ve ekran kilitliyken dinlemez. Kapatınca nokta kaybolur.
+- [ ] Ayrı mikrofon + ayrı hoparlör (USB mikrofon, monitör hoparlörü) ile canlı tahta sorusu sor → Mac donmaz, Activity Monitor'da coreaudiod %30'un altında kalır; 3D tahta 20 sn sonra dönmeyi bırakır ve WebKit %0'a iner.
 - [ ] Bir hedef ekle, 5 dakikadan uzun YouTube'da kal → "6 min on YouTube. Your goal: … Back to it?" bildirimi; günde en fazla 3, aralarında 45 dk. Hedef yokken gelmez.
 - [ ] Takvime 6 dk sonra, daha önce toplantı yaptığın biriyle bir toplantı koy → ~5 dk kala "Before “…” · in 5 min" bildirimi; tıklayınca brifing kutuda açılır ve okunur. Tanımadığın biriyle olan toplantıda gelmez.
 - [ ] Rabik'e kendinle ilgili bir şey öğret ("kahvemi yulaf sütlü içerim") → akşam özetinde "Learned about you" altında görünür; Keep ✓ işaretler, Forget About you'dan siler.

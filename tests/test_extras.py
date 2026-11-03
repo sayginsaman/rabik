@@ -144,17 +144,19 @@ for (app, title) in [("Google Chrome", "Lofi beats - YouTube"), ("Safari", "Home
         src = (ROOT / 'Sources/Rabik/Speech/WakeWord.swift').read_text()
         body = src[src.index('    static func heard'):src.index('    func start() {')]
         out = run_swift(SNIPPET_HEAD + 'enum WakeWord {\n' + body + '}\n' + r'''
-for t in ["Hey Rabik", "hey rabbit what time is it", "Hey, Robik", "OK Rabik", "hey Rebecca", "Rabik is great", "hey robert", "they rabbit", "the rabbit hole"] {
+for t in ["Hey Rabik", "hey rabbit what time is it", "Hey, Robik", "OK Rabik", "hey Rebecca", "Rabik is great", "hey robert", "they rabbit", "the rabbit hole", "Hey Rubik", "hi rabbi", "hey Robbie"] {
     print(WakeWord.heard(t))
 }''')
-        self.assertEqual(out[:9], ['true', 'true', 'true', 'true', 'true', 'false', 'false', 'false', 'false'])
+        self.assertEqual(out[:12], ['true', 'true', 'true', 'true', 'true', 'false', 'false', 'false', 'false', 'true', 'true', 'true'])
 
     def test_wiring_and_defaults(self):
         app, prefs = native_source(), (ROOT / 'Sources/Rabik/Core/Prefs.swift').read_text()
         self.assertIn('"focusNudges": true, "meetingBriefs": true, "wakeWord": false,', prefs)   # the mic stays off unless asked
-        self.assertIn('wakeWord.canListen = { !app.engine.isRunning && !app.busy && !app.dictating && !app.speaker.speaking && !meeting.running && callAppsOnMic().isEmpty }', app)
+        self.assertIn('wakeWord.canListen = { !app.engine.isRunning && !app.busy && !app.dictating && !app.speaker.speaking && !meeting.running }', app)   # a call app on the mic no longer deafens it
         self.assertIn('app.clickTalk = true; app.start(); if !app.engine.isRunning { app.clickTalk = false }', app)
-        self.assertIn('r.requiresOnDeviceRecognition = true', app); self.assertIn('recognizer?.supportsOnDeviceRecognition == true', app)   # never a server
+        wake = (ROOT / 'Sources/Rabik/Speech/WakeWord.swift').read_text()
+        self.assertIn('SpeechAnalyzer(modules: [transcriber])', wake); self.assertNotIn('SFSpeechRecognizer(', wake)   # the asks' on-device model: never a server, no offline Dictation needed
+        self.assertIn('mic.start(device, sampleRate: format.sampleRate', wake); self.assertIn('let convert = speechConverter(to: format)', wake)
         self.assertIn('if let brief = info["brief"] as? String { MeetingBriefs.show(', app)
         self.assertIn('guard Prefs.bool("focusNudges"), !Prefs.bool("paused"), !meeting.running, callAppsOnMic().isEmpty,', app)
         settings = (ROOT / 'ui/settings.html').read_text()
