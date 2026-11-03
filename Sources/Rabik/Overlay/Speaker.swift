@@ -14,7 +14,7 @@ final class Speaker {
     var onInterrupted: (() -> Void)?   // the user started talking over it
     private(set) var speaking = false
     private var engine: AVAudioEngine?, player: AVAudioPlayerNode?
-    private var generation = 0, pending = 0, loudSince: Date?, startedAt = Date.distantPast
+    private var generation = 0, pending = 0, loudSince: Date?, startedAt = Date.distantPast, listening = false   // listening: the mic tap for Stop when I talk
     private var queued: [(started: ((Double) -> Void)?, seconds: Double)] = []   // scheduled sentences not yet played to the end, in order
     private var sequence = 0, nextUp = 0, rendered: [Int: (sentence: String, started: ((Double) -> Void)?, buffer: AVAudioPCMBuffer?)] = [:]   // rendered out of order, played in order
     private let render = DispatchQueue(label: "rabik.speaker")   // AVSpeechSynthesizer voices: one synthesizer, one at a time
@@ -99,7 +99,7 @@ final class Speaker {
     func stop() {
         guard speaking else { return }
         generation += 1; pending = 0; speaking = false; loudSince = nil; queued = []; rendered = [:]; sequence = 0; nextUp = 0
-        player?.stop(); engine?.inputNode.removeTap(onBus: 0); engine?.stop(); engine = nil; player = nil
+        player?.stop(); if listening { engine?.inputNode.removeTap(onBus: 0) }; engine?.stop(); engine = nil; player = nil; listening = false   // inputNode alone would open the default mic
     }
 
     private func finished(_ g: Int) {
@@ -120,6 +120,7 @@ final class Speaker {
         }
         e.attach(p); e.connect(p, to: e.mainMixerNode, format: Speaker.format)
         if listen && e.inputNode.isVoiceProcessingEnabled {
+            listening = true
             let g = generation
             e.inputNode.installTap(onBus: 0, bufferSize: 1024, format: e.inputNode.outputFormat(forBus: 0)) { [weak self] buffer, _ in
                 guard let data = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
@@ -129,7 +130,7 @@ final class Speaker {
                 DispatchQueue.main.async { self?.heard(db, g) }
             }
         }
-        do { try e.start() } catch { speaking = false; e.inputNode.removeTap(onBus: 0); return }
+        do { try e.start() } catch { speaking = false; if listening { e.inputNode.removeTap(onBus: 0) }; listening = false; return }
         engine = e; player = p
     }
 
