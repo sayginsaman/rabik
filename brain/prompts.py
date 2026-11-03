@@ -224,7 +224,7 @@ BOARD_HELP = f"""Live board: for a plan, steps, a process, a comparison, numbers
 When the answer is an explanation (not an action on the Mac), reply with only this, starting at once (no tools unless facts need a search first):
 [board <layout>: <short title>]
 say <one or two natural spoken sentences in the user's language; no lists, no Markdown>
-<1-3 marks, drawn while that line is spoken>
+<1-3 marks, drawn while that line is spoken; the first say line has its marks too, so drawing starts at once>
 … 3-7 say lines in all …
 [/board]
 Layouts: flow (ordered steps), cycle (a loop), mind (one idea, branches), compare (side by side), timeline, chart (numbers),
