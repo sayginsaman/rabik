@@ -228,6 +228,7 @@ final class SettingsWindow: NSObject, WKScriptMessageHandler, WKNavigationDelega
         }
         guard Prefs.set(k, v) else { push(); send("notice", ["text": "Couldn’t save that change, so the old setting is back."]); return }
         if k == "draw", v as? Bool == false { app.drawing.clear(); app.unwarm() }
+        if k == "board", v as? Bool == false { app.board.close(); app.unwarm() }
         if k == "meetingSave" { meeting.savingChanged(v as? Bool == true) }
         if k == "meeting", v as? Bool == false { meeting.stop() }
         if k == "meetingBriefs", v as? Bool == true, EKEventStore.authorizationStatus(for: .event) == .notDetermined {

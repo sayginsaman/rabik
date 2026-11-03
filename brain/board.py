@@ -4,7 +4,7 @@ Rabik speaks it. The model writes one small command per line; each complete line
 model never runs code. The spoken lines become the answer the box shows and history keeps."""
 import json
 import re
-from brain import environ, protocol
+from brain import environ, prefs, protocol
 
 __all__ = ['BOARD_LAYOUTS', 'BOARD_SHAPES', 'BOARD_COLORS', 'board_line', 'BoardStream', 'board_stream', 'board_reply',
            'board_context', 'board_spoken']
@@ -129,7 +129,7 @@ def board_spoken(reply):
 def board_reply(reply):
     """The final reply: a board's remaining lines go to the app, and the answer becomes what was said."""
     if not re.match(r'\s*\[board', reply or '', re.I): return reply
-    stream = board_stream if board_stream.state in ('board', 'done') else BoardStream(emit=environ.in_box())
+    stream = board_stream if board_stream.state in ('board', 'done') else BoardStream(emit=environ.in_box() and prefs.pref('board', True))
     stream.feed(reply, final=True)
     return ' '.join(stream.spoken) or 'It’s on the board.'
 

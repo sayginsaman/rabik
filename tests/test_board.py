@@ -16,7 +16,7 @@ from tests import native_source, prompt_chars
 from tests.test_shelf_page import HARNESS
 from tests import test_stream
 from tests.test_stream import message
-import brain.board, brain.prompts
+import brain.board, brain.prefs, brain.prompts
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN = '''[board flow: Acme pazarlama planı]
@@ -168,6 +168,15 @@ class BoardPromptTests(unittest.TestCase):
         self.assertLessEqual(prompt_chars(system), 10050)
         for shape in brain.board.BOARD_SHAPES: self.assertIn(shape, brain.prompts.BOARD_HELP)
         for layout in brain.board.BOARD_LAYOUTS: self.assertIn(layout, brain.prompts.BOARD_HELP)
+
+    def test_the_board_can_be_turned_off(self):
+        with patch.object(brain.prefs, 'pref', side_effect=lambda k, d: False if k == 'board' else d):
+            self.assertNotIn('--board --help', brain.prompts.system_prompt(brain.prompts.ASK_FIRST))
+            self.assertEqual(brain.prompts.board_help('draw me a marketing plan'), '')
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), patch.dict(os.environ, {'RABIK_UI': '1'}), patch.object(brain.board, 'board_stream', brain.board.BoardStream(emit=False)):
+                self.assertEqual(brain.board.board_reply(PLAN), 'Birincisi, kime sattığını netleştir. Sonra kazanabileceğin iki kanal seç.')
+            self.assertEqual(out.getvalue(), '')   # nothing drawn, the answer is still what would have been said
 
     def test_help_command(self):
         run = subprocess.run([sys.executable, str(ROOT / 'rabik.py'), '--board', '--help'], capture_output=True, text=True, timeout=30,

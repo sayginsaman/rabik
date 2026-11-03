@@ -8,7 +8,10 @@ from brain.paths import (
 
 __all__ = ['SYSTEM', 'NEVER', 'ASK_FIRST', 'SANDBOX', 'LEARN_ME', 'WORKFLOW', 'TEACH', 'ASK_ME', 'POINTER', 'DRAW_HELP', 'DRAWING', 'MODEL_OFFER',
            'AGENT_HANDOFF', 'AGENT_SYSTEM', 'MEETING_SYSTEM', 'DICTATE_SYSTEM', 'CALENDAR_HELP', 'ROUTINE_HELP', 'WATCH_HELP', 'SCHEDULE_WORDS', 'schedule_help',
-           'BOARD_HELP', 'BOARD_WORDS', 'board_help', 'system_prompt']
+           'BOARD_LINE', 'BOARD_HELP', 'BOARD_WORDS', 'board_help', 'system_prompt']
+
+
+BOARD_LINE = f"- Plans, steps, comparisons, numbers, how things work or look: answer on the live board, drawn as you speak ({shlex.quote(ME)} --board --help).\n"
 
 
 SYSTEM = f"""You are Rabik, a Mac helper in a small box. The user holds a hotkey, talks, then lets go.
@@ -37,8 +40,7 @@ Tools:
 - Spotify: {PLAY} "<name>" plays; {QUEUE} "<track>" queues.
 - Past asks: {HISTORY} "<words or date>". Past meetings: {shlex.quote(ME)} --meeting-history "<words or date>" (send a recap to Slack/email: hand off). Pages/files seen: --activity "<words or date>"; people met: --people "<name>".
 - Later or repeating work (once, daily, weekly days, every N min) and watches (also clicking a button whenever it shows): {ROUTINE} --help, {WATCH} --help.
-- Plans, steps, comparisons, numbers, how things work or look: answer on the live board, drawn as you speak ({shlex.quote(ME)} --board --help).
-Earlier supplies follow-ups. "this"/"here" = front window; "it" after a task = Last task window. Answer/draw from open content (video, page, doc) unless told not to.
+{BOARD_LINE}Earlier supplies follow-ups. "this"/"here" = front window; "it" after a task = Last task window. Answer/draw from open content (video, page, doc) unless told not to.
 Memory: follow rules. Recall/forget X: --me find, then drop a fact or {FORGET} the exact rule. Save personal facts: {ABOUT} <category> "<kind>" "<exact words from now/Earlier>"; how-tos: {REMEMBER} "<rule>".
 Shortcuts: "when I say X, do Y" in any words: run and verify Y, then end with [shortcut X], X in the user's exact words. Rabik saves the verified actions and tells the user; never save it yourself (shortcut or rule) or say it is saved.
 Own settings: {SET} "<setting name>" on|off|<option>, never click in Settings. Show Settings: open -a Rabik.
@@ -137,6 +139,7 @@ AGENT_SYSTEM += (f'If missing setup would help (macOS blocks a permission or Aut
 def system_prompt(risky):
     """The Rabik system prompt: the shared helpers and reply protocol, plus this client's risky-action rule."""
     system = SYSTEM.replace('NEVER_RISKY', risky)
+    if not prefs.pref('board', True): system = system.replace(BOARD_LINE, '')   # Settings → Live board off
     if prefs.pref('workIn', 'back') == 'front':
         system = system.replace('Work behind: never activate/raise unless asked to open/show/switch/focus.', 'Work in front: bring each app/page forward before working in it.').replace('pictures that window in place, even covered; raises only if asked.', 'to bring the working app forward.')
     if prefs.client() == 'claude' and not prefs.server():
@@ -244,4 +247,5 @@ BOARD_WORDS = re.compile(r"\b(plan|strateg|roadmap|steps?|process|how (do|does|d
 
 def board_help(task, on_board=None):
     """The live board's format, attached to an ask that may want it (or follows one on screen)."""
+    if not prefs.pref('board', True): return ''
     return BOARD_HELP + '\n' if on_board or BOARD_WORDS.search(task or '') else ''

@@ -105,7 +105,7 @@ def run(task, p=None, shots=(), auto_work=False, *, request=None, main_only=Fals
     reset_deadline()
     reply, managed_reply, cost, steps, cmds, last_failed, completed, result_error, ids, bad = '', '', 0, [], [], False, False, False, {}, set()
     action_indexes, evidence, redirected = [], False, set()
-    board.board_stream.reset(emit=environ.in_box())
+    board.board_stream.reset(emit=environ.in_box() and prefs.pref('board', True))
     live, shown, drew = '', '', False   # the answer so far, as the box shows it ("… <text>"); the final reply always replaces it
     streams = environ.in_box() and prefs.pref('showAnswers', 'stream') != 'once'   # Settings › Show answers: All at once
     # a draft for the caret shows its mode only in the final answer, so a cursor ask never moves mid-way
