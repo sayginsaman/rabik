@@ -6,7 +6,8 @@ import NaturalLanguage
 // Settings → Read answers aloud: sentence by sentence through Rabik's own audio engine, so speaking starts before the answer
 // ends. Automatic is the Siri voice `say` uses (AVSpeechSynthesizer can't use Siri voices); a picked voice, or the best one
 // installed for an answer in another language, comes from AVSpeechSynthesizer. With "Stop when I talk" the mic listens while it
-// speaks, through Apple's voice processing (echo cancellation), so Rabik's own voice never counts as you and nothing is recorded.
+// speaks, through Apple's voice processing (echo cancellation), so Rabik's own voice never counts as you and nothing is recorded;
+// only on the Mac's own mic and speakers (builtInAudioPair), where that is cheap.
 final class Speaker {
     static let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 22050, channels: 1, interleaved: false)!
     var onIdle: (() -> Void)?   // the last queued sentence was spoken
@@ -15,7 +16,9 @@ final class Speaker {
     private var engine: AVAudioEngine?, player: AVAudioPlayerNode?
     private var generation = 0, pending = 0, loudSince: Date?, startedAt = Date.distantPast
     private var queued: [(started: ((Double) -> Void)?, seconds: Double)] = []   // scheduled sentences not yet played to the end, in order
-    private let render = DispatchQueue(label: "rabik.speaker")
+    private var sequence = 0, nextUp = 0, rendered: [Int: (sentence: String, started: ((Double) -> Void)?, buffer: AVAudioPCMBuffer?)] = [:]   // rendered out of order, played in order
+    private let render = DispatchQueue(label: "rabik.speaker")   // AVSpeechSynthesizer voices: one synthesizer, one at a time
+    private let sayRender: OperationQueue = { let q = OperationQueue(); q.maxConcurrentOperationCount = 3; return q }()   // Siri: each `say` takes ~2 s to start, so a few at once
     private let synth = AVSpeechSynthesizer()
 
     // Settings' Voice list: the natural voices installed on this Mac (Premium and Enhanced).
@@ -52,22 +55,32 @@ final class Speaker {
         let g = generation
         for sentence in sentences {
             pending += 1
-            render.async { [weak self] in
+            let n = sequence; sequence += 1
+            let work = { [weak self] in
                 guard let self else { return }
                 let buffer = self.render(sentence, voice)
                 DispatchQueue.main.async { [weak self] in
                     guard let self, generation == g else { return }
-                    guard let buffer, let player else {   // no voice for this one: its turn comes in order, at once
-                        if queued.isEmpty { started?(Speaker.readingTime(sentence)); finished(g) }
-                        else { queued.append((started, -Speaker.readingTime(sentence))) }
-                        return
-                    }
-                    queued.append((started, Double(buffer.frameLength) / Speaker.format.sampleRate))
-                    player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in DispatchQueue.main.async { self?.played(g) } }
-                    if queued.count == 1 { queued[0].started?(queued[0].seconds) }   // nothing ahead of it: it plays now
-                    if !player.isPlaying { player.play() }
+                    rendered[n] = (sentence, started, buffer); schedule(g)
                 }
             }
+            if voice == nil { sayRender.addOperation(work) } else { render.async(execute: work) }
+        }
+    }
+
+    // The rendered sentences whose turn has come, in the order they were asked for.
+    private func schedule(_ g: Int) {
+        while generation == g, let next = rendered.removeValue(forKey: nextUp) {
+            nextUp += 1
+            guard let buffer = next.buffer, let player else {   // no voice for this one: its turn comes in order, at once
+                if queued.isEmpty { next.started?(Speaker.readingTime(next.sentence)); finished(g) }
+                else { queued.append((next.started, -Speaker.readingTime(next.sentence))) }
+                continue
+            }
+            queued.append((next.started, Double(buffer.frameLength) / Speaker.format.sampleRate))
+            player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in DispatchQueue.main.async { self?.played(g) } }
+            if queued.count == 1 { queued[0].started?(queued[0].seconds) }   // nothing ahead of it: it plays now
+            if !player.isPlaying { player.play() }
         }
     }
 
@@ -85,7 +98,7 @@ final class Speaker {
 
     func stop() {
         guard speaking else { return }
-        generation += 1; pending = 0; speaking = false; loudSince = nil; queued = []
+        generation += 1; pending = 0; speaking = false; loudSince = nil; queued = []; rendered = [:]; sequence = 0; nextUp = 0
         player?.stop(); engine?.inputNode.removeTap(onBus: 0); engine?.stop(); engine = nil; player = nil
     }
 
@@ -98,7 +111,7 @@ final class Speaker {
     private func begin() {
         speaking = true; startedAt = Date()
         let e = AVAudioEngine(), p = AVAudioPlayerNode()
-        let listen = Prefs.bool("bargeIn") && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        let listen = Prefs.bool("bargeIn") && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && builtInAudioPair()
         if listen {   // must be set before the engine starts; it also cancels the player's sound out of the mic
             do {
                 try e.inputNode.setVoiceProcessingEnabled(true)

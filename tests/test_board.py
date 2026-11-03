@@ -254,6 +254,15 @@ class BoardPageTests(unittest.TestCase):
         self.assertEqual(posts, ['ready', 'save', 'close'])
 
 
+    def test_the_3d_view_draws_only_while_something_moves(self):
+        page = (ROOT / 'ui/board.html').read_text()   # a board left on screen kept WebKit busy 120 times a second
+        self.assertIn('if (busy || turning) requestAnimationFrame(frame); else running = false', page)
+        self.assertIn("if (!canvas.classList.contains('on')) { running = false; return }", page)   # a 2D board: no 3D frames at all
+        self.assertIn('now - lastGrow < 20000', page)   # the slow turn rests 20 s after the last part grew
+        self.assertIn('const VP = mul(P, V), r = rect', page)   # no layout read per frame
+        self.assertIn('hover = {x: e.clientX, y: e.clientY}; wake()', page)   # one pick per frame, not per mouse event
+
+
 class BoardNativeTests(unittest.TestCase):
     def test_app_wiring(self):
         app = native_source()
@@ -266,7 +275,9 @@ class BoardNativeTests(unittest.TestCase):
         self.assertIn('if was { board.flush() }', app)   # speech stopped: the drawing finishes
         self.assertIn('func say(_ sentences: [String], voice: AVSpeechSynthesisVoice?, started: ((Double) -> Void)? = nil)', speaker)
         self.assertIn('if generation == g, let next = queued.first { next.started?(next.seconds) }', speaker)
-        self.assertIn('else { queued.append((started, -Speaker.readingTime(sentence))) }', speaker)   # a line with no voice keeps its place
+        self.assertIn('else { queued.append((next.started, -Speaker.readingTime(next.sentence))) }', speaker)   # a line with no voice keeps its place
+        self.assertIn('while generation == g, let next = rendered.removeValue(forKey: nextUp) {', speaker)   # rendered a few at once, played in order
+        self.assertIn('q.maxConcurrentOperationCount = 3', speaker)
         self.assertIn('guard speaking else { return }   // no audio engine', speaker)
         self.assertIn('return speaker.speaking   // the audio engine could not start', app)
         self.assertIn('if quiet || speak?(text, start) != true {', board)   # voice off or stopped: reading pace

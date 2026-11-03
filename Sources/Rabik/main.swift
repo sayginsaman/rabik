@@ -70,6 +70,32 @@ func listenMic() -> MicrophoneDevice? {
     let sys = AudioObjectID(kAudioObjectSystemObject)
     return chooseMic(Prefs.str("microphone"), microphones(), audioProp(sys, kAudioHardwarePropertyDefaultInputDevice, AudioDeviceID(0)).first ?? 0)
 }
+// Mic buffers in the format a speech model wants (asks and "Hey Rabik"); one that can't be converted goes as it is.
+func speechConverter(to want: AVAudioFormat) -> (AVAudioPCMBuffer) -> AVAudioPCMBuffer {
+    var conv: AVAudioConverter?, convFrom: AVAudioFormat?
+    return { buf in
+        guard buf.format != want else { return buf }
+        if convFrom != buf.format { conv = AVAudioConverter(from: buf.format, to: want); convFrom = buf.format }
+        guard let conv, let out = AVAudioPCMBuffer(pcmFormat: want, frameCapacity: AVAudioFrameCount(Double(buf.frameLength) * want.sampleRate / buf.format.sampleRate) + 1) else { return buf }
+        var given = false
+        conv.convert(to: out, error: nil) { _, status in
+            if given { status.pointee = .noDataNow; return nil }
+            given = true; status.pointee = .haveData; return buf
+        }
+        return out
+    }
+}
+
+// Apple's echo cancellation ("Stop when I talk") joins the default mic and speakers into one device. On the Mac's own pair that is
+// cheap; across separate ones (a USB mic and a display's 8-channel speakers) it kept coreaudiod at 200% CPU and froze the Mac while
+// Rabik spoke, and on Bluetooth headphones it opens their mic (call mode). So it runs only on the built-in pair.
+func builtInAudioPair() -> Bool {
+    let sys = AudioObjectID(kAudioObjectSystemObject)
+    return [kAudioHardwarePropertyDefaultInputDevice, kAudioHardwarePropertyDefaultOutputDevice].allSatisfy { selector in
+        guard let id = audioProp(sys, selector, AudioDeviceID(0)).first, id != 0 else { return false }
+        return audioProp(id, kAudioDevicePropertyTransportType, UInt32(0)).first == kAudioDeviceTransportTypeBuiltIn
+    }
+}
 // final class Mic lives in Audio/Audio.swift
 func microphoneChoices() -> [[String: String]] { microphones().map { ["uid": $0.uid, "name": $0.name] } }
 
@@ -678,7 +704,7 @@ focusNudge.start()
 let meetingBriefs = MeetingBriefs()   // Settings → Meeting briefs
 meetingBriefs.start()
 let wakeWord = WakeWord()   // Settings → "Hey Rabik"
-wakeWord.canListen = { !app.engine.isRunning && !app.busy && !app.dictating && !app.speaker.speaking && !meeting.running && callAppsOnMic().isEmpty }   // never in a call
+wakeWord.canListen = { !app.engine.isRunning && !app.busy && !app.dictating && !app.speaker.speaking && !meeting.running }   // in a Discord or Zoom call too: an app holding the mic used to keep it deaf all day
 wakeWord.onWake = {   // as if the mic button was clicked: the ask ends after a pause
     guard !app.engine.isRunning, !app.busy else { return }
     app.clickTalk = true; app.start(); if !app.engine.isRunning { app.clickTalk = false }

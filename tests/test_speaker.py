@@ -23,6 +23,7 @@ class SpeakerTests(unittest.TestCase):
 
     def test_the_voice_follows_the_answers_language(self):
         swift = SPEAKER.split('import NaturalLanguage', 1)[1] + r'''
+func builtInAudioPair() -> Bool { false }
 enum Prefs { static var picked = ""; static func str(_ k: String) -> String { k == "voice" ? picked : "" }; static func bool(_ k: String) -> Bool { false } }
 precondition(Speaker.voice(for: "en") == nil, "English should be the Siri voice")
 precondition(Speaker.voice(for: nil) == nil && Speaker.voice(for: "und") == nil, "an unknown language should stay on Siri")
@@ -40,7 +41,11 @@ print("voices ok")
 
     def test_its_own_voice_is_cancelled_out_and_your_voice_stops_it(self):
         self.assertIn('try e.inputNode.setVoiceProcessingEnabled(true)', SPEAKER)
-        self.assertIn('let listen = Prefs.bool("bargeIn") && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized', SPEAKER)   # never asks for the mic
+        self.assertIn('let listen = Prefs.bool("bargeIn") && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && builtInAudioPair()', SPEAKER)   # never asks for the mic
+        # echo cancellation across a USB mic and a display's speakers kept coreaudiod at 200% and froze the Mac: the Mac's own pair only
+        main = (ROOT / 'Sources/Rabik/main.swift').read_text()
+        self.assertIn('[kAudioHardwarePropertyDefaultInputDevice, kAudioHardwarePropertyDefaultOutputDevice].allSatisfy', main)
+        self.assertIn('== kAudioDeviceTransportTypeBuiltIn', main[main.index('func builtInAudioPair'):])
         self.assertIn('guard db > -38 else { loudSince = nil; return }', SPEAKER)
         self.assertIn('if let since = loudSince, Date().timeIntervalSince(since) >= 0.3 { stop(); onInterrupted?() }', SPEAKER)
         self.assertIn('e.attach(p); e.connect(p, to: e.mainMixerNode, format: Speaker.format)', SPEAKER)   # played by Rabik, so the canceller knows it

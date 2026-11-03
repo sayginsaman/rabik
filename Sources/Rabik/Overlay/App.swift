@@ -1016,20 +1016,10 @@ final class App: NSObject, WKScriptMessageHandler {
         let first = beginSpeechSegment("", listeningID: listeningID)
         feed = first.feed; speechInputID = first.inputID; analyzer = first.analyzer; reading = first.reading; activeSpeechSegment = first.segment
         let want = speechFormat ?? AVAudioFormat(standardFormatWithSampleRate: 16000, channels: 1)!
-        var conv: AVAudioConverter?, convFrom: AVAudioFormat?
+        let convert = speechConverter(to: want)
         var n = 0
         let onBuffer: (AVAudioPCMBuffer) -> Void = { [weak self] buf in
-            if buf.format != want, convFrom != buf.format { conv = AVAudioConverter(from: buf.format, to: want); convFrom = buf.format }
-            if buf.format != want, let conv, let out = AVAudioPCMBuffer(pcmFormat: want, frameCapacity: AVAudioFrameCount(Double(buf.frameLength) * want.sampleRate / buf.format.sampleRate) + 1) {
-                var given = false
-                conv.convert(to: out, error: nil) { _, status in
-                    if given { status.pointee = .noDataNow; return nil }
-                    given = true; status.pointee = .haveData; return buf
-                }
-                self?.speechInputs?.yield(AnalyzerInput(buffer: out))
-            } else {
-                self?.speechInputs?.yield(AnalyzerInput(buffer: buf))
-            }
+            self?.speechInputs?.yield(AnalyzerInput(buffer: convert(buf)))
             n += 1
             guard n % 2 == 0, let ch = buf.floatChannelData?[0], buf.frameLength > 0 else { return }
             var sum: Float = 0
