@@ -17,6 +17,10 @@
 <td><img src="docs/screens/recap.png" alt="The daily recap card"><br><b>In the evening</b>, one card: what got done, to-dos for Reminders, your goals and where the time went.</td>
 <td><img src="docs/screens/people.png" alt="Settings, People: a person's meetings and what Rabik knows"><br><b>Any time</b>, ask about a person, a meeting or that page you had open on Tuesday.</td>
 </tr>
+<tr>
+<td><img src="docs/screens/board.png" alt="The live board: a hand-drawn marketing plan in six numbered steps"><br><b>Ask for a plan</b>, and it is drawn step by step while Rabik talks you through it.</td>
+<td><img src="docs/screens/board-3d.png" alt="A 3D model of an engine cylinder with its piston, rod and crankshaft"><br><b>Ask how something works</b>, and a 3D model builds part by part; click a part to ask about it.</td>
+</tr>
 </table>
 
 ## Things to say
