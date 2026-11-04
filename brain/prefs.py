@@ -6,7 +6,7 @@ import urllib.error
 import urllib.parse
 from brain import environ, paths, storage
 
-__all__ = ['pref', 'save_pref', 'routing_mode', 'work_model', 'main_model', 'server', '_models_at', 'models', 'LOCAL_SERVERS',
+__all__ = ['pref', 'save_pref', 'routing_mode', 'work_model', 'main_model', 'server', 'no_thinking', '_models_at', 'models', 'LOCAL_SERVERS',
            'local_servers', 'client', 'agent_model', 'routine_model']
 
 
@@ -42,7 +42,7 @@ def work_model():
 
 def main_model():
     if server(): return pref('model', 'haiku')
-    return work_model() if routing_mode() == 'capable' else 'haiku'
+    return 'haiku' if routing_mode() == 'cheapest' else work_model()   # balanced: the work model answering at once (clients.start_claude)
 
 
 def server(model=None):
@@ -51,6 +51,12 @@ def server(model=None):
     if not base: return {}
     env = {'ANTHROPIC_BASE_URL': base, 'ANTHROPIC_AUTH_TOKEN': str(pref('apiKey', '')).strip() or 'none', 'ANTHROPIC_API_KEY': ''}   # local servers take any key
     return {**env, **{f'ANTHROPIC_DEFAULT_{m}_MODEL': model for m in ('HAIKU', 'SONNET', 'OPUS') if model}}   # Rabik asks for haiku/sonnet; both become this model
+
+
+def no_thinking(think=None):
+    """Env for an answer that starts at once: the model writes its first word without thinking first, unless Settings →
+    Intelligence → Most capable (or this ask asked to think it through). Thinking before a word was most of an answer's wait."""
+    return {} if server() or (routing_mode() == 'capable' if think is None else think) else {'CLAUDE_CODE_DISABLE_THINKING': '1'}
 
 
 def _models_at(url, key='', timeout=4):

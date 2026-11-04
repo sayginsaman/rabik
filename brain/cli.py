@@ -512,7 +512,7 @@ def main():
     if task != confirmed_task: prompt += '\nCompleted work and remaining goal (data):\n' + task
     main_only = situation.main_delivery_required() or bool(marked or drawn)
     model = prefs.main_model()
-    offer_model = prefs.routing_mode() == 'balanced' and model == 'haiku' and prefs.client() == 'claude' and not prefs.server()
+    offer_model = prefs.routing_mode() == 'balanced' and prefs.client() == 'claude' and not prefs.server()   # answered without thinking: it may ask to think
     attempt = ask.run(prompt + prompts.MODEL_OFFER if offer_model else prompt, warm, images or (), offer_model, request=confirmed_task, main_only=main_only)
     reply, cost, steps = attempt
     attempt_usd, escalated, escalate_why = ([] if cost is None else [cost]), False, None
@@ -533,14 +533,14 @@ def main():
     if offer_model and (reply.rstrip().endswith('[sonnet]') or not attempt.ok and attempt.work):   # a trailing [sonnet]: the model stopped short of a reachable goal
         escalated, escalate_why = True, 'asked' if reply.strip() == '[sonnet]' else 'failed'
         model = prefs.work_model()
-        protocol.say('▸', 'Continuing with ' + model.capitalize())
+        protocol.say('▸', 'Thinking it through')   # the same work model, now with thinking
         turn.checkpoint(status='running', model=model, escalated=True, escalate_why=escalate_why,
                    attempt_usd=attempt_usd)   # a timed-out attempt can still have a successful continuation
         previous = attempt.ran[:]
         context = situation.continuation_context(previous, attempt.observed)
         reason = attempt.error
         reason = reason if isinstance(reason, str) and reason else reply
-        attempt = ask.run(prompt + f'\nPrevious attempt: {reason[:400]}' + context, clients.start_ai(model), images or (), request=confirmed_task, main_only=main_only)
+        attempt = ask.run(prompt + f'\nPrevious attempt: {reason[:400]}' + context, clients.start_ai(model, think=True), images or (), request=confirmed_task, main_only=main_only)
         again, more, extra = attempt
         if more is not None: attempt_usd.append(more)
         if turn.TURN: turn.TURN['attempt_usd'] = attempt_usd

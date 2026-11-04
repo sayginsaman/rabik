@@ -297,10 +297,10 @@ class BackgroundTests(unittest.TestCase):
             worker = brain.clients.start_claude()
             self.assertEqual(worker.ask, os.environ['RABIK_ASK'])
             self.assertEqual(popen.call_args.kwargs['env']['RABIK_ASK'], worker.ask)
-            self.assertEqual(popen.call_args.kwargs['env'].get('MAX_THINKING_TOKENS'), '0' if brain.prefs.main_model() == 'haiku' else None)   # Haiku answers at once
+            self.assertEqual(popen.call_args.kwargs['env'].get('CLAUDE_CODE_DISABLE_THINKING'), '1' if brain.prefs.routing_mode() != 'capable' else None)   # answers at once
             worker.errors.close()
-            brain.clients.start_claude('sonnet').errors.close()   # an escalated ask keeps thinking
-            self.assertNotIn('MAX_THINKING_TOKENS', {k: v for k, v in popen.call_args.kwargs['env'].items() if k not in os.environ})
+            brain.clients.start_claude('sonnet', think=True).errors.close()   # an ask that asked to think it through
+            self.assertNotEqual(popen.call_args.kwargs['env'].get('CLAUDE_CODE_DISABLE_THINKING'), '1')
         for request in ('메모 앱 열어줘', '打开微信'):
             with self.subTest(request=request):
                 marker.unlink(missing_ok=True)

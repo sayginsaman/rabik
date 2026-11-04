@@ -218,12 +218,12 @@ def copy_agent_skills(source, destination, visited=None):
         elif not os.path.lexists(target): os.symlink(path, target)
 
 
-def start_ai(model=None):
+def start_ai(model=None, think=None):
     """Warm the configured client ahead of the request. Claude waits on stdin; Devin and Pi start after confirmation."""
-    return start_claude(model) if prefs.client() == 'claude' else None
+    return start_claude(model, think=think) if prefs.client() == 'claude' else None
 
 
-def start_claude(model=None, agent=None):
+def start_claude(model=None, agent=None, think=None):
     """`claude -p` started ahead, waiting for the request on stdin: its ~1 s startup happens while the user is still talking."""
     claude = environ.claude() or shutil.which('claude')
     if not claude:
@@ -259,9 +259,9 @@ def start_claude(model=None, agent=None):
         env.update(RABIK_AGENT=agent['id'], RABIK_HANDS_STATE=os.path.join(ask, 'hands.json'), RABIK_FRONT=agent.get('app', ''), RABIK_UI='1',
                    RABIK_AGENT_PREP='1' if agent.get('destination') == 'meeting' else '0', CLAUDE_CODE_DISABLE_CLAUDE_MDS='1')
     env.update(prefs.server(prefs.agent_model() if agent else None))
-    # Haiku's main asks answer without thinking: at --effort low it still thought 1-2.5k tokens before a word (a 3D board's first
-    # line came at 11.5 s, 5.9 s without, same board). A harder ask escalates to a model that keeps thinking; agents keep theirs.
-    if not agent and (model or prefs.main_model()) == 'haiku' and not prefs.server(): env.setdefault('MAX_THINKING_TOKENS', '0')
+    # Main asks answer without thinking first (an ask that says it is hard retries with thinking; agents always think): a 3D
+    # board's first line came at 17-21 s on Haiku and 2 s on Sonnet without it. Haiku 5.5 does not reliably keep this switch.
+    if not agent: env.update(prefs.no_thinking(think))
     tools = 'Bash,Read,WebSearch,WebFetch'
     if agent:
         tools = 'Read,WebSearch,WebFetch,ToolSearch' if agent.get('destination') == 'meeting' else 'Bash,Read,Write,Edit,Glob,Grep,WebSearch,WebFetch,Skill,ToolSearch'

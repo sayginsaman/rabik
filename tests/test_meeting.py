@@ -97,7 +97,7 @@ class MeetingTests(unittest.TestCase):
             self.assertEqual(saved.read_text(), '00:12  Hello\n')
 
     def test_meeting_questions_and_preparation_follow_the_same_modes(self):
-        for mode, question, work in [('cheapest','haiku','haiku'), ('balanced','haiku','opus'), ('capable','opus','opus')]:
+        for mode, question, work in [('cheapest','haiku','haiku'), ('balanced','opus','opus'), ('capable','opus','opus')]:
             with self.subTest(mode=mode), patch.object(brain.prefs,'pref',side_effect=lambda k,d:{'routing':mode,'model':'opus'}.get(k,d)), \
                  patch.object(subprocess,'Popen') as launch, patch.object(brain.clients,'stop_claude'):
                 brain.meeting.meeting_process('Fixture')
@@ -118,7 +118,8 @@ class MeetingTests(unittest.TestCase):
             answer, metrics = brain.meeting.meeting_call('Stable prefix', 'A question')
         args = start.call_args.args[0]
         self.assertEqual(args[args.index('--tools') + 1], '')
-        self.assertEqual(args[args.index('--model') + 1], 'haiku')
+        self.assertEqual(args[args.index('--model') + 1], brain.prefs.main_model())
+        self.assertEqual(start.call_args.kwargs['env'].get('CLAUDE_CODE_DISABLE_THINKING'), '1' if brain.prefs.routing_mode() != 'capable' else None)   # answers during a call start at once
         self.assertIn('--no-session-persistence', args)
         self.assertEqual(args[args.index('--setting-sources') + 1], '')
         self.assertEqual(json.loads(args[args.index('--settings') + 1]), {'disableAllHooks': True})

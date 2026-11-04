@@ -763,7 +763,7 @@
   });
 
   const WHY = { cheapest: 'Haiku for everything. Fastest.',
-    balanced: 'Haiku for quick asks, work model for real work.',
+    balanced: 'Work model answering at once; it thinks when an ask is hard.',
     capable: 'Work model for everything. Slower.' };
   const dim = (k, off) => { const e = document.querySelector(`[data-k=${k}]`); e.closest('.row').classList.toggle('dim', off); if (e.type === 'range') e.disabled = off; };   // greyed, not hidden: rows below stay put
   function paint() {

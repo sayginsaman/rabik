@@ -75,7 +75,7 @@ def meeting_process(system, model=None):
                              '--no-session-persistence', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
                              '--include-partial-messages'],
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors, text=True,
-                            cwd=tempfile.gettempdir(), start_new_session=True, env={**os.environ, **prefs.server()})
+                            cwd=tempfile.gettempdir(), start_new_session=True, env={**os.environ, **prefs.server(), **prefs.no_thinking()})   # answers during a call: at once
 
 
 def meeting_payload(request, image=None):

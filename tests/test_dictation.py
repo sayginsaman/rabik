@@ -551,7 +551,7 @@ enum NSAnimationContext { static func runAnimationGroup(_ a: (Ctx) -> Void, comp
 final class Panel { var alphaValue = 1.0; func animator() -> Panel { self } }
 final class Flag { var active = false, hasInput = false, holds = false, isRunning = false, speaking = false }
 final class Harness {
-    var gen = 1, busy = false, hovering = false, pinned = false, stuck = false, composing = false, pillOn = true, dictating = false
+    var gen = 1, busy = false, hovering = false, pinned = false, stuck = false, composing = false, pillOn = true, dictating = false, voiceOnly = false
     let engine = Flag(), mini = Flag(), drawing = Flag(), panel = Panel(), speaker = Flag(); var ringGone: Int?
     var log: [String] = []
     func pill(_ on: Bool) { pillOn = on; log.append("pill \(on)") }
@@ -568,6 +568,8 @@ let hover = Harness(); hover.pinned = true; hover.hovering = true; hover.hide(af
 precondition(hover.log.isEmpty, "a hovered pill changed: \(hover.log)")
 let box = Harness(); box.pillOn = false; box.pinned = true; box.hide(after: 0); settle()
 precondition(box.log.isEmpty, "a pinned box changed: \(box.log)")
+let voice = Harness(); voice.voiceOnly = true; voice.pinned = true; voice.hide(after: 0); settle()
+precondition(voice.log.isEmpty, "a voice-only ask's pill opened into the box: \(voice.log)")   // it stays a pill until it is said
 print("pill gives the box back")
 '''
         self.assertIn('pill gives the box back', run_swift(self, swift))
@@ -656,7 +658,7 @@ if (!answer.classList.contains('old')) process.exit(console.error('a real ask no
         # Oct 20, 2026: the pill had empty space between the wave and the lock, live words, and a line at finish
         # (the thread's .turn + .turn divider on a later dictation, and a shimmer swept across the words).
         page, source = self.page, native_source()
-        self.assertIn("document.body.classList.contains('dictate') ? [card.offsetWidth, card.offsetHeight] : card.offsetHeight", page)
+        self.assertIn("document.body.matches('.dictate, .voice') ? [card.offsetWidth, card.offsetHeight] : card.offsetHeight", page)
         card = re.search(r'body\.dictate #card \{(.*?)\}', page).group(1)
         self.assertIn('width: max-content', card)
         self.assertIn('body.dictate :is(#thread, #comp', page)   # no words, no turn dividers in the pill
@@ -666,7 +668,7 @@ if (!answer.classList.contains('old')) process.exit(console.error('a real ask no
         self.assertTrue(all('#head >' in s for s in hidden.split(', ') if '#head' in s), hidden)
         sizing = source[source.index('let size = ((m.body as? [NSNumber])'):source.index('    func js(_ call: String')]
         self.assertIn('size.count == 2 && pillOn', sizing)   # a late pill size never narrows the box
-        pill = source[source.index('    func pill(_ on: Bool)'):source.index('    func allow(_ ok: Bool)')]
+        pill = source[source.index('    func pill(_ on: Bool'):source.index('    func allow(_ ok: Bool)')]
         self.assertIn('pillOn = on', pill)
         self.assertNotIn('280', pill)
         heard = source[source.index('    func heard(_ now: String)'):]

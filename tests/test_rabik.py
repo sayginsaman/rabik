@@ -189,7 +189,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
         for prefs, expected in cases:
             with self.subTest(prefs=prefs), patch.object(brain.prefs, 'pref', side_effect=lambda k,d:prefs.get(k,d)):
                 self.assertEqual(brain.prefs.routing_mode(), expected)
-                self.assertEqual(brain.prefs.main_model(), brain.prefs.work_model() if expected == 'capable' else 'haiku')
+                self.assertEqual(brain.prefs.main_model(), 'haiku' if expected == 'cheapest' else brain.prefs.work_model())   # balanced: the work model, answering without thinking
                 self.assertEqual(brain.prefs.agent_model(), 'haiku' if expected == 'cheapest' else brain.prefs.work_model())
         with patch.object(brain.prefs, 'pref', side_effect=lambda k,d:{'apiBase':'https://fixture.invalid', 'routing':'capable', 'model':'haiku', 'apiModel':'custom'}.get(k,d)):
             self.assertEqual(brain.prefs.main_model(), 'haiku')  # server() maps the alias to its chosen model
@@ -246,7 +246,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                     self.assertEqual(fake_run.call_args_list[0].args[0].endswith(brain.prompts.MODEL_OFFER), mode == 'balanced')
                     self.assertEqual(fake_run.call_args_list[0].args[3], mode == 'balanced')
                     if escalates:
-                        start.assert_called_once_with('sonnet'); ask.assert_not_called()
+                        start.assert_called_once_with('sonnet', think=True); ask.assert_not_called()
                         self.assertNotIn(brain.prompts.MODEL_OFFER, fake_run.call_args.args[0])
                         if actions:
                             self.assertIn('Verified fixture state', fake_run.call_args.args[0])
@@ -255,17 +255,17 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                             self.assertEqual(fake_run.last.cmds, [], 'a continuation must not teach a partial shortcut')
                     else: start.assert_not_called()
         fake_run, start, ask, _ = self.routing_ask({'routing':'balanced', 'model':'opus'}, [('Stopped.',False,['inspect'])])
-        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('opus'); ask.assert_not_called()
+        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('opus', think=True); ask.assert_not_called()
 
-    def test_balanced_simple_app_task_stays_on_haiku(self):
+    def test_balanced_simple_app_task_needs_no_thinking(self):
         fake_run, start, _, log = self.routing_ask({'routing':'balanced'}, [('Done and verified.',True,['change fixture'])])
         self.assertEqual(fake_run.call_count, 1); start.assert_not_called()
-        self.assertEqual(log.call_args.kwargs, {'model':'haiku', 'escalated':False, 'escalate_why':None, 'attempt_usd':[.001]})
+        self.assertEqual(log.call_args.kwargs, {'model':'sonnet', 'escalated':False, 'escalate_why':None, 'attempt_usd':[.001]})
 
     def test_balanced_real_failure_escalates_once(self):
         fake_run, start, _, log = self.routing_ask({'routing':'balanced'}, [('Could not finish.',False,['change fixture']),
                                                                           ('Finished another way.',True,['verify fixture'])])
-        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('sonnet')
+        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('sonnet', think=True)
         self.assertEqual(log.call_args.kwargs, {'model':'sonnet', 'escalated':True, 'escalate_why':'failed',
                                                 'attempt_usd':[.001, .001]})
 
@@ -273,12 +273,12 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
         # Oct 21: "fill this out" read the page, missed a frame's fields and said "click Continue yourself", all reads, so run.ok
         fake_run, start, ask, log = self.routing_ask({'routing':'balanced'}, [("I couldn't fill the form. Click Continue yourself, then ask me again. [sonnet]", True, ['--window Browser']),
                                                                             ('Filled First and Last name.', True, ['--hands type 4 "Ada"'])])
-        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('sonnet'); ask.assert_not_called()
+        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('sonnet', think=True); ask.assert_not_called()
         self.assertIn("Previous attempt: I couldn't fill the form", fake_run.call_args.args[0])
         self.assertEqual(log.call_args.kwargs['escalate_why'], 'failed')
         self.assertEqual(log.call_args.args[1], 'Filled First and Last name.')
         fake_run, start, _, _ = self.routing_ask({'routing':'balanced'}, [("I can't answer that without more detail.", True, [])])
-        self.assertEqual(fake_run.call_count, 1); start.assert_not_called()   # no tools tried: a plain answer stays on Haiku
+        self.assertEqual(fake_run.call_count, 1); start.assert_not_called()   # no tools tried: a plain answer needs no thinking
 
     def test_explanatory_failure_words_are_not_task_failures_without_an_action(self):
         with patch.object(brain.telemetry, 'report') as report:
@@ -292,7 +292,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
         # Oct 21: "play it and win" looked, then offered "say the word and I'll keep playing"; the model marks stopping short with [sonnet], no word list
         gave_up = "Board is open on your monitor. Say the word and I'll keep playing move by move. [sonnet]"
         fake_run, start, _, log = self.routing_ask({'routing':'balanced'}, [(gave_up, True, ['--look']), ('Won the game.', True, ['--hands click "1,1"'])])
-        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('sonnet')
+        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('sonnet', think=True)
         self.assertTrue(log.call_args.kwargs['escalated']); self.assertEqual(log.call_args.args[1], 'Won the game.')
         fake_run, start, _, log = self.routing_ask({'routing':'balanced'}, [("Won the game. I can't see any cells left.", True, ['--look'])])
         self.assertEqual(fake_run.call_count, 1); start.assert_not_called(); self.assertFalse(log.call_args.kwargs['escalated'])
@@ -301,7 +301,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
 
     def test_balanced_hard_task_sonnet_request_is_honored_once(self):
         fake_run, start, _, log = self.routing_ask({'routing':'balanced'}, [('[sonnet]',True,[]), ('Researched.',True,[])])
-        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('sonnet')
+        self.assertEqual(fake_run.call_count, 2); start.assert_called_once_with('sonnet', think=True)
         self.assertEqual(log.call_args.kwargs, {'model':'sonnet', 'escalated':True, 'escalate_why':'asked',
                                                 'attempt_usd':[.001, .001]})
 
@@ -348,7 +348,7 @@ print(json.dumps({{"type": "result", "is_error": True, "result": "Authentication
                                    patch.multiple(brain.screen, screen_for=lambda *a: None),
                                    patch.multiple(brain.interaction, wait_commit=lambda: True),
                                    patch.multiple(brain.ask, run=fake_run),
-                                   patch.multiple(brain.clients, start_ai=lambda *a: None)), \
+                                   patch.multiple(brain.clients, start_ai=lambda *a, **k: None)), \
                      patch.object(brain.prefs,'pref',side_effect=lambda k,d: {'escalateAuto':True}.get(k,d)), \
                      patch.object(brain.turn,'log_turn') as log,patch.object(brain.skills,'remember_workflow') as learn, \
                      patch.object(threading,'Thread'),patch.dict(os.environ,{'RABIK_UI':'1','RABIK_ASK':brain.paths.DIR}), \
@@ -1274,7 +1274,7 @@ print(json.dumps({{'type':'message_end','message':{{'role':'assistant','content'
         self.assertEqual(attempt.cmds,['different method'])
 
     def test_warmed_models_follow_routing_without_a_classifier(self):
-        for mode, expected in (('cheapest','haiku'),('balanced','haiku'),('capable','opus')):
+        for mode, expected in (('cheapest','haiku'),('balanced','opus'),('capable','opus')):
             with self.subTest(mode=mode), patch.object(brain.prefs,'pref',side_effect=lambda k,d:{'routing':mode,'model':'opus'}.get(k,d)), \
                  patch.object(shutil,'which',return_value='/fake/claude'), patch.object(subprocess,'Popen') as launch, \
                  patch.object(atexit,'register'), patch.object(signal,'signal'):
