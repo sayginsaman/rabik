@@ -53,6 +53,10 @@ class BoardLineTests(unittest.TestCase):
                          'size': [2, .6, 2], 'color': 'black', 'rot': [90, 0, 0], 'material': 'rubber'})
         self.assertEqual(line('part Lens | dome | 0,1,0 | .5,.3,.5 | chrome | glass')['material'], 'glass')   # a material without a turn
         for shape in ('roundbox', 'dome', 'capsule', 'pipe', 'wedge'): self.assertEqual(line(f'part X | {shape} | 0,0,0 | 1,1,1 | steel')['shape'], shape)
+        # as the model writes them: an empty turn slot, and a material where the color goes (it gets the material's color)
+        self.assertEqual(line('part Piston | cylinder | 0,-0.3,0 | 1.4,0.5,1.4 | silver | | metal')['material'], 'metal')
+        self.assertEqual({k: v for k, v in line('part Block | cylinder | 0,0,0 | 1.6,2.4,1.6 | glass').items() if k in ('color', 'material')}, {'color': '#dcebf2', 'material': 'glass'})
+        self.assertEqual(line('part Ring | torus | 0,0,0 | 1,1,.1 | black | metal | 90,0,0')['rot'], [90, 0, 0])
         for kind in ('note', 'check', 'formula', 'column', 'title'):
             self.assertEqual(line(f'{kind} Some words')['op'], kind)
 
@@ -60,7 +64,7 @@ class BoardLineTests(unittest.TestCase):
         for bad in ('', 'say', 'draw a cat', 'rm -rf ~', '<script>alert(1)</script>', 'circle 0', 'circle 99', 'circle two',
                     'bar Q1 = lots', 'part X | hexagon | 0,0,0 | 1,1,1 | red', 'part X | box | 0,0 | 1,1,1 | red',
                     'part X | box | 0,0,999 | 1,1,1 | red', 'part X | box | 0,0,0 | 0,1,1 | red', 'part X | box | 0,0,0 | 1,1,1 | chartreuse',
-                    'part X | box | 0,0,0 | 1,1,1 | red | 0,0,720', 'part X | box | 0,0,0 | 1,1,1 | red | wood', 'part X | box | 0,0,0 | 1,1,1 | red | metal | glass | 0,0,0'):
+                    'part X | box | 0,0,0 | 1,1,1 | red | 0,0,720', 'part X | box | 0,0,0 | 1,1,1 | red | cloud', 'part X | box | 0,0,0 | 1,1,1', 'part X | box | 0,0,0 | 1,1,1 | red | metal | glass | 0,0,0'):
             self.assertIsNone(brain.board.board_line(bad), bad)
         self.assertEqual(len(brain.board.board_line('say ' + 'w' * 900)['text']), 400)
         self.assertEqual(len(brain.board.board_line('item ' + 'w' * 300)['text']), 80)

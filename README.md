@@ -19,7 +19,7 @@
 </tr>
 <tr>
 <td><img src="docs/screens/board.png" alt="The live board: a hand-drawn marketing plan in six numbered steps"><br><b>Ask for a plan</b>, and it is drawn step by step while Rabik talks you through it.</td>
-<td><img src="docs/screens/board-3d.png" alt="A 3D model of an engine cylinder with its piston, rod and crankshaft"><br><b>Ask how something works</b>, and a 3D model builds part by part; click a part to ask about it.</td>
+<td><img src="docs/screens/board-3d.png" alt="A 3D model of a red car with a glass cabin, rubber tyres and glowing headlights"><br><b>Ask how something works</b>, and a 3D model builds part by part; click a part to ask about it.</td>
 </tr>
 </table>
 

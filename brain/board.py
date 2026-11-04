@@ -13,6 +13,7 @@ __all__ = ['BOARD_LAYOUTS', 'BOARD_SHAPES', 'BOARD_COLORS', 'BOARD_MATERIALS', '
 BOARD_LAYOUTS = ('flow', 'cycle', 'mind', 'compare', 'timeline', 'chart', '3d')
 BOARD_SHAPES = ('box', 'roundbox', 'sphere', 'dome', 'capsule', 'cylinder', 'pipe', 'cone', 'torus', 'wedge')
 BOARD_MATERIALS = ('plastic', 'matte', 'rubber', 'metal', 'glass', 'glow')
+MATERIAL_COLOR = {'glass': '#dcebf2', 'metal': 'silver', 'rubber': 'black', 'glow': 'yellow', 'matte': 'gray', 'plastic': 'gray'}
 BOARD_COLORS = ('red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray', 'black', 'white', 'silver', 'gold',
                 'steel', 'copper', 'chrome', 'navy', 'cream', 'wood', 'skin')
 OPEN = re.compile(r'\[board(\+)?(?:\s+([a-z0-9]+))?\s*:?\s*([^\]\n]*)\]\s*', re.I)
@@ -61,12 +62,15 @@ def board_line(line):
     if word == 'part':
         bits = [b.strip() for b in rest.split('|')]
         if not 5 <= len(bits) <= 7: return None
-        name, shape, at, size, color = _text(bits[0], 40), bits[1].lower(), _numbers(bits[2], 3, -50, 50), _numbers(bits[3], 3, .005, 50), _color(bits[4])
-        rot, material = [0, 0, 0], None
-        for extra in bits[5:]:   # a turn and a material, either or both, in either order
+        name, shape, at, size = _text(bits[0], 40), bits[1].lower(), _numbers(bits[2], 3, -50, 50), _numbers(bits[3], 3, .005, 50)
+        color, rot, material = None, [0, 0, 0], None
+        for extra in bits[4:]:   # a color, a material and a turn, in any order; an empty slot ("| |") is skipped
+            if not extra: continue
             if extra.lower() in BOARD_MATERIALS and not material: material = extra.lower()
+            elif _color(extra) and not color: color = _color(extra)
             elif _numbers(extra, 3, -360, 360) is not None: rot = _numbers(extra, 3, -360, 360)
             else: return None
+        color = color or MATERIAL_COLOR.get(material)   # "| glass" alone: a material standing in for its color
         if not name or shape not in BOARD_SHAPES or not at or not size or not color: return None
         return {'op': 'part', 'text': name, 'shape': shape, 'at': at, 'size': size, 'color': color, 'rot': rot, **({'material': material} if material else {})}
     return None
