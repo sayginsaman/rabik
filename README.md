@@ -101,7 +101,7 @@ Turn it on in Settings → Meetings. When a call app starts using your mic, Rabi
 </details>
 
 ### Live board
-Ask for a plan, a process, a comparison, numbers or how something works, and Rabik answers out loud while a card a little right of the middle of your screen draws it: a hand-drawn flow, mind map, comparison, timeline or chart, each part appearing as the sentence about it is spoken. Things you can hold in your hand (an engine, a molecule, a planet) get a **3D model** that grows part by part; drag to turn it, scroll to zoom, click a part to ask about it. Follow-up questions add to the same board. ⤓ saves it to Downloads as a picture.
+Ask for a plan, a process, a comparison, numbers or how something works, and Rabik answers out loud while a card a little right of the middle of your screen draws it: a hand-drawn flow, mind map, comparison, timeline or chart, each part appearing as the sentence about it is spoken. Things you can hold in your hand (an engine, a molecule, a planet) get a **3D model** that grows part by part, lit like a product shot with metal, glass and rubber parts and a soft shadow under it; drag to turn it, scroll to zoom, click a part to ask about it. Follow-up questions add to the same board. ⤓ saves it to Downloads as a picture.
 
 <details><summary>More about the live board</summary>
 
@@ -123,7 +123,7 @@ Say "remember…" or let Rabik keep lasting facts about you; your **rules** appl
 - **Activity history** (Settings → Memory, off until you turn it on): the window in front, its file or page address, so "open the Figma file I had yesterday" works. No screenshots; private windows, Tor, password managers and your Don't record list are skipped. Kept 30 days.
 
 ### Talks back
-Rabik answers out loud by default (the speaker in the box mutes it). It reads each sentence as the answer streams, in the Siri voice or any Premium or Enhanced voice on your Mac, switching to the right voice for another language. **Stop when I talk** listens only while it speaks, with Apple's echo cancellation, and stops when you start talking; it works on the Mac's own mic and speakers, since echo cancellation across a separate mic and speakers is heavy enough to stall the Mac. Esc or the shortcut stops it too. Turn on **"Hey Rabik"** (Settings → General → Voice) to start an ask by voice; it listens with the same on-device model as your asks, and only while Rabik is idle (a Discord or Zoom call is fine).
+Rabik answers out loud by default, like HeyClicky: a spoken ask is a small pill with the orb while you talk and while it works, and the answer is only heard (Settings → Answers → **Show what I said and the answer** brings the text back; menu bar → **History…** keeps every ask and answer as text). A question for you, choices or an error opens the pill into the box. The speaker in the box mutes it. It reads each sentence as the answer streams, in the Siri voice or any Premium or Enhanced voice on your Mac, switching to the right voice for another language. **Stop when I talk** listens only while it speaks, with Apple's echo cancellation, and stops when you start talking; it works on the Mac's own mic and speakers, since echo cancellation across a separate mic and speakers is heavy enough to stall the Mac. Esc or the shortcut stops it too. Turn on **"Hey Rabik"** (Settings → General → Voice) to start an ask by voice; it listens with the same on-device model as your asks, and only while Rabik is idle (a Discord or Zoom call is fine).
 
 ### Works with Claude Code and ChatGPT
 Settings → Account & Access → **Add to Claude Code** or **Add to ChatGPT** gives those apps read-only access to Rabik's memory, meetings, people, goals, recaps and Activity history through an MCP server (`rabik.py --mcp`); **Copy for Claude Desktop** copies the same config. Open Notion, Slack, Linear, Figma, Asana or ClickUp while its Claude connector isn't connected and Rabik offers it once (Settings → Account & Access → Offer connectors).
@@ -148,7 +148,7 @@ Settings → Account & Access → **Add to Claude Code** or **Add to ChatGPT** g
 
 ## Models and cost
 
-Settings → Intelligence picks how hard Rabik thinks: **Cheapest** keeps everything on Haiku, **Balanced** (default) uses Haiku for questions and quick commands and your work model (Sonnet or Opus) for real tasks, and **Most capable** uses the work model throughout. Rabik runs on your own Claude plan through Claude Code, so there is no API key; Devin, Pi and local models work too.
+Settings → Intelligence picks how hard Rabik thinks: **Cheapest** keeps everything on Haiku, **Balanced** (default) answers with your work model (Sonnet or Opus) without thinking first, so the first words come in about two seconds, and thinks it through when an ask turns out to be hard, and **Most capable** always thinks. Rabik runs on your own Claude plan through Claude Code, so there is no API key; Devin, Pi and local models work too.
 
 Rabik is built to stay fast and nearly free: instant commands cost $0, AI asks aim for a median under $0.002 and 6 seconds (`python3 rabik.py --budget` checks), the system prompt stays under 10,000 characters, and anything that waits costs $0 until it acts.
 

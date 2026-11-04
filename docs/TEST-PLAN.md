@@ -105,6 +105,8 @@ Bu build hakkında:
 - [ ] Tahta çizerken konuş ya da kısayola bas → ses susar, kalan çizim hemen tamamlanır. ⤓ Downloads'a PNG kaydeder ("Saved to Downloads"), ✕ ya da Esc kapatır.
 - [ ] Kutudaki hoparlör düğmesi: tıklayınca sessize alır (çarpı görünür), cevaplar okunmaz; tahta okuma hızında çizilir. Tekrar tıklayınca açar. İlk açılışta ses varsayılan olarak açık.
 - [ ] Settings → General → Voice → "Hey Rabik"i aç (turuncu mikrofon noktası görünür) → "Hey Rabik" de → başlangıç sesi, dinleme başlar; sustuğunda soru gider. Discord/Zoom aramasındayken de duyar. Rabik konuşurken, toplantı notu alırken ve ekran kilitliyken dinlemez. Kapatınca nokta kaybolur.
+- [ ] Settings → Answers → "Show what I said and the answer" kapalı (varsayılan): ⌃⌥Space ile sor → kutu yerine küçük hap (orb + ses dalgası), cevap yazılmaz, sesli okunur, bitince hap kaybolur. Menü çubuğu → History… cevabı yazılı gösterir. Yazarak sorulan soru ve onay/seçim kartları kutuda açılır.
+- [ ] "Show me a bicycle in 3D" → ilk parça ~2-3 sn içinde; metal jantlar, kauçuk lastikler, altında yumuşak gölge; yalnızca anlatılan parçanın adı görünür.
 - [ ] Ayrı mikrofon + ayrı hoparlör (USB mikrofon, monitör hoparlörü) ile canlı tahta sorusu sor → Mac donmaz, Activity Monitor'da coreaudiod %30'un altında kalır; 3D tahta 20 sn sonra dönmeyi bırakır ve WebKit %0'a iner.
 - [ ] Bir hedef ekle, 5 dakikadan uzun YouTube'da kal → "6 min on YouTube. Your goal: … Back to it?" bildirimi; günde en fazla 3, aralarında 45 dk. Hedef yokken gelmez.
 - [ ] Takvime 6 dk sonra, daha önce toplantı yaptığın biriyle bir toplantı koy → ~5 dk kala "Before “…” · in 5 min" bildirimi; tıklayınca brifing kutuda açılır ve okunur. Tanımadığın biriyle olan toplantıda gelmez.
