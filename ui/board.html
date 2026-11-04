@@ -30,7 +30,7 @@ svg#ink{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 #ink .wash.on{opacity:1}
 #ink .mark{transition:transform .65s var(--ease)}
 #ink .pending{visibility:hidden}
-canvas#three{position:absolute;inset:0;width:100%;height:100%;display:none;cursor:grab}
+canvas#three{position:absolute;inset:0;width:100%;height:100%;display:none;cursor:grab;background:radial-gradient(ellipse 60% 55% at 50% 45%,rgba(255,255,255,.6),rgba(255,255,255,0))}   /* a soft studio light behind the model */
 canvas#three.on{display:block}
 canvas#three.drag{cursor:grabbing}
 canvas#three.pick{cursor:pointer}
@@ -69,7 +69,22 @@ const $ = id => document.getElementById(id)
 const NS = 'http://www.w3.org/2000/svg'
 const PALETTE = ['#e8590c', '#1971c2', '#2f9e44', '#c2255c', '#7048e8', '#0c8599', '#e67700']
 const NAMED = {red: '#e03131', orange: '#f76707', yellow: '#fcc419', green: '#37b24d', teal: '#12b886', blue: '#1c7ed6', purple: '#7048e8',
-  pink: '#e64980', brown: '#8d5b3a', gray: '#868e96', black: '#343a40', white: '#f1f3f5', silver: '#c0c6cc', gold: '#e0a800'}
+  pink: '#e64980', brown: '#8d5b3a', gray: '#868e96', black: '#343a40', white: '#f1f3f5', silver: '#c0c6cc', gold: '#e0a800',
+  steel: '#8a949e', copper: '#c27a4a', chrome: '#dfe4ea', navy: '#1f3a68', cream: '#f2e8d5', wood: '#a0703f', skin: '#e9b896'}
+
+// A formula written in TeX ("f = \frac{1}{1/d_o + 1/d_i}") as it reads on a board: f = 1/(1/dₒ + 1/dᵢ)
+const SUP = {0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', n: 'ⁿ', '-': '⁻', '+': '⁺'}
+const SUB = {0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉', a: 'ₐ', e: 'ₑ', o: 'ₒ', x: 'ₓ', i: 'ᵢ', r: 'ᵣ', u: 'ᵤ', v: 'ᵥ', n: 'ₙ', t: 'ₜ', s: 'ₛ', p: 'ₚ', m: 'ₘ', k: 'ₖ', l: 'ₗ', h: 'ₕ', j: 'ⱼ'}
+const SYM = {cdot: '·', times: '×', div: '÷', pm: '±', pi: 'π', Delta: 'Δ', delta: 'δ', theta: 'θ', lambda: 'λ', mu: 'μ', alpha: 'α', beta: 'β', gamma: 'γ', omega: 'ω', Omega: 'Ω',
+  rho: 'ρ', sigma: 'σ', Sigma: 'Σ', sum: 'Σ', approx: '≈', le: '≤', leq: '≤', ge: '≥', geq: '≥', neq: '≠', to: '→', rightarrow: '→', infty: '∞', circ: '°', degree: '°'}
+function plainMath(text) {
+  const group = t => /[\s+\-*/=]/.test(t.trim()) ? `(${t.trim()})` : t.trim(), script = (t, map, mark) => [...t].every(c => map[c]) ? [...t].map(c => map[c]).join('') : mark + group(t)
+  let s = String(text || '').replace(/\$/g, '').replace(/\\left|\\right|\\,|\;|\\!/g, '')
+  for (let i = 0; i < 3; i++) s = s.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g, (_, a, b) => `${group(a)}/${group(b)}`).replace(/\\sqrt\{([^{}]*)\}/g, (_, a) => '√' + group(a))
+  s = s.replace(/\\text\{([^{}]*)\}/g, '$1').replace(/\\([A-Za-z]+)/g, (m, w) => SYM[w] ?? w)
+  s = s.replace(/\^\{([^{}]*)\}|\^([^\s{}])/g, (m, a, b) => script(a ?? b, SUP, '^')).replace(/_\{([^{}]*)\}|_([A-Za-z0-9])/g, (m, a, b) => script(a ?? b, SUB, '_'))
+  return s.replace(/[{}]/g, '').replace(/\s+/g, ' ').trim()
+}
 
 // ---------- hand-drawn strokes: seeded jitter, two passes, like a pen that went over its line again ----------
 function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296) }
@@ -364,6 +379,7 @@ function play(n, secs) {
 }
 
 function add(ev) {
+  if (ev.op === 'formula') ev = {...ev, text: plainMath(ev.text)}
   if (ev.op === 'say') { S.segments.push([]); S.seg = S.segments.length - 1; return }
   if (S.layout === '3d') {
     if (ev.op === 'title') { $('title').textContent = S.title = ev.text; return }
@@ -424,61 +440,115 @@ addEventListener('resize', () => { if (S.layout === '3d') S.three && S.three.res
 function makeThree(canvas) {
   const gl = canvas.getContext('webgl', {antialias: true, preserveDrawingBuffer: true, alpha: true})
   if (!gl) return {clear() {}, add() {}, grow(m) { m.drawn = true }, resize() {}}
-  const vs = `attribute vec3 p;attribute vec3 n;uniform mat4 M,V,P;varying vec3 vn;varying vec3 vw;
-    void main(){vec4 w=M*vec4(p,1.);vw=w.xyz;vn=mat3(M)*n;gl_Position=P*V*w;}`
-  const fs = `precision mediump float;varying vec3 vn;varying vec3 vw;uniform vec3 c;uniform float pick,hot,alpha;uniform vec3 eye;
-    void main(){if(pick>.5){gl_FragColor=vec4(c,1.);return;}vec3 N=normalize(vn);vec3 L=normalize(vec3(.5,.9,.6));vec3 E=normalize(eye-vw);
-    float d=max(dot(N,L),0.),fill=max(dot(N,normalize(vec3(-.6,.2,-.4))),0.)*.25,rim=pow(1.-max(dot(N,E),0.),2.5)*.25;
-    vec3 col=c*(.38+.62*d+fill)+vec3(rim)+vec3(.12,.1,.02)*hot;if(alpha<1.)col*=.82;gl_FragColor=vec4(col,alpha);}`
+  // Lit like a product shot: a warm key light and a cool fill, sky above and floor below (reflected by metal and gloss), highlights
+  // by material, colours in linear light; a soft shadow under the model. Normals use the inverse scale, so a squashed sphere shades right.
+  const vs = `attribute vec3 p;attribute vec3 n;uniform mat4 M,V,P;uniform mat3 Nm;varying vec3 vn;varying vec3 vw;varying vec3 vl;
+    void main(){vec4 w=M*vec4(p,1.);vw=w.xyz;vl=p;vn=Nm*n;gl_Position=P*V*w;}`
+  const fs = `precision highp float;varying vec3 vn;varying vec3 vw;varying vec3 vl;
+    uniform vec3 c,eye;uniform float pick,hot,alpha,metal,gloss,emit,shadow;
+    vec3 sky(vec3 d){return d.y>0.?mix(vec3(.80,.77,.72),vec3(.52,.64,.86),pow(d.y,.6)):mix(vec3(.80,.77,.72),vec3(.16,.14,.12),pow(-d.y,.5));}
+    void main(){
+      if(pick>.5){gl_FragColor=vec4(c,1.);return;}
+      if(shadow>.5){gl_FragColor=vec4(.12,.09,.05,alpha*pow(max(1.-length(vl.xz)*2.,0.),1.8));return;}
+      vec3 N=normalize(vn),E=normalize(eye-vw),base=pow(c,vec3(2.2));
+      vec3 K=normalize(vec3(.55,.85,.45)),F=normalize(vec3(-.7,.25,-.5));
+      float dk=max(dot(N,K),0.),df=max(dot(N,F),0.),fres=pow(1.-max(dot(N,E),0.),5.);
+      vec3 amb=mix(vec3(.10,.09,.08),vec3(.22,.24,.28),N.y*.5+.5);
+      vec3 diff=base*(1.-metal*.85)*(vec3(1.,.95,.88)*dk*1.15+vec3(.55,.65,.82)*df*.4+amb);
+      float sh=exp2(gloss*10.+1.);
+      vec3 F0=mix(vec3(.04),base,metal),Fr=F0+(1.-F0)*fres;
+      vec3 spec=Fr*pow(max(dot(N,normalize(K+E)),0.),sh)*(sh+8.)/24.*dk;
+      vec3 env=sky(reflect(-E,N))*Fr*(.2+gloss*.8)*(metal>.5?1.2:.35);
+      vec3 col=diff+spec+env+base*emit*1.6+vec3(.2,.15,.03)*hot;
+      col=col/(col+vec3(.85))*1.85;
+      gl_FragColor=vec4(pow(col,vec3(1./2.2)),alpha<1.?min(1.,alpha+fres*.55):1.);
+    }`
   const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o }
   const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog); gl.useProgram(prog)
   const loc = n => gl.getUniformLocation(prog, n), aP = gl.getAttribLocation(prog, 'p'), aN = gl.getAttribLocation(prog, 'n')
-  const U = {M: loc('M'), V: loc('V'), P: loc('P'), c: loc('c'), pick: loc('pick'), hot: loc('hot'), eye: loc('eye'), alpha: loc('alpha')}
+  const U = Object.fromEntries(['M', 'V', 'P', 'Nm', 'c', 'pick', 'hot', 'eye', 'alpha', 'metal', 'gloss', 'emit', 'shadow'].map(n => [n, loc(n)]))
   gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE)
+  const MATERIALS = {plastic: {gloss: .55, metal: 0}, matte: {gloss: .12, metal: 0}, rubber: {gloss: .08, metal: 0}, metal: {gloss: .78, metal: 1},
+    glass: {gloss: .92, metal: 0, alpha: .26}, glow: {gloss: .3, metal: 0, emit: 1}}
 
-  // unit meshes: positions and normals, triangles
+  const norm = a => { const l = Math.hypot(...a) || 1; return a.map(x => x / l) }, cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  // unit meshes in a -0.5…0.5 box: positions and normals, triangles
   function mesh(build) {
     const P = [], N = []; build((p, n) => { P.push(...p); N.push(...n) })
     const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(P), gl.STATIC_DRAW)
     const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(N), gl.STATIC_DRAW)
     return {pb, nb, count: P.length / 3}
   }
-  const quad = (v, a, b, c, d, n) => { v(a, n); v(b, n); v(c, n); v(a, n); v(c, n); v(d, n) }
-  const meshes = {
-    box: mesh(v => {
-      const h = .5, f = [[[1, 0, 0], [[h, -h, -h], [h, h, -h], [h, h, h], [h, -h, h]]], [[-1, 0, 0], [[-h, -h, h], [-h, h, h], [-h, h, -h], [-h, -h, -h]]],
-        [[0, 1, 0], [[-h, h, -h], [-h, h, h], [h, h, h], [h, h, -h]]], [[0, -1, 0], [[-h, -h, h], [-h, -h, -h], [h, -h, -h], [h, -h, h]]],
-        [[0, 0, 1], [[-h, -h, h], [h, -h, h], [h, h, h], [-h, h, h]]], [[0, 0, -1], [[h, -h, -h], [-h, -h, -h], [-h, h, -h], [h, h, -h]]]]
-      f.forEach(([n, q]) => quad(v, ...q, n))
-    }),
-    sphere: mesh(v => {
-      const a = 28, b = 18, pt = (i, j) => { const t = i / a * Math.PI * 2, u = j / b * Math.PI, x = Math.sin(u) * Math.cos(t), y = Math.cos(u), z = Math.sin(u) * Math.sin(t); return [x * .5, y * .5, z * .5, x, y, z] }
-      for (let j = 0; j < b; j++) for (let i = 0; i < a; i++) {
-        const q = [pt(i, j), pt(i, j + 1), pt(i + 1, j + 1), pt(i + 1, j)]
-        ;[[0, 3, 2], [0, 2, 1]].forEach(tri => tri.forEach(k => v(q[k].slice(0, 3), q[k].slice(3))))
+  // a solid turned around y from its profile [[radius, y], …] bottom to top: smooth across gentle bends, crisp at corners; flat caps
+  // close an end that does not reach the axis
+  function lathe(profile, caps = true, a = 56) {
+    return mesh(v => {
+      const segN = profile.slice(1).map(([r1, y1], k) => { const [r0, y0] = profile[k], l = Math.hypot(r1 - r0, y1 - y0) || 1; return [(y1 - y0) / l, -(r1 - r0) / l] })
+      const last = profile.length - 1, closed = profile[0][0] === profile[last][0] && profile[0][1] === profile[last][1]   // a ring (torus): its ends meet
+      const at = (k, s) => {   // the profile normal at point k, for segment s: shared with a neighbour bent by under 35°
+        const t = k === s ? s - 1 : s + 1, n = segN[s], o = segN[closed ? (t + segN.length) % segN.length : t]
+        if (!o || n[0] * o[0] + n[1] * o[1] < .82) return n
+        const l = Math.hypot(n[0] + o[0], n[1] + o[1]); return [(n[0] + o[0]) / l, (n[1] + o[1]) / l]
       }
-    }),
-    cylinder: null, cone: null,
-    torus: mesh(v => {
-      const a = 36, b = 14, R = .36, r = .14, pt = (i, j) => { const t = i / a * Math.PI * 2, u = j / b * Math.PI * 2, x = Math.cos(t), z = Math.sin(t); return [(R + r * Math.cos(u)) * x, r * Math.sin(u), (R + r * Math.cos(u)) * z, Math.cos(u) * x, Math.sin(u), Math.cos(u) * z] }
-      for (let j = 0; j < b; j++) for (let i = 0; i < a; i++) {
-        const q = [pt(i, j), pt(i, j + 1), pt(i + 1, j + 1), pt(i + 1, j)]
-        ;[[0, 2, 3], [0, 1, 2]].forEach(tri => tri.forEach(k => v(q[k].slice(0, 3), q[k].slice(3))))
+      for (let s = 0; s < segN.length; s++) {
+        const [r0, y0] = profile[s], [r1, y1] = profile[s + 1], m0 = at(s, s), m1 = at(s + 1, s)
+        for (let i = 0; i < a; i++) {
+          const t0 = i / a * Math.PI * 2, t1 = (i + 1) / a * Math.PI * 2, c0 = Math.cos(t0), s0 = Math.sin(t0), c1 = Math.cos(t1), s1 = Math.sin(t1)
+          const b0 = [r0 * c0, y0, r0 * s0], b1 = [r0 * c1, y0, r0 * s1], u0 = [r1 * c0, y1, r1 * s0], u1 = [r1 * c1, y1, r1 * s1]
+          const nb0 = [m0[0] * c0, m0[1], m0[0] * s0], nb1 = [m0[0] * c1, m0[1], m0[0] * s1], nu0 = [m1[0] * c0, m1[1], m1[0] * s0], nu1 = [m1[0] * c1, m1[1], m1[0] * s1]
+          v(b0, nb0); v(u1, nu1); v(b1, nb1); v(b0, nb0); v(u0, nu0); v(u1, nu1)
+        }
       }
-    }),
+      if (!caps) return
+      const [rb, yb] = profile[0], [rt, yt] = profile[profile.length - 1]
+      for (let i = 0; i < a; i++) {
+        const t0 = i / a * Math.PI * 2, t1 = (i + 1) / a * Math.PI * 2
+        if (rb > 0) { v([0, yb, 0], [0, -1, 0]); v([rb * Math.cos(t1), yb, rb * Math.sin(t1)], [0, -1, 0]); v([rb * Math.cos(t0), yb, rb * Math.sin(t0)], [0, -1, 0]) }
+        if (rt > 0) { v([0, yt, 0], [0, 1, 0]); v([rt * Math.cos(t0), yt, rt * Math.sin(t0)], [0, 1, 0]); v([rt * Math.cos(t1), yt, rt * Math.sin(t1)], [0, 1, 0]) }
+      }
+    })
   }
-  const tube = top => mesh(v => {
-    const a = 36, slope = (.5 - top) / 1
-    for (let i = 0; i < a; i++) {
-      const t0 = i / a * Math.PI * 2, t1 = (i + 1) / a * Math.PI * 2, c0 = [Math.cos(t0), Math.sin(t0)], c1 = [Math.cos(t1), Math.sin(t1)]
-      const n0 = [c0[0], slope, c0[1]], n1 = [c1[0], slope, c1[1]]
-      const b0 = [c0[0] * .5, -.5, c0[1] * .5], b1 = [c1[0] * .5, -.5, c1[1] * .5], u0 = [c0[0] * top, .5, c0[1] * top], u1 = [c1[0] * top, .5, c1[1] * top]
-      v(b0, n0); v(u1, n1); v(b1, n1); v(b0, n0); v(u0, n0); v(u1, n1)
-      v([0, -.5, 0], [0, -1, 0]); v(b1, [0, -1, 0]); v(b0, [0, -1, 0])
-      if (top > 0) { v([0, .5, 0], [0, 1, 0]); v(u0, [0, 1, 0]); v(u1, [0, 1, 0]) }
-    }
-  })
-  meshes.cylinder = tube(.5); meshes.cone = tube(0)
+  const arc = (n, from, to, f) => Array.from({length: n + 1}, (_, k) => f(from + (to - from) * k / n))
+  // a box whose edges are rounded with radius r (a hairline bevel catches the light the way real edges do)
+  function roundBox(r, m = 5) {
+    const band = arc(m, 0, Math.PI / 2, t => -.5 + r * (1 - Math.cos(t))), xs = [...band, ...band.map(x => -x).reverse()]
+    return mesh(v => {
+      const faces = [[0, 1, 1, 2], [0, -1, 2, 1], [1, 1, 2, 0], [1, -1, 0, 2], [2, 1, 0, 1], [2, -1, 1, 0]]   // axis, side, u, w: u × w points out
+      for (const [ax, side, ua, wa] of faces) {
+        const pt = (x, y) => {
+          const q = [0, 0, 0]; q[ax] = side * .5; q[ua] = x; q[wa] = y
+          const inner = q.map(c => Math.max(-(.5 - r), Math.min(.5 - r, c))), d = q.map((c, k) => c - inner[k]), l = Math.hypot(...d) || 1
+          return [inner.map((c, k) => c + d[k] / l * r), d.map(c => c / l)]
+        }
+        for (let i = 0; i < xs.length - 1; i++) for (let j = 0; j < xs.length - 1; j++) {
+          const a = pt(xs[i], xs[j]), b = pt(xs[i + 1], xs[j]), c = pt(xs[i + 1], xs[j + 1]), d = pt(xs[i], xs[j + 1])
+          ;[a, b, c, a, c, d].forEach(([p, n]) => v(p, n))
+        }
+      }
+    })
+  }
+  // a convex solid from its corner points: each face outward from the centre, flat shaded
+  function hull(faces) {
+    return mesh(v => faces.forEach(f => {
+      const [a, b, c] = f, n = norm(cross(b.map((x, k) => x - a[k]), c.map((x, k) => x - a[k]))), mid = f.reduce((s, q) => s.map((x, k) => x + q[k] / f.length), [0, 0, 0])
+      const out = dot(n, mid) < 0, pts = out ? [...f].reverse() : f, nn = out ? n.map(x => -x) : n
+      for (let k = 1; k < pts.length - 1; k++) { v(pts[0], nn); v(pts[k], nn); v(pts[k + 1], nn) }
+    }))
+  }
+  const h = .5, W0 = [-h, -h, -h], W1 = [h, -h, -h], W2 = [-h, h, -h], W3 = [-h, -h, h], W4 = [h, -h, h], W5 = [-h, h, h]
+  const meshes = {
+    box: roundBox(.025, 2),
+    roundbox: roundBox(.16),
+    sphere: lathe(arc(28, 0, Math.PI, u => [.5 * Math.sin(u), -.5 * Math.cos(u)]), false),
+    dome: lathe(arc(16, 0, Math.PI / 2, u => [.5 * Math.cos(u), -.5 + Math.sin(u)])),
+    capsule: lathe([...arc(10, 0, Math.PI / 2, u => [.5 * Math.sin(u), -.25 - .25 * Math.cos(u)]), ...arc(10, Math.PI / 2, Math.PI, u => [.5 * Math.sin(u), .25 - .25 * Math.cos(u)])], false),
+    cylinder: lathe([[.47, -.5], [.5, -.475], [.5, .475], [.47, .5]]),
+    cone: lathe([[.5, -.5], [.47, -.48], [0, .5]]),
+    pipe: lathe([[.5, -.5], [.5, .5], [.36, .5], [.36, -.5], [.5, -.5]], false),
+    torus: lathe(arc(28, -Math.PI, Math.PI, u => [.36 - .14 * Math.cos(u), -.14 * Math.sin(u)]), false),
+    wedge: hull([[W0, W1, W4, W3], [W0, W2, W5, W3], [W0, W1, W2], [W3, W4, W5], [W1, W2, W5, W4]]),   // a ramp: high at the back-left edge
+    floor: mesh(v => { [[-h, 0, -h], [-h, 0, h], [h, 0, h], [-h, 0, -h], [h, 0, h], [h, 0, -h]].forEach(p => v(p, [0, 1, 0])) }),
+  }
 
   // tiny matrix helpers (column-major, like WebGL)
   const mul = (a, b) => { const o = new Array(16).fill(0); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) for (let k = 0; k < 4; k++) o[j * 4 + i] += a[k * 4 + i] * b[j * 4 + k]; return o }
@@ -491,12 +561,11 @@ function makeThree(canvas) {
     const z = norm([e[0] - c[0], e[1] - c[1], e[2] - c[2]]), x = norm(cross([0, 1, 0], z)), y = cross(z, x)
     return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1]
   }
-  const norm = a => { const l = Math.hypot(...a) || 1; return a.map(x => x / l) }, cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
   const rgb = s => { const h = (NAMED[s] || s || '#868e96').replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255) }
 
   const parts = []
   let yaw = .6, pitch = .38, dist = 6, target = [0, 0, 0], fitDist = 6, auto = true, dragging = null, hot = -1, dirty = true
-  let rect = {left: 0, top: 0, width: 1, height: 1}, running = false, lastGrow = -1e9, lastDraw = 0, hover = null   // hover: a pick to do on the next frame
+  let rect = {left: 0, top: 0, width: 1, height: 1}, floor = null, running = false, lastGrow = -1e9, lastDraw = 0, hover = null   // hover: a pick to do on the next frame
   let pickFB = null, pickTex = null, pickRB = null, W = 1, H = 1
 
   function resize() {
@@ -514,6 +583,10 @@ function makeThree(canvas) {
     const e = p.m.ev, k = p.scale, s = e.size, r = e.rot.map(a => a * Math.PI / 180)
     return mul(T(...e.at), mul(RY(r[1]), mul(RX(r[0]), mul(RZ(r[2]), Sc(s[0] * k, s[1] * k, s[2] * k)))))
   }
+  function normals(p) {   // turned like the part, scaled by its inverse: normals stay square to a squashed surface
+    const e = p.m.ev, r = e.rot.map(a => a * Math.PI / 180), R = mul(RY(r[1]), mul(RX(r[0]), RZ(r[2]))), s = e.size.map(x => 1 / Math.max(x * p.scale, 1e-4))
+    return [0, 1, 2].flatMap(j => [R[j * 4] * s[j], R[j * 4 + 1] * s[j], R[j * 4 + 2] * s[j]])
+  }
   function box(p) {   // the part's world box, turned as it is
     const M = model({m: p.m, scale: 1}), lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
     for (const x of [-.5, .5]) for (const y of [-.5, .5]) for (const z of [-.5, .5])
@@ -529,27 +602,34 @@ function makeThree(canvas) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, picking ? pickFB : null)
     gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     gl.uniformMatrix4fv(U.V, false, V); gl.uniformMatrix4fv(U.P, false, P); gl.uniform3fv(U.eye, eye); gl.uniform1f(U.pick, picking ? 1 : 0)
-    // a part that holds others (a cylinder around its piston) is drawn last and see-through, so what is inside shows
-    const order = parts.map((p, i) => i).sort((a, b) => (picking ? 0 : (parts[a].shell ? 1 : 0) - (parts[b].shell ? 1 : 0)))
-    order.forEach(i => {
-      const p = parts[i]
-      if (p.scale <= .001) return
-      const g = meshes[p.m.ev.shape], see = !picking && p.shell
-      gl.uniform1f(U.alpha, see ? .4 : 1)
-      if (see) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false) } else { gl.disable(gl.BLEND); gl.depthMask(true) }
+    const draw = (g, M, Nm) => {
       gl.bindBuffer(gl.ARRAY_BUFFER, g.pb); gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 3, gl.FLOAT, false, 0, 0)
       gl.bindBuffer(gl.ARRAY_BUFFER, g.nb); gl.enableVertexAttribArray(aN); gl.vertexAttribPointer(aN, 3, gl.FLOAT, false, 0, 0)
-      gl.uniformMatrix4fv(U.M, false, model(p))
+      gl.uniformMatrix4fv(U.M, false, M); gl.uniformMatrix3fv(U.Nm, false, Nm); gl.drawArrays(gl.TRIANGLES, 0, g.count)
+    }
+    const blend = on => { if (on) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false) } else { gl.disable(gl.BLEND); gl.depthMask(true) } }
+    gl.uniform1f(U.shadow, 0)
+    if (!picking && floor) {   // the soft shadow it casts on the card, drawn first so the model stands on it
+      blend(true); gl.uniform1f(U.shadow, 1); gl.uniform1f(U.alpha, .38)
+      draw(meshes.floor, mul(T(floor.x, floor.y, floor.z), Sc(floor.w, 1, floor.d)), [1, 0, 0, 0, 1, 0, 0, 0, 1]); gl.uniform1f(U.shadow, 0)
+    }
+    // glass, and a part that holds others (a cylinder around its piston), go last and see-through, so what is inside shows
+    const clear = p => !picking && (p.mat.alpha || p.shell)
+    parts.map((p, i) => i).sort((a, b) => (clear(parts[a]) ? 1 : 0) - (clear(parts[b]) ? 1 : 0)).forEach(i => {
+      const p = parts[i]
+      if (p.scale <= .001) return
+      blend(clear(p)); gl.uniform1f(U.alpha, clear(p) ? p.mat.alpha || .4 : 1)
+      gl.uniform1f(U.metal, p.mat.metal); gl.uniform1f(U.gloss, p.mat.gloss); gl.uniform1f(U.emit, p.mat.emit || 0)
       gl.uniform3fv(U.c, picking ? [(i + 1) / 255, 0, 0] : p.color); gl.uniform1f(U.hot, !picking && i === hot ? 1 : 0)
-      gl.drawArrays(gl.TRIANGLES, 0, g.count)
+      draw(meshes[p.m.ev.shape] || meshes.box, model(p), normals(p))
     })
-    gl.disable(gl.BLEND); gl.depthMask(true)
+    blend(false)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     if (!picking) labels(V, P)
   }
   function labels(V, P) {
     const VP = mul(P, V), r = rect   // measured on resize: reading layout every frame made WebKit lay the page out 120 times a second
-    const placed = []
+    const placed = [], newest = parts.reduce((a, p) => p.target > 0 && (!a || p.t0 >= a.t0) ? p : a, null)   // only the part just spoken about is named; the rest on hover
     parts.map((p, i) => {   // a shell's name sits on its top edge, a part inside it at its centre
       const e = p.m.ev, top = [e.at[0], e.at[1] + (p.shell ? e.size[1] * p.scale / 2 + .12 : 0), e.at[2]]
       const c = [0, 1, 2, 3].map(k => VP[k] * top[0] + VP[4 + k] * top[1] + VP[8 + k] * top[2] + VP[12 + k])
@@ -559,7 +639,7 @@ function makeThree(canvas) {
       placed.push(l)
       l.p.label.style.left = l.x + 'px'; l.p.label.style.top = l.y + 'px'
       // a name shows while its part is new (just spoken about) or under the pointer, so a busy model never drowns in labels
-      l.p.label.classList.toggle('on', l.p.scale > .7 && (l.i === hot || performance.now() - l.p.t0 < 4500)); l.p.label.classList.toggle('hot', l.i === hot)
+      l.p.label.classList.toggle('on', l.p.scale > .7 && (l.i === hot || l.p === newest && performance.now() - l.p.t0 < 4500)); l.p.label.classList.toggle('hot', l.i === hot)
     })
   }
   function pickAt(x, y) {
@@ -575,7 +655,8 @@ function makeThree(canvas) {
     let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
     shown.forEach(p => { p.box = box(p); for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], p.box[0][k]); hi[k] = Math.max(hi[k], p.box[1][k]) } })
     p_target = lo.map((l, k) => (l + hi[k]) / 2)
-    fitDist = Math.max(3, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 1.6)   // the whole model in view at any turn
+    floor = {x: p_target[0], y: lo[1] - .01, z: p_target[2], w: (hi[0] - lo[0]) * 1.7 + .4, d: (hi[2] - lo[2]) * 1.7 + .4}
+    fitDist = Math.max(2.5, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 1.35)   // the whole model in view at any turn (its bounding sphere fits the view's height)
     // a shell: a part with another, clearly thinner one inside it (an engine block around its piston, not a crankshaft and its pin)
     const inside = (a, b) => b !== a && a.box && a.target > 0 && b.target > 0 && Math.min(...a.m.ev.size) > 1.6 * Math.min(...b.m.ev.size) && [0, 1, 2].every(k => a.box[0][k] < b.m.ev.at[k] && b.m.ev.at[k] < a.box[1][k])
     parts.forEach(a => { a.shell = parts.some(b => inside(a, b)) })
@@ -620,10 +701,11 @@ function makeThree(canvas) {
   canvas.addEventListener('wheel', e => { e.preventDefault(); fitDist = Math.max(1.2, Math.min(60, fitDist * Math.exp(e.deltaY * .0015))); wake() }, {passive: false})
   resize()
   return {
-    clear() { parts.length = 0; $('labels').innerHTML = ''; yaw = .6; pitch = .38; auto = true; p_target = [0, 0, 0]; fitDist = 6; dirty = true; lastGrow = -1e9; wake() },
+    clear() { parts.length = 0; $('labels').innerHTML = ''; yaw = .6; pitch = .38; auto = true; p_target = [0, 0, 0]; fitDist = 6; floor = null; dirty = true; lastGrow = -1e9; wake() },
     add(m) {
       const label = document.createElement('div'); label.textContent = m.ev.text; $('labels').appendChild(label)
-      parts.push({m, label, color: rgb(m.ev.color), scale: 0, target: 0, t0: 0, dur: 1})
+      const mat = MATERIALS[m.ev.material] || (['silver', 'gold', 'steel', 'copper', 'chrome'].includes(m.ev.color) ? MATERIALS.metal : MATERIALS.plastic)   // a silver part with no material is metal
+      parts.push({m, label, color: rgb(m.ev.color), mat, scale: 0, target: 0, t0: 0, dur: 1})
     },
     grow(m, secs) {
       const p = parts.find(x => x.m === m); if (!p || m.drawn) return

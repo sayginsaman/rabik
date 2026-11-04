@@ -6,13 +6,15 @@ import json
 import re
 from brain import environ, prefs, protocol
 
-__all__ = ['BOARD_LAYOUTS', 'BOARD_SHAPES', 'BOARD_COLORS', 'board_line', 'BoardStream', 'board_stream', 'board_reply',
+__all__ = ['BOARD_LAYOUTS', 'BOARD_SHAPES', 'BOARD_COLORS', 'BOARD_MATERIALS', 'board_line', 'BoardStream', 'board_stream', 'board_reply',
            'board_context', 'board_spoken']
 
 
 BOARD_LAYOUTS = ('flow', 'cycle', 'mind', 'compare', 'timeline', 'chart', '3d')
-BOARD_SHAPES = ('box', 'sphere', 'cylinder', 'cone', 'torus')
-BOARD_COLORS = ('red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray', 'black', 'white', 'silver', 'gold')
+BOARD_SHAPES = ('box', 'roundbox', 'sphere', 'dome', 'capsule', 'cylinder', 'pipe', 'cone', 'torus', 'wedge')
+BOARD_MATERIALS = ('plastic', 'matte', 'rubber', 'metal', 'glass', 'glow')
+BOARD_COLORS = ('red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray', 'black', 'white', 'silver', 'gold',
+                'steel', 'copper', 'chrome', 'navy', 'cream', 'wood', 'skin')
 OPEN = re.compile(r'\[board(\+)?(?:\s+([a-z0-9]+))?\s*:?\s*([^\]\n]*)\]\s*', re.I)
 MOST = {'say': 40, 'mark': 90, 'column': 4}
 
@@ -58,11 +60,15 @@ def board_line(line):
         return {'op': 'circle', 'n': int(rest)} if rest.isdigit() and 1 <= int(rest) <= 60 else None
     if word == 'part':
         bits = [b.strip() for b in rest.split('|')]
-        if len(bits) not in (5, 6): return None
-        name, shape, at, size, color = _text(bits[0], 40), bits[1].lower(), _numbers(bits[2], 3, -50, 50), _numbers(bits[3], 3, .01, 50), _color(bits[4])
-        rot = _numbers(bits[5], 3, -360, 360) if len(bits) == 6 else [0, 0, 0]
-        if not name or shape not in BOARD_SHAPES or not at or not size or not color or rot is None: return None
-        return {'op': 'part', 'text': name, 'shape': shape, 'at': at, 'size': size, 'color': color, 'rot': rot}
+        if not 5 <= len(bits) <= 7: return None
+        name, shape, at, size, color = _text(bits[0], 40), bits[1].lower(), _numbers(bits[2], 3, -50, 50), _numbers(bits[3], 3, .005, 50), _color(bits[4])
+        rot, material = [0, 0, 0], None
+        for extra in bits[5:]:   # a turn and a material, either or both, in either order
+            if extra.lower() in BOARD_MATERIALS and not material: material = extra.lower()
+            elif _numbers(extra, 3, -360, 360) is not None: rot = _numbers(extra, 3, -360, 360)
+            else: return None
+        if not name or shape not in BOARD_SHAPES or not at or not size or not color: return None
+        return {'op': 'part', 'text': name, 'shape': shape, 'at': at, 'size': size, 'color': color, 'rot': rot, **({'material': material} if material else {})}
     return None
 
 

@@ -232,8 +232,12 @@ Layouts: flow (ordered steps), cycle (a loop), mind (one idea, branches), compar
 Marks: item <title, ≤6 words> | <few words of detail>   (a step, branch, event or point; numbered in flow)
   column <name> (compare: the items after it go in that column)   bar <label> = <number><unit> (chart)
   note <short aside>   check <short line with a tick>   formula <math or one key line>   circle <item number> (emphasis)
-  part <name> | box|sphere|cylinder|cone|torus | x,y,z | width,height,depth | <color> [| rx,ry,rz degrees]
-    (3d: y is up; centre the object near 0,0,0; sizes about 0.2-4; colors: red, orange, yellow, green, teal, blue, purple, pink, brown, gray, black, white, silver, gold or #rrggbb; a cylinder or cone stands on y)
+  part <name> | <shape> | x,y,z | width,height,depth | <color> [| rx,ry,rz degrees] [| <material>]
+    (3d: y is up; centre the object near 0,0,0; sizes about 0.05-4. Shapes: box, roundbox, sphere, dome, capsule, cylinder, pipe (hollow),
+    cone, torus, wedge; cylinder, cone, pipe, dome and capsule stand on y. Colors: red, orange, yellow, green, teal, blue, navy, purple, pink,
+    brown, wood, cream, skin, gray, black, white, silver, steel, chrome, copper, gold or #rrggbb. Materials: metal, glass, rubber, matte, glow
+    (plastic if none). Make it look real: 8-14 parts in true proportions, with the details that make it recognisable (tyres, windows,
+    a lens), real colors and materials; a casing around inner parts is glass.)
 Say lines carry the explanation; marks are short labels. If Context shows a board on screen and this continues it, start with [board+] instead.
 Pointing at or marking things in the user's own apps stays with the screen drawing (--draw)."""
 

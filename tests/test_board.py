@@ -49,6 +49,10 @@ class BoardLineTests(unittest.TestCase):
         self.assertEqual(line('part Piston | cylinder | 0, 1, 0 | 1,2,1 | silver'),
                          {'op': 'part', 'text': 'Piston', 'shape': 'cylinder', 'at': [0, 1, 0], 'size': [1, 2, 1], 'color': 'silver', 'rot': [0, 0, 0]})
         self.assertEqual(line('part Shaft | box | 0,0,0 | .2,3,.2 | #336699 | 90,0,0')['rot'], [90, 0, 0])
+        self.assertEqual(line('part Tyre | torus | 0,0,0 | 2,.6,2 | black | 90,0,0 | rubber'), {'op': 'part', 'text': 'Tyre', 'shape': 'torus', 'at': [0, 0, 0],
+                         'size': [2, .6, 2], 'color': 'black', 'rot': [90, 0, 0], 'material': 'rubber'})
+        self.assertEqual(line('part Lens | dome | 0,1,0 | .5,.3,.5 | chrome | glass')['material'], 'glass')   # a material without a turn
+        for shape in ('roundbox', 'dome', 'capsule', 'pipe', 'wedge'): self.assertEqual(line(f'part X | {shape} | 0,0,0 | 1,1,1 | steel')['shape'], shape)
         for kind in ('note', 'check', 'formula', 'column', 'title'):
             self.assertEqual(line(f'{kind} Some words')['op'], kind)
 
@@ -56,7 +60,7 @@ class BoardLineTests(unittest.TestCase):
         for bad in ('', 'say', 'draw a cat', 'rm -rf ~', '<script>alert(1)</script>', 'circle 0', 'circle 99', 'circle two',
                     'bar Q1 = lots', 'part X | hexagon | 0,0,0 | 1,1,1 | red', 'part X | box | 0,0 | 1,1,1 | red',
                     'part X | box | 0,0,999 | 1,1,1 | red', 'part X | box | 0,0,0 | 0,1,1 | red', 'part X | box | 0,0,0 | 1,1,1 | chartreuse',
-                    'part X | box | 0,0,0 | 1,1,1 | red | 0,0,720'):
+                    'part X | box | 0,0,0 | 1,1,1 | red | 0,0,720', 'part X | box | 0,0,0 | 1,1,1 | red | wood', 'part X | box | 0,0,0 | 1,1,1 | red | metal | glass | 0,0,0'):
             self.assertIsNone(brain.board.board_line(bad), bad)
         self.assertEqual(len(brain.board.board_line('say ' + 'w' * 900)['text']), 400)
         self.assertEqual(len(brain.board.board_line('item ' + 'w' * 300)['text']), 80)
